@@ -128,7 +128,13 @@ def get_versions(prompt_id: int, db: Session = Depends(get_db)):
     # Collect the full ancestry chain
     root = prompt
     while root.parent_id:
-        root = db.get(Prompt, root.parent_id)
+        parent = db.get(Prompt, root.parent_id)
+        if parent is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Prompt ancestry is inconsistent or parent was not found.",
+            )
+        root = parent
     # Collect all descendants of the root
     versions = []
     queue = [root]
