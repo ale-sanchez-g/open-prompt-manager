@@ -15,9 +15,6 @@ axios.create.mockReturnValue({
   delete: mockDelete,
 });
 
-// Re-import after mock to pick up the mocked axios instance
-jest.resetModules();
-
 describe('API service structure', () => {
   it('promptsApi has required methods', () => {
     expect(typeof promptsApi.list).toBe('function');
