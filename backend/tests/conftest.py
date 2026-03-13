@@ -8,8 +8,8 @@ from app.models.prompt import Prompt, Tag, Agent, PromptMetric, PromptExecution 
 from app.database.base import Base, get_db
 from main import app
 
-# File-based SQLite avoids the per-connection isolation issue of in-memory SQLite
-TEST_DATABASE_URL = "sqlite:///./test_prompts.db"
+# Use a shared in-memory SQLite database to avoid on-disk artifacts and support multiple connections
+TEST_DATABASE_URL = "sqlite:///file:test_prompts?mode=memory&cache=shared&uri=true"
 
 engine = create_engine(
     TEST_DATABASE_URL,
