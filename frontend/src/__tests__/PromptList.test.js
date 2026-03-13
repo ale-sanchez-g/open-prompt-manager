@@ -18,7 +18,10 @@ beforeEach(() => {
   promptsApi.delete.mockResolvedValue({});
 });
 
-afterEach(() => jest.clearAllMocks());
+afterEach(() => {
+  jest.clearAllMocks();
+  jest.restoreAllMocks();
+});
 
 function renderPage() {
   return render(<MemoryRouter><PromptList /></MemoryRouter>);
@@ -71,7 +74,7 @@ describe('PromptList', () => {
   });
 
   it('confirms before deleting a prompt', async () => {
-    window.confirm = jest.fn(() => false);
+    jest.spyOn(window, 'confirm').mockReturnValue(false);
     renderPage();
     await screen.findByText('Alpha Prompt');
 
