@@ -1,0 +1,15 @@
+apiVersion: v2
+name: prompt-manager
+description: A production-ready Helm chart for the Prompt Management Framework
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - ai
+  - prompts
+  - management
+  - llm
+home: https://github.com/your-org/prompt-management-framework
+maintainers:
+  - name: Your Team
+    email: team@example.com
