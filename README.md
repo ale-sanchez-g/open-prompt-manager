@@ -2,6 +2,23 @@
 
 A production-ready open-source framework for managing AI prompts across agents and organizations — with version control, quality metrics, and composability.
 
+## Application Overview
+
+When you open the application, you will first land on the **Landing Page** (`/`), which introduces Prompt Manager and explains how it works. From there, clicking **Get Started** or **Go to Dashboard** takes you to the **Dashboard** (`/dashboard`) where you can view statistics, recent prompts, and quality metrics.
+
+### Frontend Routes
+
+| Path | Page | Description |
+|------|------|-------------|
+| `/` | Landing Page | Introduction to the application and how it works |
+| `/dashboard` | Dashboard | Overview stats, recent prompts, and quality metrics |
+| `/prompts` | Prompt List | Browse and search all prompts |
+| `/prompts/new` | Prompt Editor | Create a new prompt |
+| `/prompts/:id` | Prompt Detail | View a specific prompt |
+| `/prompts/:id/edit` | Prompt Editor | Edit an existing prompt |
+| `/tags` | Tags Management | Create and manage tags |
+| `/agents` | Agents Management | Create and manage AI agents |
+
 ## Features
 
 - **Version Control** — Full history, parent-child relationships, semantic versioning
@@ -36,7 +53,8 @@ docker-compose up -d
 ```
 
 Access:
-- **Frontend**: http://localhost
+- **Landing Page**: http://localhost
+- **Dashboard**: http://localhost/dashboard
 - **Backend API**: http://localhost:8000
 - **API Docs**: http://localhost:8000/docs
 
@@ -143,6 +161,7 @@ prompt-management-framework/
 ├── frontend/
 │   ├── src/
 │   │   ├── pages/
+│   │   │   ├── LandingPage.js
 │   │   │   ├── Dashboard.js
 │   │   │   ├── PromptList.js
 │   │   │   ├── PromptEditor.js
