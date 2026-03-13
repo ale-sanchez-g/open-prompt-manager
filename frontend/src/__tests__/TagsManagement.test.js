@@ -48,7 +48,9 @@ describe('TagsManagement', () => {
     renderPage();
     await screen.findByText('production');
 
-    fireEvent.change(screen.getByPlaceholderText(''), { target: { value: 'new-tag' } });
+    // The Name input is the only visible textbox in the create form
+    const nameInput = screen.getByRole('textbox');
+    fireEvent.change(nameInput, { target: { value: 'new-tag' } });
     fireEvent.click(screen.getByText('Create'));
 
     await waitFor(() => {
@@ -63,12 +65,8 @@ describe('TagsManagement', () => {
     renderPage();
     await screen.findByText('production');
 
-    const deleteButtons = screen.getAllByTitle
-      ? screen.queryAllByRole('button')
-      : [];
-    // Find delete buttons via SVG icons — use getAllByRole for buttons
     const buttons = screen.getAllByRole('button');
-    // Last two buttons are the delete buttons for each tag
+    // Last button in the list is the delete button for the last tag
     fireEvent.click(buttons[buttons.length - 1]);
 
     await waitFor(() => {

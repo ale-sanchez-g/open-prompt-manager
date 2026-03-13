@@ -34,6 +34,14 @@ function renderDashboard() {
   );
 }
 
+// Helper: find a stat card <p> label and return its next sibling value element.
+// Stat cards render labels as <p class="text-gray-400 text-sm"> — use the first match.
+function getStatValue(label) {
+  const matches = screen.getAllByText(label);
+  const labelEl = matches.find((el) => el.tagName === 'P') || matches[0];
+  return labelEl.nextElementSibling || labelEl.parentElement.querySelector('p:last-child');
+}
+
 describe('Dashboard', () => {
   it('renders the heading', async () => {
     renderDashboard();
@@ -42,26 +50,20 @@ describe('Dashboard', () => {
 
   it('shows prompt count stat', async () => {
     renderDashboard();
-    await waitFor(() => {
-      expect(screen.getByText('Total Prompts')).toBeInTheDocument();
-      expect(screen.getByText('2')).toBeInTheDocument();
-    });
+    await screen.findByText('Total Prompts');
+    expect(getStatValue('Total Prompts')).toHaveTextContent('2');
   });
 
   it('shows tag count stat', async () => {
     renderDashboard();
-    await waitFor(() => {
-      expect(screen.getByText('Tags')).toBeInTheDocument();
-      expect(screen.getByText('1')).toBeInTheDocument();
-    });
+    await screen.findByText('Tags');
+    expect(getStatValue('Tags')).toHaveTextContent('1');
   });
 
   it('shows agent count stat', async () => {
     renderDashboard();
-    await waitFor(() => {
-      expect(screen.getByText('Agents')).toBeInTheDocument();
-      expect(screen.getByText('2')).toBeInTheDocument();
-    });
+    await screen.findByText('Agents');
+    expect(getStatValue('Agents')).toHaveTextContent('2');
   });
 
   it('lists recent prompts by name', async () => {
@@ -72,10 +74,8 @@ describe('Dashboard', () => {
 
   it('shows total executions', async () => {
     renderDashboard();
-    await waitFor(() => {
-      expect(screen.getByText('Total Executions')).toBeInTheDocument();
-      expect(screen.getByText('15')).toBeInTheDocument(); // 10 + 5
-    });
+    await screen.findAllByText('Total Executions');
+    expect(getStatValue('Total Executions')).toHaveTextContent('15');
   });
 
   it('renders View all link', async () => {

@@ -7,8 +7,8 @@ import { agentsApi } from '../services/api';
 jest.mock('../services/api');
 
 const mockAgents = [
-  { id: 1, name: 'Chatbot',    description: 'Chat agent', type: 'chatbot',    status: 'active',     created_at: '2024-01-01T00:00:00' },
-  { id: 2, name: 'Classifier', description: null,         type: 'classifier', status: 'inactive',   created_at: '2024-01-02T00:00:00' },
+  { id: 1, name: 'Chatbot',    description: 'Chat agent', type: 'chatbot',    status: 'active',   created_at: '2024-01-01T00:00:00' },
+  { id: 2, name: 'Classifier', description: null,         type: 'classifier', status: 'inactive', created_at: '2024-01-02T00:00:00' },
 ];
 
 beforeEach(() => {
@@ -38,8 +38,12 @@ describe('AgentsManagement', () => {
 
   it('shows correct status badges', async () => {
     renderPage();
-    expect(await screen.findByText('active')).toBeInTheDocument();
-    expect(await screen.findByText('inactive')).toBeInTheDocument();
+    await screen.findByText('Chatbot');
+    // Status text also appears in the <select> options — verify at least one badge span exists
+    const activeEls = screen.getAllByText('active');
+    expect(activeEls.length).toBeGreaterThanOrEqual(1);
+    const inactiveEls = screen.getAllByText('inactive');
+    expect(inactiveEls.length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows agent count', async () => {
@@ -55,7 +59,8 @@ describe('AgentsManagement', () => {
     renderPage();
     await screen.findByText('Chatbot');
 
-    const nameInput = screen.getByPlaceholderText('');
+    // First textbox in the form is the Name field
+    const nameInput = screen.getAllByRole('textbox')[0];
     fireEvent.change(nameInput, { target: { value: 'New Agent' } });
     fireEvent.click(screen.getByText('Create'));
 

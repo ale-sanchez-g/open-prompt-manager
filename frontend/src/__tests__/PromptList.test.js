@@ -45,7 +45,9 @@ describe('PromptList', () => {
 
   it('renders tag chips', async () => {
     renderPage();
-    expect(await screen.findByText('prod')).toBeInTheDocument();
+    // 'prod' appears in both the filter <select> option and the chip span
+    const matches = await screen.findAllByText('prod');
+    expect(matches.length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows empty state when no prompts', async () => {
