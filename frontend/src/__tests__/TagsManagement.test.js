@@ -11,13 +11,21 @@ const mockTags = [
   { id: 2, name: 'beta',       color: '#F59E0B' },
 ];
 
+let confirmSpy;
+
 beforeEach(() => {
   tagsApi.list.mockResolvedValue({ data: mockTags });
   tagsApi.create.mockResolvedValue({ data: { id: 3, name: 'new-tag', color: '#3B82F6' } });
   tagsApi.delete.mockResolvedValue({});
 });
 
-afterEach(() => jest.clearAllMocks());
+afterEach(() => {
+  jest.clearAllMocks();
+  if (confirmSpy) {
+    confirmSpy.mockRestore();
+    confirmSpy = undefined;
+  }
+});
 
 function renderPage() {
   return render(<MemoryRouter><TagsManagement /></MemoryRouter>);
@@ -61,7 +69,7 @@ describe('TagsManagement', () => {
   });
 
   it('calls delete when trash button clicked and confirmed', async () => {
-    window.confirm = jest.fn(() => true);
+    confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
     renderPage();
     await screen.findByText('production');
 
