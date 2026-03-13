@@ -46,7 +46,7 @@ class Prompt(Base):
     children = relationship(
         'Prompt',
         foreign_keys=[parent_id],
-        backref=backref('parent', remote_side='Prompt.id'),
+        backref=backref('parent', remote_side=[id]),
     )
 
 
