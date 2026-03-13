@@ -128,7 +128,7 @@ def get_versions(prompt_id: int, db: Session = Depends(get_db)):
     # Collect the full ancestry chain
     root = prompt
     while root.parent_id:
-        root = db.query(Prompt).get(root.parent_id)
+        root = db.get(Prompt, root.parent_id)
     # Collect all descendants of the root
     versions = []
     queue = [root]

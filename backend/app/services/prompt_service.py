@@ -43,7 +43,7 @@ def render_prompt(
     component_pattern = r'\{\{component:(\d+)\}\}'
     for component_id_str in re.findall(component_pattern, content):
         component_id = int(component_id_str)
-        component_prompt = db.query(Prompt).get(component_id)
+        component_prompt = db.get(Prompt, component_id)
         if component_prompt is None:
             raise ValueError(f"Component prompt id={component_id} not found")
         component_content, _, nested_components = render_prompt(
@@ -86,7 +86,7 @@ def render_prompt(
 
 def update_prompt_stats(prompt_id: int, db: Session) -> None:
     """Recalculate and update aggregate stats for a prompt from its executions."""
-    prompt = db.query(Prompt).get(prompt_id)
+    prompt = db.get(Prompt, prompt_id)
     if prompt is None:
         return
 
