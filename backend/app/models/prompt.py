@@ -2,7 +2,7 @@ from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, Text, Float, DateTime, ForeignKey, JSON, Table
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from app.database.base import Base
 
 
@@ -43,7 +43,11 @@ class Prompt(Base):
     agents = relationship('Agent', secondary=prompt_agents, back_populates='prompts')
     metrics = relationship('PromptMetric', back_populates='prompt', cascade='all, delete-orphan')
     executions = relationship('PromptExecution', back_populates='prompt', cascade='all, delete-orphan')
-    children = relationship('Prompt', backref='parent', foreign_keys=[parent_id])
+    children = relationship(
+        'Prompt',
+        foreign_keys=[parent_id],
+        backref=backref('parent', remote_side=[id]),
+    )
 
 
 class Tag(Base):

@@ -1,9 +1,45 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
-  ArrowLeft, Edit, Trash2, Copy, Play, Star, Activity, Clock, GitBranch
+  ArrowLeft, Edit, Trash2, Copy, Play, Star, Activity, Clock, GitBranch, ArrowLeftRight, X
 } from 'lucide-react';
 import { promptsApi } from '../services/api';
+
+// Compute a line-level unified diff between two text strings.
+// Returns an array of { type: 'unchanged'|'removed'|'added', text: string }.
+function computeLineDiff(oldText, newText) {
+  const oldLines = (oldText || '').split('\n');
+  const newLines = (newText || '').split('\n');
+  const m = oldLines.length;
+  const n = newLines.length;
+  // LCS DP table
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (oldLines[i - 1] === newLines[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+  }
+  // Backtrack to build diff
+  const result = [];
+  let i = m, j = n;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
+      result.unshift({ type: 'unchanged', text: oldLines[i - 1] });
+      i--; j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      result.unshift({ type: 'added', text: newLines[j - 1] });
+      j--;
+    } else {
+      result.unshift({ type: 'removed', text: oldLines[i - 1] });
+      i--;
+    }
+  }
+  return result;
+}
 
 function MetricBadge({ label, value }) {
   return (
@@ -24,6 +60,22 @@ export default function PromptDetail() {
   const [renderError, setRenderError] = useState('');
   const [rendering, setRendering] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [diffTarget, setDiffTarget] = useState(null);   // { prompt, diff[] }
+  const [diffLoading, setDiffLoading] = useState(false);
+
+  const handleCompare = async (otherId) => {
+    setDiffLoading(true);
+    try {
+      const res = await promptsApi.get(otherId);
+      const other = res.data;
+      const diff = computeLineDiff(other.content, prompt.content);
+      setDiffTarget({ prompt: other, diff });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDiffLoading(false);
+    }
+  };
 
   useEffect(() => {
     promptsApi.get(id).then((r) => {
@@ -198,10 +250,10 @@ export default function PromptDetail() {
             ) : (
               <ul className="space-y-1">
                 {versions.map((v) => (
-                  <li key={v.id}>
+                  <li key={v.id} className="flex items-center gap-1">
                     <Link
                       to={`/prompts/${v.id}`}
-                      className={`flex justify-between text-sm px-2 py-1.5 rounded-lg transition-colors ${
+                      className={`flex-1 flex justify-between text-sm px-2 py-1.5 rounded-lg transition-colors ${
                         v.id === parseInt(id, 10)
                           ? 'bg-blue-600 text-white'
                           : 'text-gray-300 hover:bg-gray-700'
@@ -210,6 +262,16 @@ export default function PromptDetail() {
                       <span className="truncate">{v.name}</span>
                       <span className="text-xs ml-2 flex-shrink-0">v{v.version}</span>
                     </Link>
+                    {v.id !== parseInt(id, 10) && (
+                      <button
+                        onClick={() => handleCompare(v.id)}
+                        disabled={diffLoading}
+                        title={`Compare v${v.version} → v${prompt.version}`}
+                        className="flex-shrink-0 text-gray-400 hover:text-blue-300 disabled:opacity-40 p-1 rounded transition-colors"
+                      >
+                        <ArrowLeftRight size={13} />
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -268,6 +330,77 @@ export default function PromptDetail() {
           </div>
         </div>
       </div>
+
+      {/* Diff modal */}
+      {diffTarget && (
+        <div className="fixed inset-0 bg-black/70 flex items-start justify-center z-50 p-4 overflow-auto">
+          <div className="bg-gray-900 rounded-xl border border-gray-700 w-full max-w-4xl shadow-2xl mt-8 mb-8">
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-700">
+              <div className="flex items-center gap-3">
+                <ArrowLeftRight size={16} className="text-blue-400" />
+                <span className="text-white font-semibold">
+                  Diff: v{diffTarget.prompt.version}
+                  <span className="text-gray-400 mx-2">→</span>
+                  v{prompt.version}
+                </span>
+                <span className="text-xs text-gray-500 ml-1">
+                  ({diffTarget.diff.filter(l => l.type !== 'unchanged').length} change(s))
+                </span>
+              </div>
+              <button
+                onClick={() => setDiffTarget(null)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Legend */}
+            <div className="flex items-center gap-4 px-5 py-2 bg-gray-800 border-b border-gray-700 text-xs">
+              <span className="flex items-center gap-1.5 text-red-400"><span className="w-3 h-3 rounded-sm bg-red-900 inline-block" /> Removed from v{diffTarget.prompt.version}</span>
+              <span className="flex items-center gap-1.5 text-green-400"><span className="w-3 h-3 rounded-sm bg-green-900 inline-block" /> Added in v{prompt.version}</span>
+              <span className="flex items-center gap-1.5 text-gray-400"><span className="w-3 h-3 rounded-sm bg-gray-700 inline-block" /> Unchanged</span>
+            </div>
+
+            {/* Diff content */}
+            <div className="p-5 overflow-x-auto">
+              {diffTarget.diff.every(l => l.type === 'unchanged') ? (
+                <p className="text-gray-400 text-sm italic text-center py-6">No differences found between these versions.</p>
+              ) : (
+                <pre className="text-sm font-mono leading-relaxed">
+                  {diffTarget.diff.map((line, idx) => (
+                    <div
+                      key={idx}
+                      className={
+                        line.type === 'removed'
+                          ? 'bg-red-950 text-red-300'
+                          : line.type === 'added'
+                          ? 'bg-green-950 text-green-300'
+                          : 'text-gray-400'
+                      }
+                    >
+                      <span className={`select-none mr-2 w-4 inline-block text-center ${
+                        line.type === 'removed' ? 'text-red-500' :
+                        line.type === 'added' ? 'text-green-500' : 'text-gray-600'
+                      }`}>
+                        {line.type === 'removed' ? '−' : line.type === 'added' ? '+' : ' '}
+                      </span>
+                      {line.text || '\u00a0'}
+                    </div>
+                  ))}
+                </pre>
+              )}
+            </div>
+
+            {/* Audit footer */}
+            <div className="px-5 py-3 border-t border-gray-700 bg-gray-800 rounded-b-xl text-xs text-gray-500 flex justify-between">
+              <span>Audit comparison — {diffTarget.prompt.name} v{diffTarget.prompt.version} → v{prompt.version}</span>
+              <span>Generated: {new Date().toISOString()}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

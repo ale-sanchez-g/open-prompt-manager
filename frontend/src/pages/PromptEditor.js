@@ -70,7 +70,17 @@ export default function PromptEditor() {
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [showVersionModal, setShowVersionModal] = useState(false);
   const contentRef = React.useRef(null);
+
+  const bumpPatchVersion = (version) => {
+    const parts = version.split('.');
+    if (parts.length === 3) {
+      const patch = parseInt(parts[2], 10);
+      if (!isNaN(patch)) return `${parts[0]}.${parts[1]}.${patch + 1}`;
+    }
+    return version;
+  };
 
   useEffect(() => {
     tagsApi.list().then((r) => setTags(r.data)).catch(console.error);
@@ -135,17 +145,38 @@ export default function PromptEditor() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isEdit) {
+      setShowVersionModal(true);
+      return;
+    }
     setSaving(true);
     setError('');
     try {
-      if (isEdit) {
-        await promptsApi.update(id, form);
-      } else {
-        const res = await promptsApi.create(form);
+      const res = await promptsApi.create(form);
+      navigate(`/prompts/${res.data.id}`);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveWithVersion = async (bumpVersion) => {
+    setShowVersionModal(false);
+    setSaving(true);
+    setError('');
+    try {
+      if (bumpVersion) {
+        const res = await promptsApi.createVersion(id, {
+          content: form.content,
+          description: form.description,
+          variables: form.variables,
+        });
         navigate(`/prompts/${res.data.id}`);
-        return;
+      } else {
+        await promptsApi.update(id, form);
+        navigate(`/prompts/${id}`);
       }
-      navigate(`/prompts/${id}`);
     } catch (err) {
       setError(err.response?.data?.detail || 'Save failed');
     } finally {
@@ -157,6 +188,38 @@ export default function PromptEditor() {
 
   return (
     <div className="max-w-3xl space-y-6">
+      {showVersionModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-xl p-6 max-w-sm w-full shadow-xl border border-gray-700">
+            <h3 className="text-white font-semibold text-lg mb-2">Update Version?</h3>
+            <p className="text-gray-400 text-sm mb-5">
+              Would you like to bump the version from{' '}
+              <span className="text-white font-mono">{form.version}</span> to{' '}
+              <span className="text-white font-mono">{bumpPatchVersion(form.version)}</span>?
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => handleSaveWithVersion(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                Yes, bump to {bumpPatchVersion(form.version)}
+              </button>
+              <button
+                onClick={() => handleSaveWithVersion(false)}
+                className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                No, keep version {form.version}
+              </button>
+              <button
+                onClick={() => setShowVersionModal(false)}
+                className="text-gray-400 hover:text-white text-sm py-1 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <button
         onClick={() => navigate(-1)}
         className="flex items-center gap-2 text-gray-400 hover:text-white text-sm"
