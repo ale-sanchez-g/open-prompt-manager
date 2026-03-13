@@ -7,7 +7,7 @@ COPY package*.json ./
 RUN npm install --frozen-lockfile
 
 COPY . .
-RUN npm run build
+RUN DISABLE_ESLINT_PLUGIN=true npm run build
 
 # Production stage
 FROM nginx:alpine

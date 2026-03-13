@@ -113,8 +113,9 @@ jobs:
       - name: Build production bundle
         run: npm run build
         env:
-          CI: false   # treat warnings as warnings, not errors
+          CI: false                    # treat warnings as warnings, not errors
           REACT_APP_API_URL: http://localhost:8000
+          DISABLE_ESLINT_PLUGIN: true  # ESLint runs in frontend-test; skip it during webpack build
 
       - name: Check build output exists
         run: test -d build && test -f build/index.html
