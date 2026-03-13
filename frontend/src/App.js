@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, NavLink, Link } from 'react-router-dom';
 import { LayoutDashboard, FileText, Tag, Bot } from 'lucide-react';
 
 import LandingPage from './pages/LandingPage';
@@ -28,14 +28,16 @@ function NavItem({ to, icon: Icon, label }) {
   );
 }
 
-function AppLayout() {
+export function AppLayout() {
   return (
     <div className="flex h-screen bg-gray-900 text-gray-100">
       {/* Sidebar */}
       <aside className="w-56 flex-shrink-0 bg-gray-800 flex flex-col py-6 px-3 gap-2">
         <div className="px-4 mb-4">
-          <h1 className="text-lg font-bold text-white">Prompt Manager</h1>
-          <p className="text-xs text-gray-400">v1.0.0</p>
+          <Link to="/" className="block hover:opacity-80 transition-opacity">
+            <h1 className="text-lg font-bold text-white">Prompt Manager</h1>
+            <p className="text-xs text-gray-400">v1.0.0</p>
+          </Link>
         </div>
         <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" />
         <NavItem to="/prompts" icon={FileText} label="Prompts" />
