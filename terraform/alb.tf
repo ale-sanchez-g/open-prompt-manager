@@ -12,7 +12,9 @@ resource "aws_lb" "main" {
   enable_deletion_protection = false
 
   tags = {
-    Name = "${var.project_name}-alb"
+    Name        = "${var.project_name}-alb"
+    project     = var.project_name
+    environment = var.environment
   }
 }
 
@@ -39,7 +41,9 @@ resource "aws_lb_target_group" "frontend" {
   }
 
   tags = {
-    Name = "${var.project_name}-frontend-tg"
+    Name        = "${var.project_name}-frontend-tg"
+    project     = var.project_name
+    environment = var.environment
   }
 }
 
@@ -63,7 +67,9 @@ resource "aws_lb_target_group" "backend" {
   }
 
   tags = {
-    Name = "${var.project_name}-backend-tg"
+    Name        = "${var.project_name}-backend-tg"
+    project     = var.project_name
+    environment = var.environment
   }
 }
 
