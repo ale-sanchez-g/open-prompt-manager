@@ -10,36 +10,42 @@ This guide walks you through deploying **Open Prompt Manager** on AWS using the 
 Internet
     │
     ▼
-┌─────────────────────────────────────────┐
-│              AWS VPC (10.0.0.0/16)      │
-│                                         │
-│  ┌──────────────┐  ┌──────────────┐    │
-│  │ Public Subnet│  │ Public Subnet│    │
-│  │  us-east-1a  │  │  us-east-1b  │    │
-│  │              │  │              │    │
-│  │  ┌─────────┐ │  │              │    │
-│  │  │   ALB   │ │  │              │    │
-│  │  └────┬────┘ │  │              │    │
-│  │       │      │  │              │    │
-│  │  ┌────▼────┐ │  │              │    │
-│  │  │  NAT GW │ │  │              │    │
-│  │  └────┬────┘ │  │              │    │
-│  └───────┼──────┘  └──────────────┘    │
-│          │                             │
-│  ┌───────▼──────┐  ┌──────────────┐    │
-│  │Private Subnet│  │Private Subnet│    │
-│  │  us-east-1a  │  │  us-east-1b  │    │
-│  │              │  │              │    │
-│  │  ┌─────────┐ │  │ ┌─────────┐  │    │
-│  │  │ Backend │ │  │ │ Backend │  │    │
-│  │  │ (ECS)   │ │  │ │ (ECS)   │  │    │
-│  │  └─────────┘ │  │ └─────────┘  │    │
-│  │  ┌─────────┐ │  │ ┌─────────┐  │    │
-│  │  │Frontend │ │  │ │Frontend │  │    │
-│  │  │ (ECS)   │ │  │ │ (ECS)   │  │    │
-│  │  └─────────┘ │  │ └─────────┘  │    │
-│  └──────────────┘  └──────────────┘    │
-└─────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│                AWS VPC (10.0.0.0/16)             │
+│                                                  │
+│  ┌───────────────┐   ┌───────────────┐           │
+│  │ Public Subnet │   │ Public Subnet │           │
+│  │  us-east-1a   │   │  us-east-1b   │           │
+│  │               │   │               │           │
+│  │  ┌──────────┐ │   │               │           │
+│  │  │   ALB    │ │   │               │           │
+│  │  └────┬─────┘ │   │               │           │
+│  │       │       │   │               │           │
+│  │  ┌────▼─────┐ │   │               │           │
+│  │  │  NAT GW  │ │   │               │           │
+│  │  └────┬─────┘ │   │               │           │
+│  └────────┼───────┘   └───────────────┘           │
+│           │                                       │
+│  ┌────────▼───────┐   ┌───────────────┐           │
+│  │ Private Subnet │   │ Private Subnet│           │
+│  │  us-east-1a    │   │  us-east-1b   │           │
+│  │                │   │               │           │
+│  │  ┌──────────┐  │   │ ┌──────────┐  │           │
+│  │  │ Backend  │  │   │ │ Backend  │  │           │
+│  │  │  (ECS)   │  │   │ │  (ECS)   │  │           │
+│  │  └────┬─────┘  │   │ └────┬─────┘  │           │
+│  │       │        │   │      │        │           │
+│  │  ┌────▼─────┐  │   │ ┌────▼─────┐  │           │
+│  │  │ Frontend │  │   │ │ Frontend │  │           │
+│  │  │  (ECS)   │  │   │ │  (ECS)   │  │           │
+│  │  └──────────┘  │   │ └──────────┘  │           │
+│  │                │   │               │           │
+│  │  ┌─────────────┴───┴──────────┐    │           │
+│  │  │   RDS PostgreSQL 16         │   │           │
+│  │  │   (private, encrypted)      │   │           │
+│  └──┤   db.t4g.micro / gp3        ├───┘           │
+│     └─────────────────────────────┘               │
+└──────────────────────────────────────────────────┘
 ```
 
 ### Components
@@ -52,7 +58,8 @@ Internet
 | **Internet Gateway (IGW)** | Enables inbound/outbound internet traffic for the public subnets. |
 | **NAT Gateway** | Sits in the public subnet; allows ECS tasks in private subnets to reach the internet (e.g. to pull images) without being publicly reachable. |
 | **Route Tables** | Public RT routes `0.0.0.0/0` → IGW. Private RT routes `0.0.0.0/0` → NAT GW. |
-| **Application Load Balancer (ALB)** | Internet-facing; routes `/api/*` paths to the backend and `/*` to the frontend. |
+| **Application Load Balancer (ALB)** | Internet-facing; two listener rules route `/health`, `/prompts*`, `/tags*`, `/agents*`, `/docs` (priority 10) and `/openapi.json` (priority 11) to the backend — everything else goes to the frontend. AWS ALB path-pattern rules are capped at 5 values each, which is why two rules are used. |
+| **RDS PostgreSQL 16** | Single-AZ `db.t4g.micro` in the private subnets. Password auto-generated and stored in AWS Secrets Manager; injected into the backend container at runtime. Port 5432 is open only from the backend ECS security group. |
 | **ECS Fargate** | Serverless container runtime. Runs backend and frontend tasks in private subnets. |
 | **ECR** | Private container image registry for backend and frontend Docker images. |
 | **CloudWatch Logs** | Centralised log storage for ECS tasks. |
@@ -116,18 +123,19 @@ export BACKEND_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/open-
 aws ecr get-login-password --region "${AWS_REGION}" | \
   docker login --username AWS --password-stdin "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
-# Build and push
-docker build -t "${BACKEND_REPO}:latest" ../backend/
-docker push "${BACKEND_REPO}:latest"
+# Build and push (--platform linux/amd64 is required when building on Apple Silicon)
+docker buildx build --platform linux/amd64 -t "${BACKEND_REPO}:latest" ../backend/ --push
 ```
+
+> **Note (Apple Silicon / ARM):** ECS Fargate runs on `linux/amd64`. If you build on an Apple Silicon Mac without specifying `--platform linux/amd64`, ECS will fail to start the container with a `CannotPullContainerError: image Manifest does not contain descriptor matching platform 'linux/amd64'`. Always use `docker buildx build --platform linux/amd64` when targeting ECS Fargate.
 
 ### 2c – Build and push the frontend image
 
 ```bash
 export FRONTEND_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/open-prompt-manager-frontend"
 
-docker build -t "${FRONTEND_REPO}:latest" ../frontend/
-docker push "${FRONTEND_REPO}:latest"
+# Build and push (--platform linux/amd64 required on Apple Silicon)
+docker buildx build --platform linux/amd64 -t "${FRONTEND_REPO}:latest" ../frontend/ --push
 ```
 
 ---
@@ -159,10 +167,12 @@ Review the resources that will be created. Key items to confirm:
 - 1 Internet Gateway
 - 1 NAT Gateway + 1 Elastic IP
 - 2 Route Tables (public and private) with associations
-- 1 Application Load Balancer
+- 1 Application Load Balancer with **2 backend listener rules** (priorities 10 and 11)
 - 2 ECS services (backend, frontend) in private subnets
 - 2 ECR repositories
 - IAM roles for ECS task execution
+- 1 RDS PostgreSQL 16 instance (`db.t4g.micro`) in private subnets
+- 1 Secrets Manager secret containing the `DATABASE_URL`
 
 ---
 
@@ -182,8 +192,13 @@ Outputs:
 alb_dns_name                 = "open-prompt-manager-alb-XXXXXXXXXX.us-east-1.elb.amazonaws.com"
 application_url              = "http://open-prompt-manager-alb-XXXXXXXXXX.us-east-1.elb.amazonaws.com"
 backend_ecr_repository_url   = "XXXXXXXXXXXX.dkr.ecr.us-east-1.amazonaws.com/open-prompt-manager-backend"
+backend_target_group_arn     = "arn:aws:elasticloadbalancing:us-east-1:XXXXXXXXXXXX:targetgroup/open-prompt-manager-backend-tg/XXXXXXXXXXXXXXXX"
+db_endpoint                  = "open-prompt-manager-prod.XXXXXXXXXXXX.us-east-1.rds.amazonaws.com:5432"
+db_name                      = "promptmanager"
+db_secret_arn                = "arn:aws:secretsmanager:us-east-1:XXXXXXXXXXXX:secret:open-prompt-manager/prod/database-url-XXXXXX"
 ecs_cluster_name             = "open-prompt-manager-cluster"
 frontend_ecr_repository_url  = "XXXXXXXXXXXX.dkr.ecr.us-east-1.amazonaws.com/open-prompt-manager-frontend"
+frontend_target_group_arn    = "arn:aws:elasticloadbalancing:us-east-1:XXXXXXXXXXXX:targetgroup/open-prompt-manager-frontend-tg/XXXXXXXXXXXXXXXX"
 nat_gateway_public_ip        = "XX.XX.XX.XX"
 vpc_id                       = "vpc-XXXXXXXXXXXXXXXXX"
 ```
@@ -295,8 +310,9 @@ To deploy a new version of the application:
 
 ```bash
 # 1. Build and push a new image with a specific tag
-docker build -t "${BACKEND_REPO}:v1.1.0" ../backend/
-docker push "${BACKEND_REPO}:v1.1.0"
+#    Always include --platform linux/amd64 when building on Apple Silicon
+docker buildx build --platform linux/amd64 \
+  -t "${BACKEND_REPO}:v1.1.0" ../backend/ --push
 
 # 2. Update the variable and re-apply
 terraform apply -var="backend_image=${BACKEND_REPO}:v1.1.0"
@@ -323,10 +339,13 @@ terraform destroy
 | Symptom | Likely Cause | Resolution |
 |---------|-------------|------------|
 | ECS tasks fail to start | Image not found in ECR | Re-push the Docker image (Step 2) |
+| `CannotPullContainerError: image Manifest does not contain descriptor matching platform 'linux/amd64'` | Image built on Apple Silicon (ARM) without `--platform linux/amd64` | Rebuild with `docker buildx build --platform linux/amd64 … --push` (Step 2b/2c) |
 | Tasks stuck in `PENDING` | IAM execution role missing permissions | Check `aws_iam_role.ecs_task_execution` attachments |
 | ALB returns 502 | Container unhealthy or port mismatch | Check CloudWatch Logs and health check settings |
 | `terraform apply` fails on NAT GW | Elastic IP limit reached | Request a limit increase in AWS console |
 | Cannot pull images from ECR | NAT Gateway not yet ready | Wait a few minutes and retry; NAT GW provisioning takes ~2 min |
+| `ValidationError: A rule can only have '5' condition values` | ALB listener rule `path_pattern` exceeded the 5-value AWS limit | The configuration already uses two separate rules (priorities 10 and 11) to work around this limit — no action needed |
+| Backend container crashes with `ModuleNotFoundError: No module named 'psycopg2'` | Missing PostgreSQL driver | `psycopg2-binary` is included in `backend/requirements.txt`; rebuild and re-push the backend image |
 
 ### View ECS logs
 
