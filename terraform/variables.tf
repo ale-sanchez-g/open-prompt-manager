@@ -109,9 +109,41 @@ variable "frontend_port" {
   default     = 80
 }
 
-variable "database_url" {
-  description = "DATABASE_URL environment variable injected into the backend container."
+# ─────────────────────────────────────────────
+# Database (RDS PostgreSQL)
+# ─────────────────────────────────────────────
+variable "db_name" {
+  description = "Name of the PostgreSQL database to create."
   type        = string
-  default     = "sqlite:///./data/prompts.db"
-  sensitive   = true
+  default     = "promptmanager"
+}
+
+variable "db_username" {
+  description = "Master username for the RDS instance."
+  type        = string
+  default     = "dbadmin"
+}
+
+variable "db_instance_class" {
+  description = "RDS instance type (e.g. db.t4g.micro for dev, db.t4g.small for prod)."
+  type        = string
+  default     = "db.t4g.micro"
+}
+
+variable "db_allocated_storage" {
+  description = "Allocated storage in GiB for the RDS instance."
+  type        = number
+  default     = 20
+}
+
+variable "db_multi_az" {
+  description = "Enable Multi-AZ deployment for RDS high availability (recommended for production)."
+  type        = bool
+  default     = false
+}
+
+variable "db_deletion_protection" {
+  description = "Prevent accidental deletion of the RDS instance. Set to true for production."
+  type        = bool
+  default     = false
 }

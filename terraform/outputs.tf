@@ -68,3 +68,21 @@ output "application_url" {
   description = "URL to access the Open Prompt Manager application."
   value       = "http://${aws_lb.main.dns_name}"
 }
+
+# ─────────────────────────────────────────────
+# Database Outputs
+# ─────────────────────────────────────────────
+output "db_endpoint" {
+  description = "RDS instance endpoint (host:port). Use this for direct DB access from a bastion or VPN."
+  value       = aws_db_instance.main.endpoint
+}
+
+output "db_name" {
+  description = "Name of the PostgreSQL database."
+  value       = aws_db_instance.main.db_name
+}
+
+output "db_secret_arn" {
+  description = "ARN of the Secrets Manager secret that holds the DATABASE_URL. Reference this to retrieve credentials."
+  value       = aws_secretsmanager_secret.db_url.arn
+}

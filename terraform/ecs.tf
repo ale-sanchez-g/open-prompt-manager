@@ -84,12 +84,15 @@ resource "aws_ecs_task_definition" "backend" {
 
       environment = [
         {
-          name  = "DATABASE_URL"
-          value = var.database_url
-        },
-        {
           name  = "CORS_ORIGINS"
           value = "http://${aws_lb.main.dns_name}"
+        }
+      ]
+
+      secrets = [
+        {
+          name      = "DATABASE_URL"
+          valueFrom = aws_secretsmanager_secret.db_url.arn
         }
       ]
 
@@ -141,6 +144,8 @@ resource "aws_ecs_service" "backend" {
   depends_on = [
     aws_lb_listener.http,
     aws_iam_role_policy_attachment.ecs_task_execution,
+    aws_iam_role_policy.ecs_execution_secrets,
+    aws_secretsmanager_secret_version.db_url,
   ]
 
   tags = {

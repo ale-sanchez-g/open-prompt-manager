@@ -337,6 +337,68 @@ aws logs tail /ecs/open-prompt-manager/frontend --follow
 
 ---
 
+## Database (Amazon RDS PostgreSQL)
+
+The Terraform configuration provisions an Amazon RDS PostgreSQL 16 instance in the private subnets. No extra steps are required — the database is created as part of `terraform apply`.
+
+### What gets created
+
+| Resource | Details |
+|---|---|
+| `aws_db_instance` | PostgreSQL 16, `db.t4g.micro` by default, encrypted with gp3 storage |
+| `aws_db_subnet_group` | Uses the existing private subnets (multi-AZ ready) |
+| `aws_security_group.rds` | Port 5432 open only from the backend ECS security group |
+| `random_password` | 32-char random password, never stored in state as plain text |
+| `aws_secretsmanager_secret` | Full `DATABASE_URL` stored at `<project>/<env>/database-url` |
+
+The `DATABASE_URL` is injected into the backend ECS container as an ECS secret (not a plain-text environment variable). ECS pulls the value from Secrets Manager at task start.
+
+### Retrieve the DATABASE_URL
+
+```bash
+aws secretsmanager get-secret-value \
+  --secret-id "open-prompt-manager/prod/database-url" \
+  --query SecretString --output text
+```
+
+### Connect to the database from a local machine
+
+The RDS instance has no public endpoint. Use AWS Systems Manager Session Manager to port-forward through a bastion or an ECS task:
+
+```bash
+# Install the Session Manager plugin first: https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html
+
+# Start a port-forward session to the RDS host via an ECS container
+aws ssm start-session \
+  --target <ecs-task-id> \
+  --document-name AWS-StartPortForwardingSessionToRemoteHost \
+  --parameters '{"host":["<rds-endpoint>"],"portNumber":["5432"],"localPortNumber":["5432"]}'
+
+# Then connect locally
+psql -h localhost -U dbadmin -d promptmanager
+```
+
+Get the RDS endpoint from Terraform outputs:
+
+```bash
+terraform output db_endpoint
+terraform output db_secret_arn
+```
+
+### Customise the database tier
+
+```hcl
+# terraform.tfvars
+db_instance_class      = "db.t4g.small"   # upgrade for higher throughput
+db_allocated_storage   = 50               # GiB
+db_multi_az            = true             # enable for production HA
+db_deletion_protection = true             # prevent accidental drops
+```
+
+> **Note:** Enabling `db_deletion_protection = true` also triggers a final RDS snapshot before any `terraform destroy`.
+
+---
+
 ## File Reference
 
 ```
@@ -344,11 +406,12 @@ terraform/
 ├── versions.tf          # Terraform and AWS provider version constraints
 ├── variables.tf         # All input variables with defaults
 ├── vpc.tf               # VPC, subnets, IGW, NAT Gateway, route tables
-├── security_groups.tf   # Security groups for ALB, frontend, and backend
-├── iam.tf               # IAM roles for ECS task execution
+├── security_groups.tf   # Security groups for ALB, frontend, backend, and RDS
+├── iam.tf               # IAM roles for ECS task execution + Secrets Manager policy
 ├── ecr.tf               # ECR repositories and lifecycle policies
 ├── alb.tf               # Application Load Balancer, target groups, listener rules
 ├── ecs.tf               # ECS cluster, task definitions, and services (Fargate)
-├── outputs.tf           # Output values (URLs, IDs, etc.)
+├── rds.tf               # RDS PostgreSQL, DB subnet group, and Secrets Manager secret
+├── outputs.tf           # Output values (URLs, IDs, DB endpoint, secret ARN)
 └── install.md           # This file
 ```

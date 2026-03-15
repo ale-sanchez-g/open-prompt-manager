@@ -48,3 +48,24 @@ resource "aws_iam_role" "ecs_task" {
     environment = var.environment
   }
 }
+
+# ─────────────────────────────────────────────
+# Allow the task execution role to read the
+# DATABASE_URL secret so ECS can inject it into
+# the container at launch time.
+# ─────────────────────────────────────────────
+resource "aws_iam_role_policy" "ecs_execution_secrets" {
+  name = "${var.project_name}-ecs-execution-secrets-policy"
+  role = aws_iam_role.ecs_task_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = [aws_secretsmanager_secret.db_url.arn]
+      }
+    ]
+  })
+}
