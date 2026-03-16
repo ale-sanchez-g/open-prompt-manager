@@ -56,7 +56,7 @@ resource "aws_lb_target_group" "backend" {
 
   health_check {
     enabled             = true
-    path                = "/health"
+    path                = "/api/health"
     port                = "traffic-port"
     protocol            = "HTTP"
     healthy_threshold   = 3
@@ -75,11 +75,10 @@ resource "aws_lb_target_group" "backend" {
 
 # ─────────────────────────────────────────────
 # HTTP Listener
-# The FastAPI backend exposes resources at the
-# root path level (e.g. /prompts/, /tags/,
-# /agents/). Path-based rules forward those
-# paths to the backend; everything else goes to
-# the React frontend.
+# All backend routes are prefixed with /api/.
+# A single path-pattern rule sends /api/* to
+# the backend; everything else goes to the
+# React frontend SPA.
 # ─────────────────────────────────────────────
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
@@ -104,31 +103,7 @@ resource "aws_lb_listener_rule" "backend_api" {
 
   condition {
     path_pattern {
-      values = [
-        "/health",
-        "/prompts*",
-        "/tags*",
-        "/agents*",
-        "/docs",
-      ]
-    }
-  }
-}
-
-# AWS ALB path_pattern conditions are limited to 5 values per rule;
-# the OpenAPI schema endpoint uses a separate rule.
-resource "aws_lb_listener_rule" "backend_openapi" {
-  listener_arn = aws_lb_listener.http.arn
-  priority     = 11
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.backend.arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/openapi.json"]
+      values = ["/api/*"]
     }
   }
 }

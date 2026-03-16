@@ -106,7 +106,7 @@ resource "aws_ecs_task_definition" "backend" {
       }
 
       healthCheck = {
-        command     = ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:${var.backend_port}/health')\" || exit 1"]
+        command     = ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:${var.backend_port}/api/health')\" || exit 1"]
         interval    = 30
         timeout     = 10
         retries     = 3
@@ -182,8 +182,10 @@ resource "aws_ecs_task_definition" "frontend" {
 
       environment = [
         {
-          name  = "REACT_APP_API_URL"
-          value = "http://${aws_lb.main.dns_name}"
+          # In ECS, ALB routes /api/* directly to the backend service — nginx never
+          # receives those requests. This value just satisfies nginx startup (envsubst).
+          name  = "BACKEND_URL"
+          value = "http://127.0.0.1:8000"
         }
       ]
 

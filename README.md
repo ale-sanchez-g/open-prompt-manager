@@ -55,8 +55,8 @@ docker-compose up -d
 Access:
 - **Landing Page**: http://localhost
 - **Dashboard**: http://localhost/dashboard
-- **Backend API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
+- **Backend API**: http://localhost:8000/api
+- **API Docs**: http://localhost:8000/api/docs
 
 ### Local Development
 
@@ -78,42 +78,42 @@ cd frontend && npm install && npm start
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/prompts/` | List prompts (filter by tag, agent, search) |
-| POST | `/prompts/` | Create new prompt |
-| GET | `/prompts/{id}` | Get prompt details |
-| PUT | `/prompts/{id}` | Update prompt |
-| DELETE | `/prompts/{id}` | Delete prompt |
-| POST | `/prompts/{id}/versions` | Create new version |
-| GET | `/prompts/{id}/versions` | Get version history |
-| POST | `/prompts/{id}/render` | Render prompt with variables |
-| POST | `/prompts/{id}/executions` | Track an execution |
-| GET | `/prompts/{id}/executions` | Get execution history |
-| POST | `/prompts/{id}/metrics` | Add custom metric |
-| GET | `/prompts/{id}/metrics` | Get metrics |
+| GET | `/api/prompts/` | List prompts (filter by tag, agent, search) |
+| POST | `/api/prompts/` | Create new prompt |
+| GET | `/api/prompts/{id}` | Get prompt details |
+| PUT | `/api/prompts/{id}` | Update prompt |
+| DELETE | `/api/prompts/{id}` | Delete prompt |
+| POST | `/api/prompts/{id}/versions` | Create new version |
+| GET | `/api/prompts/{id}/versions` | Get version history |
+| POST | `/api/prompts/{id}/render` | Render prompt with variables |
+| POST | `/api/prompts/{id}/executions` | Track an execution |
+| GET | `/api/prompts/{id}/executions` | Get execution history |
+| POST | `/api/prompts/{id}/metrics` | Add custom metric |
+| GET | `/api/prompts/{id}/metrics` | Get metrics |
 
 ### Tags
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/tags/` | List all tags |
-| POST | `/tags/` | Create tag |
-| DELETE | `/tags/{id}` | Delete tag |
+| GET | `/api/tags/` | List all tags |
+| POST | `/api/tags/` | Create tag |
+| DELETE | `/api/tags/{id}` | Delete tag |
 
 ### Agents
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/agents/` | List all agents |
-| GET | `/agents/{id}` | Get agent |
-| POST | `/agents/` | Create agent |
-| PUT | `/agents/{id}` | Update agent |
-| DELETE | `/agents/{id}` | Delete agent |
+| GET | `/api/agents/` | List all agents |
+| GET | `/api/agents/{id}` | Get agent |
+| POST | `/api/agents/` | Create agent |
+| PUT | `/api/agents/{id}` | Update agent |
+| DELETE | `/api/agents/{id}` | Delete agent |
 
 ### Health
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/health` | Health check |
+| GET | `/api/health` | Health check |
 
 ## Prompt Syntax
 
@@ -134,7 +134,7 @@ Now respond to: {{user_message}}
 ### Render Example
 
 ```bash
-curl -X POST http://localhost:8000/prompts/1/render \
+curl -X POST http://localhost:8000/api/prompts/1/render \
   -H "Content-Type: application/json" \
   -d '{"variables": {"user_name": "Alice", "topic": "Python"}}'
 ```
@@ -224,14 +224,14 @@ helm install prompt-manager ./helm/prompt-manager \
 ### Frontend
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `REACT_APP_API_URL` | `http://localhost:8000` | Backend API base URL |
+| `REACT_APP_API_URL` | `` (same origin) | Backend API base URL — leave empty when deploying behind a reverse proxy or ALB. Set to the full backend URL (e.g. `http://localhost:8000`) only for standalone local development. |
 
 ## Version Control
 
 Create a new version from an existing prompt:
 
 ```bash
-curl -X POST http://localhost:8000/prompts/1/versions \
+curl -X POST http://localhost:8000/api/prompts/1/versions \
   -H "Content-Type: application/json" \
   -d '{"content": "Updated content here", "description": "Fixed typo in greeting"}'
 ```
@@ -241,7 +241,7 @@ Versions are automatically given the next patch version (e.g., `1.0.0` → `1.0.
 ## Tracking Executions
 
 ```bash
-curl -X POST http://localhost:8000/prompts/1/executions \
+curl -X POST http://localhost:8000/api/prompts/1/executions \
   -H "Content-Type: application/json" \
   -d '{
     "agent_id": 2,

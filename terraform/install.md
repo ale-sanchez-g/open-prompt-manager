@@ -58,7 +58,7 @@ Internet
 | **Internet Gateway (IGW)** | Enables inbound/outbound internet traffic for the public subnets. |
 | **NAT Gateway** | Sits in the public subnet; allows ECS tasks in private subnets to reach the internet (e.g. to pull images) without being publicly reachable. |
 | **Route Tables** | Public RT routes `0.0.0.0/0` → IGW. Private RT routes `0.0.0.0/0` → NAT GW. |
-| **Application Load Balancer (ALB)** | Internet-facing; two listener rules route `/health`, `/prompts*`, `/tags*`, `/agents*`, `/docs` (priority 10) and `/openapi.json` (priority 11) to the backend — everything else goes to the frontend. AWS ALB path-pattern rules are capped at 5 values each, which is why two rules are used. |
+| **Application Load Balancer (ALB)** | Internet-facing; a single listener rule routes `/api/*` (priority 10) to the backend — everything else goes to the frontend. All API routes are prefixed with `/api/` to avoid collisions with React SPA client-side routes. |
 | **RDS PostgreSQL 16** | Single-AZ `db.t4g.micro` in the private subnets. Password auto-generated and stored in AWS Secrets Manager; injected into the backend container at runtime. Port 5432 is open only from the backend ECS security group. |
 | **ECS Fargate** | Serverless container runtime. Runs backend and frontend tasks in private subnets. |
 | **ECR** | Private container image registry for backend and frontend Docker images. |
@@ -167,7 +167,7 @@ Review the resources that will be created. Key items to confirm:
 - 1 Internet Gateway
 - 1 NAT Gateway + 1 Elastic IP
 - 2 Route Tables (public and private) with associations
-- 1 Application Load Balancer with **2 backend listener rules** (priorities 10 and 11)
+- 1 Application Load Balancer with **1 backend listener rule** (priority 10: `/api/*` → backend)
 - 2 ECS services (backend, frontend) in private subnets
 - 2 ECR repositories
 - IAM roles for ECS task execution
@@ -232,10 +232,10 @@ You can also access the API directly:
 ALB_URL=$(terraform output -raw application_url)
 
 # Health check
-curl "${ALB_URL}/health"
+curl "${ALB_URL}/api/health"
 
 # List prompts
-curl "${ALB_URL}/prompts/"
+curl "${ALB_URL}/api/prompts/"
 ```
 
 ---
