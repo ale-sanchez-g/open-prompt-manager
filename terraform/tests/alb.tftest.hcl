@@ -201,7 +201,7 @@ run "mcp_listener_rule_matches_mcp_path" {
   command = plan
 
   assert {
-    condition     = contains(aws_lb_listener_rule.backend_mcp.condition[0].path_pattern[0].values, "/mcp")
+    condition     = contains(flatten([for c in aws_lb_listener_rule.backend_mcp.condition : [for pp in c.path_pattern : pp.values]]), "/mcp")
     error_message = "MCP listener rule must match the exact /mcp path."
   }
 }
@@ -210,7 +210,7 @@ run "mcp_listener_rule_matches_mcp_wildcard" {
   command = plan
 
   assert {
-    condition     = contains(aws_lb_listener_rule.backend_mcp.condition[0].path_pattern[0].values, "/mcp/*")
+    condition     = contains(flatten([for c in aws_lb_listener_rule.backend_mcp.condition : [for pp in c.path_pattern : pp.values]]), "/mcp/*")
     error_message = "MCP listener rule must match /mcp/* sub-paths."
   }
 }
