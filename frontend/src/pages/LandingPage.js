@@ -102,12 +102,6 @@ export default function LandingPage() {
             description="Track ratings, success rate, usage count, execution time, token count, and cost to measure and improve prompt quality."
             color="bg-orange-600"
           />
-          <FeatureCard
-            icon={Cpu}
-            title="MCP / AI Agent Connectivity"
-            description="Expose all prompts as MCP tools so AI coding assistants like GitHub Copilot and Claude Code can discover and use them automatically."
-            color="bg-teal-600"
-          />
         </div>
       </section>
 
@@ -142,8 +136,11 @@ export default function LandingPage() {
       <section className="max-w-4xl mx-auto px-6 py-12">
         <h2 className="text-2xl font-bold text-white mb-2 text-center">Connect AI Agents via MCP</h2>
         <p className="text-gray-400 text-center mb-8 text-sm">
-          The built-in <a href="https://modelcontextprotocol.io/" target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:underline">Model Context Protocol</a> server at <code className="bg-gray-800 text-teal-300 px-1 rounded">http://localhost:8000/mcp</code> exposes all prompt tools so coding assistants can use them directly.
+          The built-in <a href="https://modelcontextprotocol.io/" target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:underline">Model Context Protocol</a> server at <code className="bg-gray-800 text-teal-300 px-1 rounded"><a href="/mcp" target="_blank" rel="noopener noreferrer">/mcp</a></code> exposes all prompt tools so coding assistants can use them directly.
         </p>
+        <p className="text-gray-400 text-center mb-8 text-sm">
+          The below examples are based on a local MCP server running from the docker images on <code className="bg-gray-800 text-teal-300 px-1 rounded">http://localhost/mcp</code>.
+          </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* VS Code */}
           <div className="bg-gray-800 rounded-xl p-6">
@@ -153,7 +150,7 @@ export default function LandingPage() {
   "servers": {
     "open-prompt-manager": {
       "type": "http",
-      "url": "http://localhost:8000/mcp"
+      "url": "http://localhost/mcp"
     }
   }
 }`}</pre>
@@ -166,7 +163,7 @@ export default function LandingPage() {
             <pre className="bg-gray-900 rounded-lg p-4 text-sm text-teal-300 overflow-x-auto">{`claude mcp add \\
   --transport http \\
   open-prompt-manager \\
-  http://localhost:8000/mcp`}</pre>
+  http://localhost/mcp`}</pre>
             <p className="text-gray-500 text-xs mt-3">Verify with <code className="bg-gray-700 px-1 rounded">claude mcp list</code>. All tools become available in every Claude Code session.</p>
           </div>
         </div>
