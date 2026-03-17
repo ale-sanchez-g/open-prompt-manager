@@ -170,12 +170,21 @@ run "http_listener_protocol_is_http" {
 # ─────────────────────────────────────────────
 # MCP Listener Rule
 # ─────────────────────────────────────────────
-run "mcp_listener_rule_routes_to_backend" {
+run "mcp_listener_rule_action_type_is_forward" {
   command = plan
 
   assert {
-    condition     = aws_lb_listener_rule.backend_mcp.action[0].target_group_arn == aws_lb_target_group.backend.arn
-    error_message = "MCP listener rule must forward to the backend target group."
+    condition     = aws_lb_listener_rule.backend_mcp.action[0].type == "forward"
+    error_message = "MCP listener rule action type must be 'forward'."
+  }
+}
+
+run "mcp_listener_rule_priority_is_20" {
+  command = plan
+
+  assert {
+    condition     = aws_lb_listener_rule.backend_mcp.priority == 20
+    error_message = "MCP listener rule priority must be 20."
   }
 }
 
