@@ -275,6 +275,36 @@ jobs:
           echo "Agent response: $RESPONSE"
           echo "$RESPONSE" | grep -q '"id"'
 
+      - name: Smoke test — MCP endpoint is reachable
+        run: |
+          RESPONSE=$(curl -s -X POST http://localhost:8000/mcp \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json, text/event-stream" \
+            -H "Host: localhost:8000" \
+            -d '{
+              "jsonrpc": "2.0",
+              "method": "initialize",
+              "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "ci-smoke", "version": "0.1"}
+              },
+              "id": 1
+            }')
+          echo "MCP response: $RESPONSE"
+          echo "$RESPONSE" | grep -q '"Open Prompt Manager"'
+
+      - name: Smoke test — MCP tools/list returns expected tools
+        run: |
+          RESPONSE=$(curl -s -X POST http://localhost:8000/mcp \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json, text/event-stream" \
+            -H "Host: localhost:8000" \
+            -d '{"jsonrpc": "2.0", "method": "tools/list", "id": 2}')
+          echo "MCP tools/list: $RESPONSE"
+          echo "$RESPONSE" | grep -q '"list_prompts"'
+          echo "$RESPONSE" | grep -q '"render_prompt"'
+
       - name: Verify frontend is serving
         run: |
           for i in $(seq 1 20); do

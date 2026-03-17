@@ -10,6 +10,9 @@ services:
     environment:
       - DATABASE_URL=sqlite:///./data/prompts.db
       - CORS_ORIGINS=http://localhost,http://localhost:3000,http://localhost:80
+      # MCP (Model Context Protocol) server is available at http://localhost:8000/mcp
+      # Add any additional host names that MCP clients will use in MCP_ALLOWED_HOSTS.
+      - MCP_ALLOWED_HOSTS=localhost,localhost:8000,127.0.0.1,127.0.0.1:8000
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]

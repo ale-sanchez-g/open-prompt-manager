@@ -166,3 +166,42 @@ run "http_listener_protocol_is_http" {
     error_message = "HTTP listener protocol must be 'HTTP'."
   }
 }
+
+# ─────────────────────────────────────────────
+# MCP Listener Rule
+# ─────────────────────────────────────────────
+run "mcp_listener_rule_routes_to_backend" {
+  command = plan
+
+  assert {
+    condition     = aws_lb_listener_rule.backend_mcp.action[0].target_group_arn == aws_lb_target_group.backend.arn
+    error_message = "MCP listener rule must forward to the backend target group."
+  }
+}
+
+run "mcp_listener_rule_has_lower_priority_than_api" {
+  command = plan
+
+  assert {
+    condition     = aws_lb_listener_rule.backend_mcp.priority > aws_lb_listener_rule.backend_api.priority
+    error_message = "MCP listener rule priority must be numerically greater than the API rule priority."
+  }
+}
+
+run "mcp_listener_rule_matches_mcp_path" {
+  command = plan
+
+  assert {
+    condition     = contains(aws_lb_listener_rule.backend_mcp.condition[0].path_pattern[0].values, "/mcp")
+    error_message = "MCP listener rule must match the exact /mcp path."
+  }
+}
+
+run "mcp_listener_rule_matches_mcp_wildcard" {
+  command = plan
+
+  assert {
+    condition     = contains(aws_lb_listener_rule.backend_mcp.condition[0].path_pattern[0].values, "/mcp/*")
+    error_message = "MCP listener rule must match /mcp/* sub-paths."
+  }
+}
