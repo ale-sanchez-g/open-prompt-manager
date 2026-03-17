@@ -8,6 +8,37 @@ on:
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────────
+  # Terraform: validate configuration and run the test suite (no AWS creds needed)
+  # ─────────────────────────────────────────────────────────────────────────────
+  terraform:
+    name: Terraform Validate & Test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.5"
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Test
+        run: terraform test
+
+  # ─────────────────────────────────────────────────────────────────────────────
   # Backend: lint, unit tests, API integration tests, coverage
   # ─────────────────────────────────────────────────────────────────────────────
   backend-test:
@@ -180,7 +211,7 @@ jobs:
       - name: Wait for backend to be healthy
         run: |
           for i in $(seq 1 30); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health || echo "000")
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/health || echo "000")
             echo "Attempt $i: HTTP $STATUS"
             if [ "$STATUS" = "200" ]; then
               echo "Backend is healthy"
@@ -194,19 +225,19 @@ jobs:
 
       - name: Verify health endpoint response
         run: |
-          RESPONSE=$(curl -s http://localhost:8000/health)
+          RESPONSE=$(curl -s http://localhost:8000/api/health)
           echo "Response: $RESPONSE"
           echo "$RESPONSE" | grep -q '"status":"ok"'
 
       - name: Verify API docs are accessible
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/docs)
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/docs)
           echo "Docs HTTP status: $STATUS"
           test "$STATUS" = "200"
 
       - name: Smoke test — create a prompt via API
         run: |
-          RESPONSE=$(curl -s -X POST http://localhost:8000/prompts/ \
+          RESPONSE=$(curl -s -X POST http://localhost:8000/api/prompts/ \
             -H "Content-Type: application/json" \
             -d '{
               "name": "CI Smoke Prompt",
@@ -222,7 +253,7 @@ jobs:
           echo "Created prompt ID: $PROMPT_ID"
 
           # Render the prompt
-          RENDER=$(curl -s -X POST "http://localhost:8000/prompts/$PROMPT_ID/render" \
+          RENDER=$(curl -s -X POST "http://localhost:8000/api/prompts/$PROMPT_ID/render" \
             -H "Content-Type: application/json" \
             -d '{"variables": {"name": "CI"}}')
           echo "Render response: $RENDER"
@@ -230,7 +261,7 @@ jobs:
 
       - name: Smoke test — create a tag
         run: |
-          RESPONSE=$(curl -s -X POST http://localhost:8000/tags/ \
+          RESPONSE=$(curl -s -X POST http://localhost:8000/api/tags/ \
             -H "Content-Type: application/json" \
             -d '{"name": "ci-tag", "color": "#3B82F6"}')
           echo "Tag response: $RESPONSE"
@@ -238,7 +269,7 @@ jobs:
 
       - name: Smoke test — create an agent
         run: |
-          RESPONSE=$(curl -s -X POST http://localhost:8000/agents/ \
+          RESPONSE=$(curl -s -X POST http://localhost:8000/api/agents/ \
             -H "Content-Type: application/json" \
             -d '{"name": "CI Agent", "type": "test", "status": "active"}')
           echo "Agent response: $RESPONSE"
@@ -246,9 +277,18 @@ jobs:
 
       - name: Verify frontend is serving
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:80)
-          echo "Frontend HTTP status: $STATUS"
-          test "$STATUS" = "200"
+          for i in $(seq 1 20); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:80 || echo "000")
+            echo "Attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "Frontend is serving"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Frontend did not become available in time"
+          docker compose logs frontend
+          exit 1
 
       - name: Print service logs on failure
         if: failure()

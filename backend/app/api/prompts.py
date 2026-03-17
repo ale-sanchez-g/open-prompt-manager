@@ -12,7 +12,7 @@ from app.models.schemas import (
 )
 from app.services.prompt_service import render_prompt, update_prompt_stats, _increment_version
 
-router = APIRouter(prefix='/prompts', tags=['prompts'])
+router = APIRouter(prefix='/api/prompts', tags=['prompts'])
 
 
 def _get_prompt_or_404(prompt_id: int, db: Session) -> Prompt:

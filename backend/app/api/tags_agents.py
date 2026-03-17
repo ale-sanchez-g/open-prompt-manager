@@ -13,7 +13,7 @@ router = APIRouter(tags=['tags-agents'])
 
 # ── Tags ──────────────────────────────────────────────────────────────────────
 
-tags_router = APIRouter(prefix='/tags')
+tags_router = APIRouter(prefix='/api/tags')
 
 
 @tags_router.get('/', response_model=list[TagResponse])
@@ -44,7 +44,7 @@ def delete_tag(tag_id: int, db: Session = Depends(get_db)):
 
 # ── Agents ────────────────────────────────────────────────────────────────────
 
-agents_router = APIRouter(prefix='/agents')
+agents_router = APIRouter(prefix='/api/agents')
 
 
 @agents_router.get('/', response_model=list[AgentResponse])

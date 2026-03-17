@@ -13,6 +13,9 @@ app = FastAPI(
     title='Prompt Management Framework',
     description='A production-ready framework for managing AI prompts across agents and organizations.',
     version='1.0.0',
+    docs_url='/api/docs',
+    redoc_url='/api/redoc',
+    openapi_url='/api/openapi.json',
 )
 
 cors_origins_env = os.getenv('CORS_ORIGINS', 'http://localhost,http://localhost:3000,http://localhost:80')
@@ -34,6 +37,6 @@ app.include_router(tags_router)
 app.include_router(agents_router)
 
 
-@app.get('/health')
+@app.get('/api/health')
 def health_check():
     return {'status': 'ok', 'version': '1.0.0'}
