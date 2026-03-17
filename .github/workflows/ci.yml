@@ -277,9 +277,18 @@ jobs:
 
       - name: Verify frontend is serving
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:80)
-          echo "Frontend HTTP status: $STATUS"
-          test "$STATUS" = "200"
+          for i in $(seq 1 20); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:80 || echo "000")
+            echo "Attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "Frontend is serving"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Frontend did not become available in time"
+          docker compose logs frontend
+          exit 1
 
       - name: Print service logs on failure
         if: failure()
