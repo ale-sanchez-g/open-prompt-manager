@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FileText, Tag, Bot, TrendingUp, GitBranch, Layers, ArrowRight } from 'lucide-react';
+import { FileText, Tag, Bot, TrendingUp, GitBranch, Layers, ArrowRight, Cpu } from 'lucide-react';
 
 function FeatureCard({ icon: Icon, title, description, color }) {
   return (
@@ -102,6 +102,12 @@ export default function LandingPage() {
             description="Track ratings, success rate, usage count, execution time, token count, and cost to measure and improve prompt quality."
             color="bg-orange-600"
           />
+          <FeatureCard
+            icon={Cpu}
+            title="MCP / AI Agent Connectivity"
+            description="Expose all prompts as MCP tools so AI coding assistants like GitHub Copilot and Claude Code can discover and use them automatically."
+            color="bg-teal-600"
+          />
         </div>
       </section>
 
@@ -129,6 +135,48 @@ export default function LandingPage() {
             title="Monitor Quality"
             description="Review ratings, success rates, and usage statistics in the dashboard to continuously improve your prompts."
           />
+        </div>
+      </section>
+
+      {/* MCP / AI Agent Connectivity */}
+      <section className="max-w-4xl mx-auto px-6 py-12">
+        <h2 className="text-2xl font-bold text-white mb-2 text-center">Connect AI Agents via MCP</h2>
+        <p className="text-gray-400 text-center mb-8 text-sm">
+          The built-in <a href="https://modelcontextprotocol.io/" target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:underline">Model Context Protocol</a> server at <code className="bg-gray-800 text-teal-300 px-1 rounded">http://localhost:8000/mcp</code> exposes all prompt tools so coding assistants can use them directly.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* VS Code */}
+          <div className="bg-gray-800 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-3">VS Code (GitHub Copilot)</h3>
+            <p className="text-gray-400 text-sm mb-4">Add this to <code className="bg-gray-700 px-1 rounded">.vscode/mcp.json</code> in your project:</p>
+            <pre className="bg-gray-900 rounded-lg p-4 text-sm text-teal-300 overflow-x-auto">{`{
+  "servers": {
+    "open-prompt-manager": {
+      "type": "http",
+      "url": "http://localhost:8000/mcp"
+    }
+  }
+}`}</pre>
+            <p className="text-gray-500 text-xs mt-3">Open the Chat panel → Agent mode, and your prompts are available as context tools.</p>
+          </div>
+          {/* Claude Code */}
+          <div className="bg-gray-800 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-3">Claude Code</h3>
+            <p className="text-gray-400 text-sm mb-4">Register the server with one command:</p>
+            <pre className="bg-gray-900 rounded-lg p-4 text-sm text-teal-300 overflow-x-auto">{`claude mcp add \\
+  --transport http \\
+  open-prompt-manager \\
+  http://localhost:8000/mcp`}</pre>
+            <p className="text-gray-500 text-xs mt-3">Verify with <code className="bg-gray-700 px-1 rounded">claude mcp list</code>. All tools become available in every Claude Code session.</p>
+          </div>
+        </div>
+        <div className="mt-6 bg-gray-800 rounded-xl p-5">
+          <h3 className="text-base font-semibold text-white mb-3">Available MCP Tools</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 text-sm">
+            {['list_prompts', 'get_prompt', 'render_prompt', 'create_prompt', 'list_tags', 'create_tag', 'list_agents'].map(tool => (
+              <span key={tool} className="bg-gray-900 text-teal-300 rounded px-2 py-1 font-mono text-xs">{tool}</span>
+            ))}
+          </div>
         </div>
       </section>
 
