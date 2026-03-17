@@ -207,6 +207,28 @@ def build_mcp_server() -> FastMCP:
             db.close()
 
     @mcp.tool()
+    def create_tag(name: str, color: str = "#3B82F6") -> dict:
+        """
+        Create a new tag.
+
+        Args:
+            name:  Unique human-readable label for the tag (e.g. "safety").
+            color: Hex colour code used in the UI (default: "#3B82F6").
+        """
+        db = _db_module.SessionLocal()
+        try:
+            existing = db.query(Tag).filter(Tag.name == name).first()
+            if existing is not None:
+                return {"error": f"Tag '{name}' already exists (id={existing.id})"}
+            tag = Tag(name=name, color=color)
+            db.add(tag)
+            db.commit()
+            db.refresh(tag)
+            return {"id": tag.id, "name": tag.name, "color": tag.color}
+        finally:
+            db.close()
+
+    @mcp.tool()
     def list_agents() -> list[dict]:
         """Return all agents registered in the system."""
         db = _db_module.SessionLocal()

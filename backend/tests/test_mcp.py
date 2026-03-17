@@ -142,6 +142,7 @@ def test_mcp_tools_list(mcp_client: TestClient):
         "render_prompt",
         "create_prompt",
         "list_tags",
+        "create_tag",
         "list_agents",
     }
 
@@ -247,6 +248,33 @@ def test_list_tags_returns_created_tag(mcp_client: TestClient, client: TestClien
     client.post("/api/tags/", json={"name": "mcp-tag", "color": "#FF0000"})
     result = call_tool(mcp_client, "list_tags")
     assert any(t["name"] == "mcp-tag" for t in result)
+
+
+# ── Tool: create_tag ──────────────────────────────────────────────────────────
+
+def test_create_tag_via_mcp(mcp_client: TestClient):
+    result = call_tool(mcp_client, "create_tag", {"name": "my-tag", "color": "#AABBCC"})
+    assert result["name"] == "my-tag"
+    assert result["color"] == "#AABBCC"
+    assert "id" in result
+
+
+def test_create_tag_default_color(mcp_client: TestClient):
+    result = call_tool(mcp_client, "create_tag", {"name": "default-color-tag"})
+    assert result["color"] == "#3B82F6"
+
+
+def test_create_tag_appears_in_list_tags(mcp_client: TestClient):
+    call_tool(mcp_client, "create_tag", {"name": "listed-tag", "color": "#123456"})
+    tags = call_tool(mcp_client, "list_tags")
+    assert any(t["name"] == "listed-tag" for t in tags)
+
+
+def test_create_tag_duplicate_returns_error(mcp_client: TestClient):
+    call_tool(mcp_client, "create_tag", {"name": "dup-tag", "color": "#FFFFFF"})
+    result = call_tool(mcp_client, "create_tag", {"name": "dup-tag", "color": "#000000"})
+    assert "error" in result
+    assert "dup-tag" in result["error"]
 
 
 # ── Tool: list_agents ─────────────────────────────────────────────────────────
