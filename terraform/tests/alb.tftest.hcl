@@ -127,8 +127,8 @@ run "backend_target_group_health_check_path" {
   command = plan
 
   assert {
-    condition     = aws_lb_target_group.backend.health_check[0].path == "/health"
-    error_message = "Backend target group health check path must be '/health'."
+    condition     = aws_lb_target_group.backend.health_check[0].path == "/api/health"
+    error_message = "Backend target group health check path must be '/api/health'."
   }
 }
 

@@ -211,7 +211,7 @@ jobs:
       - name: Wait for backend to be healthy
         run: |
           for i in $(seq 1 30); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health || echo "000")
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/health || echo "000")
             echo "Attempt $i: HTTP $STATUS"
             if [ "$STATUS" = "200" ]; then
               echo "Backend is healthy"
@@ -225,19 +225,19 @@ jobs:
 
       - name: Verify health endpoint response
         run: |
-          RESPONSE=$(curl -s http://localhost:8000/health)
+          RESPONSE=$(curl -s http://localhost:8000/api/health)
           echo "Response: $RESPONSE"
           echo "$RESPONSE" | grep -q '"status":"ok"'
 
       - name: Verify API docs are accessible
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/docs)
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/docs)
           echo "Docs HTTP status: $STATUS"
           test "$STATUS" = "200"
 
       - name: Smoke test — create a prompt via API
         run: |
-          RESPONSE=$(curl -s -X POST http://localhost:8000/prompts/ \
+          RESPONSE=$(curl -s -X POST http://localhost:8000/api/prompts/ \
             -H "Content-Type: application/json" \
             -d '{
               "name": "CI Smoke Prompt",
@@ -253,7 +253,7 @@ jobs:
           echo "Created prompt ID: $PROMPT_ID"
 
           # Render the prompt
-          RENDER=$(curl -s -X POST "http://localhost:8000/prompts/$PROMPT_ID/render" \
+          RENDER=$(curl -s -X POST "http://localhost:8000/api/prompts/$PROMPT_ID/render" \
             -H "Content-Type: application/json" \
             -d '{"variables": {"name": "CI"}}')
           echo "Render response: $RENDER"
@@ -261,7 +261,7 @@ jobs:
 
       - name: Smoke test — create a tag
         run: |
-          RESPONSE=$(curl -s -X POST http://localhost:8000/tags/ \
+          RESPONSE=$(curl -s -X POST http://localhost:8000/api/tags/ \
             -H "Content-Type: application/json" \
             -d '{"name": "ci-tag", "color": "#3B82F6"}')
           echo "Tag response: $RESPONSE"
@@ -269,7 +269,7 @@ jobs:
 
       - name: Smoke test — create an agent
         run: |
-          RESPONSE=$(curl -s -X POST http://localhost:8000/agents/ \
+          RESPONSE=$(curl -s -X POST http://localhost:8000/api/agents/ \
             -H "Content-Type: application/json" \
             -d '{"name": "CI Agent", "type": "test", "status": "active"}')
           echo "Agent response: $RESPONSE"
