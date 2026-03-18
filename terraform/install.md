@@ -58,7 +58,7 @@ Internet
 | **Internet Gateway (IGW)** | Enables inbound/outbound internet traffic for the public subnets. |
 | **NAT Gateway** | Sits in the public subnet; allows ECS tasks in private subnets to reach the internet (e.g. to pull images) without being publicly reachable. |
 | **Route Tables** | Public RT routes `0.0.0.0/0` → IGW. Private RT routes `0.0.0.0/0` → NAT GW. |
-| **Application Load Balancer (ALB)** | Internet-facing; a single listener rule routes `/api/*` (priority 10) to the backend — everything else goes to the frontend. All API routes are prefixed with `/api/` to avoid collisions with React SPA client-side routes. |
+| **Application Load Balancer (ALB)** | Internet-facing; two listener rules route traffic to the backend: priority 10 (`/api/*` → REST API) and priority 20 (`/mcp`, `/mcp/*` → MCP server). Everything else goes to the frontend React SPA. |
 | **RDS PostgreSQL 16** | Single-AZ `db.t4g.micro` in the private subnets. Password auto-generated and stored in AWS Secrets Manager; injected into the backend container at runtime. Port 5432 is open only from the backend ECS security group. |
 | **ECS Fargate** | Serverless container runtime. Runs backend and frontend tasks in private subnets. |
 | **ECR** | Private container image registry for backend and frontend Docker images. |
@@ -167,7 +167,9 @@ Review the resources that will be created. Key items to confirm:
 - 1 Internet Gateway
 - 1 NAT Gateway + 1 Elastic IP
 - 2 Route Tables (public and private) with associations
-- 1 Application Load Balancer with **1 backend listener rule** (priority 10: `/api/*` → backend)
+- 1 Application Load Balancer with **2 backend listener rules**:
+  - priority 10: `/api/*` → backend REST API
+  - priority 20: `/mcp`, `/mcp/*` → backend MCP server
 - 2 ECS services (backend, frontend) in private subnets
 - 2 ECR repositories
 - IAM roles for ECS task execution
@@ -191,6 +193,7 @@ Outputs:
 
 alb_dns_name                 = "open-prompt-manager-alb-XXXXXXXXXX.us-east-1.elb.amazonaws.com"
 application_url              = "http://open-prompt-manager-alb-XXXXXXXXXX.us-east-1.elb.amazonaws.com"
+mcp_url                      = "http://open-prompt-manager-alb-XXXXXXXXXX.us-east-1.elb.amazonaws.com/mcp"
 backend_ecr_repository_url   = "XXXXXXXXXXXX.dkr.ecr.us-east-1.amazonaws.com/open-prompt-manager-backend"
 backend_target_group_arn     = "arn:aws:elasticloadbalancing:us-east-1:XXXXXXXXXXXX:targetgroup/open-prompt-manager-backend-tg/XXXXXXXXXXXXXXXX"
 db_endpoint                  = "open-prompt-manager-prod.XXXXXXXXXXXX.us-east-1.rds.amazonaws.com:5432"
@@ -236,6 +239,17 @@ curl "${ALB_URL}/api/health"
 
 # List prompts
 curl "${ALB_URL}/api/prompts/"
+```
+
+Verify the MCP server is reachable:
+
+```bash
+MCP_URL=$(terraform output -raw mcp_url)
+
+# Initialize an MCP session (returns 200 with session details)
+curl -i -X POST "${MCP_URL}" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"curl-test","version":"1.0"}}}'
 ```
 
 ---
@@ -338,6 +352,8 @@ terraform destroy
 
 | Symptom | Likely Cause | Resolution |
 |---------|-------------|------------|
+| MCP clients receive `403 Forbidden` | `MCP_ALLOWED_HOSTS` not set or missing the ALB hostname | The ECS task definition automatically sets `MCP_ALLOWED_HOSTS` to the ALB DNS name. If you added a custom domain, add it via `terraform apply -var="..."` or override the env var | 
+| MCP clients receive `404` on `/mcp` | ALB listener rule for `/mcp` not created | Run `terraform apply`; the `aws_lb_listener_rule.backend_mcp` rule (priority 20) must exist |
 | ECS tasks fail to start | Image not found in ECR | Re-push the Docker image (Step 2) |
 | `CannotPullContainerError: image Manifest does not contain descriptor matching platform 'linux/amd64'` | Image built on Apple Silicon (ARM) without `--platform linux/amd64` | Rebuild with `docker buildx build --platform linux/amd64 … --push` (Step 2b/2c) |
 | Tasks stuck in `PENDING` | IAM execution role missing permissions | Check `aws_iam_role.ecs_task_execution` attachments |
@@ -353,6 +369,73 @@ terraform destroy
 aws logs tail /ecs/open-prompt-manager/backend --follow
 aws logs tail /ecs/open-prompt-manager/frontend --follow
 ```
+
+---
+
+## MCP Server (AI Agent Connectivity)
+
+The backend exposes a **Model Context Protocol (MCP)** server at `/mcp`. This lets AI agents (Claude, Cursor, VS Code Copilot, etc.) discover and use your prompts programmatically via standardised tool calls.
+
+### How it works in AWS
+
+| Layer | What happens |
+|---|---|
+| ALB listener rule (priority 20) | Routes `/mcp` and `/mcp/*` to the backend target group |
+| ECS backend container | `MCP_ALLOWED_HOSTS` is automatically set to the ALB DNS name so the host-validation middleware accepts requests arriving through the load balancer |
+| MCP server | Mounted at `/mcp`; runs in stateless HTTP mode — every request is self-contained |
+
+### Connecting an AI agent
+
+Use the `mcp_url` Terraform output as the server URL in your MCP client configuration:
+
+```bash
+MCP_URL=$(terraform output -raw mcp_url)
+echo "MCP endpoint: ${MCP_URL}"
+# e.g. http://open-prompt-manager-alb-XXXXXXXXXX.us-east-1.elb.amazonaws.com/mcp
+```
+
+**Example: Claude Desktop (`claude_desktop_config.json`)**
+
+```json
+{
+  "mcpServers": {
+    "open-prompt-manager": {
+      "url": "http://<alb-dns-name>/mcp"
+    }
+  }
+}
+```
+
+**Example: VS Code (`settings.json`)**
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "open-prompt-manager": {
+        "type": "http",
+        "url": "http://<alb-dns-name>/mcp"
+      }
+    }
+  }
+}
+```
+
+Replace `<alb-dns-name>` with the value of `terraform output -raw alb_dns_name`.
+
+### Adding a custom domain to MCP_ALLOWED_HOSTS
+
+If you front the ALB with a custom domain (e.g., via Route 53), you must add it to the allowed hosts list. Override the environment variable in the ECS task definition by adding a `tfvars` entry or by editing `ecs.tf`:
+
+```hcl
+# In ecs.tf – extend the environment block of the backend container
+{
+  name  = "MCP_ALLOWED_HOSTS"
+  value = "${aws_lb.main.dns_name},prompts.example.com"
+}
+```
+
+Then run `terraform apply` to redeploy the backend task.
 
 ---
 

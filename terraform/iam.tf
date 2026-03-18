@@ -21,8 +21,8 @@ resource "aws_iam_role" "ecs_task_execution" {
 
   tags = {
     Name        = "${var.project_name}-ecs-task-execution-role"
-    project     = var.project_name
-    environment = var.environment
+    Project     = var.project_name
+    Environment = var.environment
   }
 }
 
@@ -44,8 +44,8 @@ resource "aws_iam_role" "ecs_task" {
 
   tags = {
     Name        = "${var.project_name}-ecs-task-role"
-    project     = var.project_name
-    environment = var.environment
+    Project     = var.project_name
+    Environment = var.environment
   }
 }
 

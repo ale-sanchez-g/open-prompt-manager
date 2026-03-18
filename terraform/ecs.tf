@@ -7,8 +7,8 @@ resource "aws_cloudwatch_log_group" "backend" {
 
   tags = {
     Name        = "${var.project_name}-backend-logs"
-    project     = var.project_name
-    environment = var.environment
+    Project     = var.project_name
+    Environment = var.environment
   }
 }
 
@@ -18,8 +18,8 @@ resource "aws_cloudwatch_log_group" "frontend" {
 
   tags = {
     Name        = "${var.project_name}-frontend-logs"
-    project     = var.project_name
-    environment = var.environment
+    Project     = var.project_name
+    Environment = var.environment
   }
 }
 
@@ -36,8 +36,8 @@ resource "aws_ecs_cluster" "main" {
 
   tags = {
     Name        = "${var.project_name}-cluster"
-    project     = var.project_name
-    environment = var.environment
+    Project     = var.project_name
+    Environment = var.environment
   }
 }
 
@@ -86,6 +86,12 @@ resource "aws_ecs_task_definition" "backend" {
         {
           name  = "CORS_ORIGINS"
           value = "http://${aws_lb.main.dns_name}"
+        },
+        {
+          # Allow MCP clients connecting through the ALB.  The default only
+          # permits localhost, which would cause 403s in production.
+          name  = "MCP_ALLOWED_HOSTS"
+          value = aws_lb.main.dns_name
         }
       ]
 
@@ -117,8 +123,8 @@ resource "aws_ecs_task_definition" "backend" {
 
   tags = {
     Name        = "${var.project_name}-backend-task"
-    project     = var.project_name
-    environment = var.environment
+    Project     = var.project_name
+    Environment = var.environment
   }
 }
 
@@ -150,8 +156,8 @@ resource "aws_ecs_service" "backend" {
 
   tags = {
     Name        = "${var.project_name}-backend-service"
-    project     = var.project_name
-    environment = var.environment
+    Project     = var.project_name
+    Environment = var.environment
   }
 }
 
@@ -202,8 +208,8 @@ resource "aws_ecs_task_definition" "frontend" {
 
   tags = {
     Name        = "${var.project_name}-frontend-task"
-    project     = var.project_name
-    environment = var.environment
+    Project     = var.project_name
+    Environment = var.environment
   }
 }
 
@@ -233,7 +239,7 @@ resource "aws_ecs_service" "frontend" {
 
   tags = {
     Name        = "${var.project_name}-frontend-service"
-    project     = var.project_name
-    environment = var.environment
+    Project     = var.project_name
+    Environment = var.environment
   }
 }

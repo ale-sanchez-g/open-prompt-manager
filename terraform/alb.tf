@@ -13,8 +13,8 @@ resource "aws_lb" "main" {
 
   tags = {
     Name        = "${var.project_name}-alb"
-    project     = var.project_name
-    environment = var.environment
+    Project     = var.project_name
+    Environment = var.environment
   }
 }
 
@@ -42,8 +42,8 @@ resource "aws_lb_target_group" "frontend" {
 
   tags = {
     Name        = "${var.project_name}-frontend-tg"
-    project     = var.project_name
-    environment = var.environment
+    Project     = var.project_name
+    Environment = var.environment
   }
 }
 
@@ -68,17 +68,16 @@ resource "aws_lb_target_group" "backend" {
 
   tags = {
     Name        = "${var.project_name}-backend-tg"
-    project     = var.project_name
-    environment = var.environment
+    Project     = var.project_name
+    Environment = var.environment
   }
 }
 
 # ─────────────────────────────────────────────
 # HTTP Listener
-# All backend routes are prefixed with /api/.
-# A single path-pattern rule sends /api/* to
-# the backend; everything else goes to the
-# React frontend SPA.
+# /api/* routes go to the backend.
+# /mcp and /mcp/* routes go to the backend MCP server.
+# Everything else is forwarded to the React frontend SPA.
 # ─────────────────────────────────────────────
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
@@ -89,6 +88,22 @@ resource "aws_lb_listener" "http" {
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.frontend.arn
+  }
+}
+
+resource "aws_lb_listener_rule" "backend_mcp" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 20
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.backend.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/mcp", "/mcp/*"]
+    }
   }
 }
 

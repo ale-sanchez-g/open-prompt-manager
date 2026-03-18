@@ -36,6 +36,7 @@ When you open the application, you will first land on the **Landing Page** (`/`)
 | Database | SQLite (upgradeable to PostgreSQL/MySQL) |
 | Frontend | React 18, Tailwind CSS, React Router v6, Axios |
 | Infrastructure | Docker, Kubernetes, Helm 3 |
+| AI Connectivity | MCP (Model Context Protocol) via `mcp==1.23.3` |
 
 ## Quick Start
 
@@ -57,6 +58,7 @@ Access:
 - **Dashboard**: http://localhost/dashboard
 - **Backend API**: http://localhost:8000/api
 - **API Docs**: http://localhost:8000/api/docs
+- **MCP Endpoint**: http://localhost:8000/mcp
 
 ### Local Development
 
@@ -115,6 +117,77 @@ cd frontend && npm install && npm start
 |--------|------|-------------|
 | GET | `/api/health` | Health check |
 
+## MCP Server
+
+Open Prompt Manager exposes an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server so AI coding assistants (GitHub Copilot, Claude Code, etc.) can discover and use prompts programmatically without any custom integration code.
+
+### Endpoint
+
+```
+POST http://localhost:8000/mcp
+```
+
+The server uses the **Streamable HTTP** transport (`stateless_http=True`), which means every request is self-contained — no persistent session is required.
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `list_prompts` | List prompts, optionally filtered by a search string |
+| `get_prompt` | Retrieve a single prompt by ID |
+| `render_prompt` | Render a prompt, substituting variables and resolving components |
+| `create_prompt` | Create a new prompt |
+| `list_tags` | List all tags |
+| `create_tag` | Create a new tag |
+| `list_agents` | List all registered agents |
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_ALLOWED_HOSTS` | `localhost,localhost:8000,127.0.0.1,127.0.0.1:8000` | Comma-separated list of host names allowed to connect to the MCP endpoint (DNS rebinding protection). Add your production domain here. |
+
+### Connect from VS Code (GitHub Copilot)
+
+Create or update `.vscode/mcp.json` in your project:
+
+```json
+{
+  "servers": {
+    "open-prompt-manager": {
+      "type": "http",
+      "url": "http://localhost:8000/mcp"
+    }
+  }
+}
+```
+
+Open the **Chat** panel in VS Code, switch to **Agent mode**, and your prompts will be available as context tools.
+
+### Connect from Claude Code
+
+```bash
+claude mcp add --transport http open-prompt-manager http://localhost:8000/mcp
+```
+
+Verify the server is registered:
+
+```bash
+claude mcp list
+```
+
+Claude Code will now be able to call `list_prompts`, `get_prompt`, `render_prompt`, `create_prompt`, `list_tags`, `create_tag`, and `list_agents` as tools during conversations.
+
+### Production Deployment
+
+When running behind a load balancer or reverse proxy, allow the production host:
+
+```bash
+MCP_ALLOWED_HOSTS="localhost,localhost:8000,prompt-manager.yourdomain.com" docker-compose up -d
+```
+
+The AWS ALB listener rule in `terraform/alb.tf` already routes `/mcp` and `/mcp/*` requests to the backend target group.
+
 ## Prompt Syntax
 
 ### Variables
@@ -153,8 +226,9 @@ prompt-management-framework/
 │   │   │   └── tags_agents.py     # Tags and Agents endpoints
 │   │   ├── services/
 │   │   │   └── prompt_service.py  # Business logic
-│   │   └── database/
-│   │       └── base.py            # Database configuration
+│   │   ├── database/
+│   │   │   └── base.py            # Database configuration
+│   │   └── mcp_server.py          # MCP server (AI agent connectivity)
 │   ├── main.py
 │   ├── requirements.txt
 │   └── Dockerfile
@@ -220,6 +294,7 @@ helm install prompt-manager ./helm/prompt-manager \
 |----------|---------|-------------|
 | `DATABASE_URL` | `sqlite:///./data/prompts.db` | Database connection string |
 | `CORS_ORIGINS` | `http://localhost,http://localhost:3000` | Comma-separated allowed CORS origins |
+| `MCP_ALLOWED_HOSTS` | `localhost,localhost:8000,127.0.0.1,127.0.0.1:8000` | Comma-separated host names allowed to connect to the MCP endpoint |
 
 ### Frontend
 | Variable | Default | Description |

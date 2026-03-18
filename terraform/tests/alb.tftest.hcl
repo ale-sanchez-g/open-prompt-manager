@@ -51,13 +51,13 @@ run "alb_has_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_lb.main.tags["project"] == var.project_name
-    error_message = "ALB must have 'project' tag."
+    condition     = aws_lb.main.tags["Project"] == var.project_name
+    error_message = "ALB must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_lb.main.tags["environment"] == var.environment
-    error_message = "ALB must have 'environment' tag."
+    condition     = aws_lb.main.tags["Environment"] == var.environment
+    error_message = "ALB must have 'Environment' tag."
   }
 }
 
@@ -95,13 +95,13 @@ run "frontend_target_group_has_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_lb_target_group.frontend.tags["project"] == var.project_name
-    error_message = "Frontend target group must have 'project' tag."
+    condition     = aws_lb_target_group.frontend.tags["Project"] == var.project_name
+    error_message = "Frontend target group must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_lb_target_group.frontend.tags["environment"] == var.environment
-    error_message = "Frontend target group must have 'environment' tag."
+    condition     = aws_lb_target_group.frontend.tags["Environment"] == var.environment
+    error_message = "Frontend target group must have 'Environment' tag."
   }
 }
 
@@ -136,13 +136,13 @@ run "backend_target_group_has_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_lb_target_group.backend.tags["project"] == var.project_name
-    error_message = "Backend target group must have 'project' tag."
+    condition     = aws_lb_target_group.backend.tags["Project"] == var.project_name
+    error_message = "Backend target group must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_lb_target_group.backend.tags["environment"] == var.environment
-    error_message = "Backend target group must have 'environment' tag."
+    condition     = aws_lb_target_group.backend.tags["Environment"] == var.environment
+    error_message = "Backend target group must have 'Environment' tag."
   }
 }
 
@@ -164,5 +164,53 @@ run "http_listener_protocol_is_http" {
   assert {
     condition     = aws_lb_listener.http.protocol == "HTTP"
     error_message = "HTTP listener protocol must be 'HTTP'."
+  }
+}
+
+# ─────────────────────────────────────────────
+# MCP Listener Rule
+# ─────────────────────────────────────────────
+run "mcp_listener_rule_action_type_is_forward" {
+  command = plan
+
+  assert {
+    condition     = aws_lb_listener_rule.backend_mcp.action[0].type == "forward"
+    error_message = "MCP listener rule action type must be 'forward'."
+  }
+}
+
+run "mcp_listener_rule_priority_is_20" {
+  command = plan
+
+  assert {
+    condition     = aws_lb_listener_rule.backend_mcp.priority == 20
+    error_message = "MCP listener rule priority must be 20."
+  }
+}
+
+run "mcp_listener_rule_has_lower_priority_than_api" {
+  command = plan
+
+  assert {
+    condition     = aws_lb_listener_rule.backend_mcp.priority > aws_lb_listener_rule.backend_api.priority
+    error_message = "MCP listener rule priority must be numerically greater than the API rule priority."
+  }
+}
+
+run "mcp_listener_rule_matches_mcp_path" {
+  command = plan
+
+  assert {
+    condition     = contains(flatten([for c in aws_lb_listener_rule.backend_mcp.condition : [for pp in c.path_pattern : pp.values]]), "/mcp")
+    error_message = "MCP listener rule must match the exact /mcp path."
+  }
+}
+
+run "mcp_listener_rule_matches_mcp_wildcard" {
+  command = plan
+
+  assert {
+    condition     = contains(flatten([for c in aws_lb_listener_rule.backend_mcp.condition : [for pp in c.path_pattern : pp.values]]), "/mcp/*")
+    error_message = "MCP listener rule must match /mcp/* sub-paths."
   }
 }
