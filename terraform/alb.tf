@@ -13,8 +13,8 @@ resource "aws_lb" "main" {
 
   tags = {
     Name        = "${var.project_name}-alb"
-    project     = var.project_name
-    environment = var.environment
+    Project     = var.project_name
+    Environment = var.environment
   }
 }
 
@@ -42,8 +42,8 @@ resource "aws_lb_target_group" "frontend" {
 
   tags = {
     Name        = "${var.project_name}-frontend-tg"
-    project     = var.project_name
-    environment = var.environment
+    Project     = var.project_name
+    Environment = var.environment
   }
 }
 
@@ -68,8 +68,8 @@ resource "aws_lb_target_group" "backend" {
 
   tags = {
     Name        = "${var.project_name}-backend-tg"
-    project     = var.project_name
-    environment = var.environment
+    Project     = var.project_name
+    Environment = var.environment
   }
 }
 

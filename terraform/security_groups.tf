@@ -33,8 +33,8 @@ resource "aws_security_group" "alb" {
 
   tags = {
     Name        = "${var.project_name}-alb-sg"
-    project     = var.project_name
-    environment = var.environment
+    Project     = var.project_name
+    Environment = var.environment
   }
 }
 
@@ -65,8 +65,8 @@ resource "aws_security_group" "frontend" {
 
   tags = {
     Name        = "${var.project_name}-frontend-sg"
-    project     = var.project_name
-    environment = var.environment
+    Project     = var.project_name
+    Environment = var.environment
   }
 }
 
@@ -97,8 +97,8 @@ resource "aws_security_group" "backend" {
 
   tags = {
     Name        = "${var.project_name}-backend-sg"
-    project     = var.project_name
-    environment = var.environment
+    Project     = var.project_name
+    Environment = var.environment
   }
 }
 
@@ -130,7 +130,7 @@ resource "aws_security_group" "rds" {
 
   tags = {
     Name        = "${var.project_name}-rds-sg"
-    project     = var.project_name
-    environment = var.environment
+    Project     = var.project_name
+    Environment = var.environment
   }
 }

@@ -22,8 +22,8 @@ resource "aws_secretsmanager_secret" "db_url" {
 
   tags = {
     Name        = "${var.project_name}-db-url-secret"
-    project     = var.project_name
-    environment = var.environment
+    Project     = var.project_name
+    Environment = var.environment
   }
 }
 
@@ -53,8 +53,8 @@ resource "aws_db_subnet_group" "main" {
 
   tags = {
     Name        = "${var.project_name}-db-subnet-group"
-    project     = var.project_name
-    environment = var.environment
+    Project     = var.project_name
+    Environment = var.environment
   }
 }
 
@@ -94,7 +94,7 @@ resource "aws_db_instance" "main" {
 
   tags = {
     Name        = "${var.project_name}-db"
-    project     = var.project_name
-    environment = var.environment
+    Project     = var.project_name
+    Environment = var.environment
   }
 }
