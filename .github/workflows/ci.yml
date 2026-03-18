@@ -6,6 +6,8 @@ on:
   pull_request:
     branches: ["**"]
 
+permissions: {}  # Deny all at workflow level — each job opts in explicitly
+
 jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   # Terraform: validate configuration and run the test suite (no AWS creds needed)
@@ -44,6 +46,8 @@ jobs:
   backend-test:
     name: Backend Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     defaults:
       run:
@@ -85,6 +89,8 @@ jobs:
     name: pip-audit (dependency vulnerability scan)
     runs-on: ubuntu-latest
     needs: backend-test
+    permissions:
+      contents: read
 
     defaults:
       run:
@@ -123,6 +129,8 @@ jobs:
   frontend-test:
     name: Frontend Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     defaults:
       run:
@@ -161,6 +169,8 @@ jobs:
     name: Frontend Build
     runs-on: ubuntu-latest
     needs: frontend-test
+    permissions:
+      contents: read
 
     defaults:
       run:
@@ -204,6 +214,8 @@ jobs:
     name: Docker Build
     runs-on: ubuntu-latest
     needs: [backend-test, pip-audit, frontend-build]
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout code
@@ -237,6 +249,8 @@ jobs:
     name: E2E Smoke Test
     runs-on: ubuntu-latest
     needs: docker-build
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout code
