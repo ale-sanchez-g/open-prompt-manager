@@ -1,0 +1,129 @@
+name: Dependabot Auto-Merge
+
+# Triggered for every Dependabot pull request (opened, updated, or re-opened).
+# Runs the full backend + frontend test suites, then merges automatically if
+# every test job succeeds.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# Give the workflow the minimum permissions required to read the code and
+# merge the pull request.
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Guard: skip everything when the PR was not opened by Dependabot
+  # ─────────────────────────────────────────────────────────────────────────────
+  check-actor:
+    name: Check PR actor
+    runs-on: ubuntu-latest
+    outputs:
+      is-dependabot: ${{ steps.actor-check.outputs.result }}
+    steps:
+      - name: Determine whether PR is from Dependabot
+        id: actor-check
+        run: |
+          if [ "${{ github.actor }}" = "dependabot[bot]" ]; then
+            echo "result=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Backend: install dependencies and run pytest
+  # ─────────────────────────────────────────────────────────────────────────────
+  backend-test:
+    name: Backend Tests
+    needs: check-actor
+    if: needs.check-actor.outputs.is-dependabot == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements-test.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-test.txt
+
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ \
+            --cov=app \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            -v
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Frontend: install dependencies and run Jest
+  # ─────────────────────────────────────────────────────────────────────────────
+  frontend-test:
+    name: Frontend Tests
+    needs: check-actor
+    if: needs.check-actor.outputs.is-dependabot == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Run tests (CI mode, no watch)
+        run: npm test -- --watchAll=false --ci
+        env:
+          CI: true
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Auto-merge: squash-merge the PR after both test jobs succeed
+  # ─────────────────────────────────────────────────────────────────────────────
+  auto-merge:
+    name: Auto-Merge
+    needs: [check-actor, backend-test, frontend-test]
+    if: needs.check-actor.outputs.is-dependabot == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge pull request
+        run: gh pr merge --squash --auto "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
