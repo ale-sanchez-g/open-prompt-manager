@@ -74,6 +74,14 @@ make dev-frontend
 cd frontend && npm install && npm start
 ```
 
+### Frontend Build Notes (CRA)
+
+- The frontend currently uses Create React App (`react-scripts@5`).
+- Docker builds use `npm ci` (lockfile-based, deterministic installs).
+- API requests default to relative `/api/*` paths so Nginx can proxy to the backend.
+- Optional override for local direct backend calls: set `REACT_APP_API_URL` to backend origin (for example `http://localhost:8000`). Values ending with `/api` are also accepted.
+- Tailwind CSS v4 is intentionally deferred while CRA is in use. CRA v5 is not compatible with Tailwind v4's PostCSS plugin model; migrate bundler first (for example Vite), then upgrade Tailwind.
+
 ## API Reference
 
 ### Prompts

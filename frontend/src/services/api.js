@@ -1,7 +1,15 @@
 import axios from 'axios';
 
+function resolveApiBaseURL() {
+  const raw = (process.env.REACT_APP_API_URL || '').trim();
+  if (!raw) return '';
+
+  // Accept values like http://localhost:8000 or http://localhost:8000/api.
+  return raw.replace(/\/+$/, '').replace(/\/api$/, '');
+}
+
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || '',
+  baseURL: resolveApiBaseURL(),
   headers: { 'Content-Type': 'application/json' },
 });
 
