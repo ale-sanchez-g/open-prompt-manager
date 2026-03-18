@@ -63,23 +63,23 @@ run "log_groups_have_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_cloudwatch_log_group.backend.tags["project"] == var.project_name
-    error_message = "Backend log group must have 'project' tag."
+    condition     = aws_cloudwatch_log_group.backend.tags["Project"] == var.project_name
+    error_message = "Backend log group must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_cloudwatch_log_group.backend.tags["environment"] == var.environment
-    error_message = "Backend log group must have 'environment' tag."
+    condition     = aws_cloudwatch_log_group.backend.tags["Environment"] == var.environment
+    error_message = "Backend log group must have 'Environment' tag."
   }
 
   assert {
-    condition     = aws_cloudwatch_log_group.frontend.tags["project"] == var.project_name
-    error_message = "Frontend log group must have 'project' tag."
+    condition     = aws_cloudwatch_log_group.frontend.tags["Project"] == var.project_name
+    error_message = "Frontend log group must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_cloudwatch_log_group.frontend.tags["environment"] == var.environment
-    error_message = "Frontend log group must have 'environment' tag."
+    condition     = aws_cloudwatch_log_group.frontend.tags["Environment"] == var.environment
+    error_message = "Frontend log group must have 'Environment' tag."
   }
 }
 
@@ -99,13 +99,13 @@ run "ecs_cluster_has_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_ecs_cluster.main.tags["project"] == var.project_name
-    error_message = "ECS cluster must have 'project' tag."
+    condition     = aws_ecs_cluster.main.tags["Project"] == var.project_name
+    error_message = "ECS cluster must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_ecs_cluster.main.tags["environment"] == var.environment
-    error_message = "ECS cluster must have 'environment' tag."
+    condition     = aws_ecs_cluster.main.tags["Environment"] == var.environment
+    error_message = "ECS cluster must have 'Environment' tag."
   }
 }
 
@@ -161,13 +161,13 @@ run "backend_task_definition_has_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_ecs_task_definition.backend.tags["project"] == var.project_name
-    error_message = "Backend task definition must have 'project' tag."
+    condition     = aws_ecs_task_definition.backend.tags["Project"] == var.project_name
+    error_message = "Backend task definition must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_ecs_task_definition.backend.tags["environment"] == var.environment
-    error_message = "Backend task definition must have 'environment' tag."
+    condition     = aws_ecs_task_definition.backend.tags["Environment"] == var.environment
+    error_message = "Backend task definition must have 'Environment' tag."
   }
 }
 
@@ -223,13 +223,13 @@ run "frontend_task_definition_has_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_ecs_task_definition.frontend.tags["project"] == var.project_name
-    error_message = "Frontend task definition must have 'project' tag."
+    condition     = aws_ecs_task_definition.frontend.tags["Project"] == var.project_name
+    error_message = "Frontend task definition must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_ecs_task_definition.frontend.tags["environment"] == var.environment
-    error_message = "Frontend task definition must have 'environment' tag."
+    condition     = aws_ecs_task_definition.frontend.tags["Environment"] == var.environment
+    error_message = "Frontend task definition must have 'Environment' tag."
   }
 }
 
@@ -267,13 +267,13 @@ run "backend_service_has_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_ecs_service.backend.tags["project"] == var.project_name
-    error_message = "Backend ECS service must have 'project' tag."
+    condition     = aws_ecs_service.backend.tags["Project"] == var.project_name
+    error_message = "Backend ECS service must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_ecs_service.backend.tags["environment"] == var.environment
-    error_message = "Backend ECS service must have 'environment' tag."
+    condition     = aws_ecs_service.backend.tags["Environment"] == var.environment
+    error_message = "Backend ECS service must have 'Environment' tag."
   }
 }
 
@@ -308,12 +308,12 @@ run "frontend_service_has_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_ecs_service.frontend.tags["project"] == var.project_name
-    error_message = "Frontend ECS service must have 'project' tag."
+    condition     = aws_ecs_service.frontend.tags["Project"] == var.project_name
+    error_message = "Frontend ECS service must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_ecs_service.frontend.tags["environment"] == var.environment
-    error_message = "Frontend ECS service must have 'environment' tag."
+    condition     = aws_ecs_service.frontend.tags["Environment"] == var.environment
+    error_message = "Frontend ECS service must have 'Environment' tag."
   }
 }

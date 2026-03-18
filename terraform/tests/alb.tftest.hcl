@@ -51,13 +51,13 @@ run "alb_has_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_lb.main.tags["project"] == var.project_name
-    error_message = "ALB must have 'project' tag."
+    condition     = aws_lb.main.tags["Project"] == var.project_name
+    error_message = "ALB must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_lb.main.tags["environment"] == var.environment
-    error_message = "ALB must have 'environment' tag."
+    condition     = aws_lb.main.tags["Environment"] == var.environment
+    error_message = "ALB must have 'Environment' tag."
   }
 }
 
@@ -95,13 +95,13 @@ run "frontend_target_group_has_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_lb_target_group.frontend.tags["project"] == var.project_name
-    error_message = "Frontend target group must have 'project' tag."
+    condition     = aws_lb_target_group.frontend.tags["Project"] == var.project_name
+    error_message = "Frontend target group must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_lb_target_group.frontend.tags["environment"] == var.environment
-    error_message = "Frontend target group must have 'environment' tag."
+    condition     = aws_lb_target_group.frontend.tags["Environment"] == var.environment
+    error_message = "Frontend target group must have 'Environment' tag."
   }
 }
 
@@ -136,13 +136,13 @@ run "backend_target_group_has_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_lb_target_group.backend.tags["project"] == var.project_name
-    error_message = "Backend target group must have 'project' tag."
+    condition     = aws_lb_target_group.backend.tags["Project"] == var.project_name
+    error_message = "Backend target group must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_lb_target_group.backend.tags["environment"] == var.environment
-    error_message = "Backend target group must have 'environment' tag."
+    condition     = aws_lb_target_group.backend.tags["Environment"] == var.environment
+    error_message = "Backend target group must have 'Environment' tag."
   }
 }
 

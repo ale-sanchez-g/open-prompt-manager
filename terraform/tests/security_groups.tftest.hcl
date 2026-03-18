@@ -55,13 +55,13 @@ run "alb_sg_has_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_security_group.alb.tags["project"] == var.project_name
-    error_message = "ALB security group must have 'project' tag."
+    condition     = aws_security_group.alb.tags["Project"] == var.project_name
+    error_message = "ALB security group must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_security_group.alb.tags["environment"] == var.environment
-    error_message = "ALB security group must have 'environment' tag."
+    condition     = aws_security_group.alb.tags["Environment"] == var.environment
+    error_message = "ALB security group must have 'Environment' tag."
   }
 }
 
@@ -92,13 +92,13 @@ run "frontend_sg_has_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_security_group.frontend.tags["project"] == var.project_name
-    error_message = "Frontend security group must have 'project' tag."
+    condition     = aws_security_group.frontend.tags["Project"] == var.project_name
+    error_message = "Frontend security group must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_security_group.frontend.tags["environment"] == var.environment
-    error_message = "Frontend security group must have 'environment' tag."
+    condition     = aws_security_group.frontend.tags["Environment"] == var.environment
+    error_message = "Frontend security group must have 'Environment' tag."
   }
 }
 
@@ -129,12 +129,12 @@ run "backend_sg_has_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_security_group.backend.tags["project"] == var.project_name
-    error_message = "Backend security group must have 'project' tag."
+    condition     = aws_security_group.backend.tags["Project"] == var.project_name
+    error_message = "Backend security group must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_security_group.backend.tags["environment"] == var.environment
-    error_message = "Backend security group must have 'environment' tag."
+    condition     = aws_security_group.backend.tags["Environment"] == var.environment
+    error_message = "Backend security group must have 'Environment' tag."
   }
 }

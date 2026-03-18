@@ -40,13 +40,13 @@ run "backend_ecr_has_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_ecr_repository.backend.tags["project"] == var.project_name
-    error_message = "Backend ECR repository must have 'project' tag."
+    condition     = aws_ecr_repository.backend.tags["Project"] == var.project_name
+    error_message = "Backend ECR repository must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_ecr_repository.backend.tags["environment"] == var.environment
-    error_message = "Backend ECR repository must have 'environment' tag."
+    condition     = aws_ecr_repository.backend.tags["Environment"] == var.environment
+    error_message = "Backend ECR repository must have 'Environment' tag."
   }
 }
 
@@ -75,12 +75,12 @@ run "frontend_ecr_has_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_ecr_repository.frontend.tags["project"] == var.project_name
-    error_message = "Frontend ECR repository must have 'project' tag."
+    condition     = aws_ecr_repository.frontend.tags["Project"] == var.project_name
+    error_message = "Frontend ECR repository must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_ecr_repository.frontend.tags["environment"] == var.environment
-    error_message = "Frontend ECR repository must have 'environment' tag."
+    condition     = aws_ecr_repository.frontend.tags["Environment"] == var.environment
+    error_message = "Frontend ECR repository must have 'Environment' tag."
   }
 }

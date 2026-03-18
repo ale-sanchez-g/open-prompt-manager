@@ -50,13 +50,13 @@ run "vpc_has_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_vpc.main.tags["project"] == var.project_name
-    error_message = "VPC must have a 'project' tag matching var.project_name."
+    condition     = aws_vpc.main.tags["Project"] == var.project_name
+    error_message = "VPC must have a 'Project' tag matching var.project_name."
   }
 
   assert {
-    condition     = aws_vpc.main.tags["environment"] == var.environment
-    error_message = "VPC must have an 'environment' tag matching var.environment."
+    condition     = aws_vpc.main.tags["Environment"] == var.environment
+    error_message = "VPC must have an 'Environment' tag matching var.environment."
   }
 }
 
@@ -121,23 +121,23 @@ run "subnets_have_required_tags" {
   command = plan
 
   assert {
-    condition     = alltrue([for s in aws_subnet.public : s.tags["project"] == var.project_name])
-    error_message = "Public subnets must have 'project' tag."
+    condition     = alltrue([for s in aws_subnet.public : s.tags["Project"] == var.project_name])
+    error_message = "Public subnets must have 'Project' tag."
   }
 
   assert {
-    condition     = alltrue([for s in aws_subnet.public : s.tags["environment"] == var.environment])
-    error_message = "Public subnets must have 'environment' tag."
+    condition     = alltrue([for s in aws_subnet.public : s.tags["Environment"] == var.environment])
+    error_message = "Public subnets must have 'Environment' tag."
   }
 
   assert {
-    condition     = alltrue([for s in aws_subnet.private : s.tags["project"] == var.project_name])
-    error_message = "Private subnets must have 'project' tag."
+    condition     = alltrue([for s in aws_subnet.private : s.tags["Project"] == var.project_name])
+    error_message = "Private subnets must have 'Project' tag."
   }
 
   assert {
-    condition     = alltrue([for s in aws_subnet.private : s.tags["environment"] == var.environment])
-    error_message = "Private subnets must have 'environment' tag."
+    condition     = alltrue([for s in aws_subnet.private : s.tags["Environment"] == var.environment])
+    error_message = "Private subnets must have 'Environment' tag."
   }
 }
 
@@ -148,13 +148,13 @@ run "igw_has_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_internet_gateway.main.tags["project"] == var.project_name
-    error_message = "Internet Gateway must have 'project' tag."
+    condition     = aws_internet_gateway.main.tags["Project"] == var.project_name
+    error_message = "Internet Gateway must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_internet_gateway.main.tags["environment"] == var.environment
-    error_message = "Internet Gateway must have 'environment' tag."
+    condition     = aws_internet_gateway.main.tags["Environment"] == var.environment
+    error_message = "Internet Gateway must have 'Environment' tag."
   }
 }
 
@@ -174,13 +174,13 @@ run "nat_eip_has_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_eip.nat.tags["project"] == var.project_name
-    error_message = "NAT EIP must have 'project' tag."
+    condition     = aws_eip.nat.tags["Project"] == var.project_name
+    error_message = "NAT EIP must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_eip.nat.tags["environment"] == var.environment
-    error_message = "NAT EIP must have 'environment' tag."
+    condition     = aws_eip.nat.tags["Environment"] == var.environment
+    error_message = "NAT EIP must have 'Environment' tag."
   }
 }
 
@@ -188,13 +188,13 @@ run "nat_gateway_has_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_nat_gateway.main.tags["project"] == var.project_name
-    error_message = "NAT Gateway must have 'project' tag."
+    condition     = aws_nat_gateway.main.tags["Project"] == var.project_name
+    error_message = "NAT Gateway must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_nat_gateway.main.tags["environment"] == var.environment
-    error_message = "NAT Gateway must have 'environment' tag."
+    condition     = aws_nat_gateway.main.tags["Environment"] == var.environment
+    error_message = "NAT Gateway must have 'Environment' tag."
   }
 }
 
@@ -205,23 +205,23 @@ run "route_tables_have_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_route_table.public.tags["project"] == var.project_name
-    error_message = "Public route table must have 'project' tag."
+    condition     = aws_route_table.public.tags["Project"] == var.project_name
+    error_message = "Public route table must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_route_table.public.tags["environment"] == var.environment
-    error_message = "Public route table must have 'environment' tag."
+    condition     = aws_route_table.public.tags["Environment"] == var.environment
+    error_message = "Public route table must have 'Environment' tag."
   }
 
   assert {
-    condition     = aws_route_table.private.tags["project"] == var.project_name
-    error_message = "Private route table must have 'project' tag."
+    condition     = aws_route_table.private.tags["Project"] == var.project_name
+    error_message = "Private route table must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_route_table.private.tags["environment"] == var.environment
-    error_message = "Private route table must have 'environment' tag."
+    condition     = aws_route_table.private.tags["Environment"] == var.environment
+    error_message = "Private route table must have 'Environment' tag."
   }
 }
 

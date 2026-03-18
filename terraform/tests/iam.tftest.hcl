@@ -31,13 +31,13 @@ run "task_execution_role_has_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_iam_role.ecs_task_execution.tags["project"] == var.project_name
-    error_message = "ECS task execution role must have 'project' tag."
+    condition     = aws_iam_role.ecs_task_execution.tags["Project"] == var.project_name
+    error_message = "ECS task execution role must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_iam_role.ecs_task_execution.tags["environment"] == var.environment
-    error_message = "ECS task execution role must have 'environment' tag."
+    condition     = aws_iam_role.ecs_task_execution.tags["Environment"] == var.environment
+    error_message = "ECS task execution role must have 'Environment' tag."
   }
 }
 
@@ -57,12 +57,12 @@ run "task_role_has_required_tags" {
   command = plan
 
   assert {
-    condition     = aws_iam_role.ecs_task.tags["project"] == var.project_name
-    error_message = "ECS task role must have 'project' tag."
+    condition     = aws_iam_role.ecs_task.tags["Project"] == var.project_name
+    error_message = "ECS task role must have 'Project' tag."
   }
 
   assert {
-    condition     = aws_iam_role.ecs_task.tags["environment"] == var.environment
-    error_message = "ECS task role must have 'environment' tag."
+    condition     = aws_iam_role.ecs_task.tags["Environment"] == var.environment
+    error_message = "ECS task role must have 'Environment' tag."
   }
 }
