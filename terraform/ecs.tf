@@ -86,6 +86,12 @@ resource "aws_ecs_task_definition" "backend" {
         {
           name  = "CORS_ORIGINS"
           value = "http://${aws_lb.main.dns_name}"
+        },
+        {
+          # Allow MCP clients connecting through the ALB.  The default only
+          # permits localhost, which would cause 403s in production.
+          name  = "MCP_ALLOWED_HOSTS"
+          value = aws_lb.main.dns_name
         }
       ]
 
