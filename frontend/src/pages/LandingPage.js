@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FileText, Tag, Bot, TrendingUp, GitBranch, Layers, ArrowRight, Cpu } from 'lucide-react';
+import { FileText, Tag, Bot, TrendingUp, GitBranch, Layers, ArrowRight } from 'lucide-react';
 
 function FeatureCard({ icon: Icon, title, description, color }) {
   return (
