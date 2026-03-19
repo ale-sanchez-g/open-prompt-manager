@@ -41,6 +41,66 @@ jobs:
         run: terraform test
 
   # ─────────────────────────────────────────────────────────────────────────────
+  # MCP Python package: unit tests
+  # ─────────────────────────────────────────────────────────────────────────────
+  mcp-python-test:
+    name: MCP Python Package Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: mcp-package-python
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: mcp-package-python/pyproject.toml
+
+      - name: Install package with test dependencies
+        run: pip install -e ".[test]"
+
+      - name: Run tests
+        run: pytest tests/ -v
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # MCP Node.js package: unit tests
+  # ─────────────────────────────────────────────────────────────────────────────
+  mcp-node-test:
+    name: MCP Node.js Package Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: mcp-package-node
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: mcp-package-node/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+  # ─────────────────────────────────────────────────────────────────────────────
   # Backend: lint, unit tests, API integration tests, coverage
   # ─────────────────────────────────────────────────────────────────────────────
   backend-test:

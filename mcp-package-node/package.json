@@ -7,10 +7,12 @@
     "open-prompt-manager-mcp": "./bin/server.js"
   },
   "files": [
-    "bin/"
+    "bin/",
+    "lib/"
   ],
   "scripts": {
-    "start": "node bin/server.js"
+    "start": "node bin/server.js",
+    "test": "node --test tests/server.test.js"
   },
   "keywords": ["mcp", "claude", "prompt-management", "ai"],
   "license": "MIT",
