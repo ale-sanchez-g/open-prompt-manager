@@ -275,7 +275,7 @@ Here is the typical workflow for adding a new capability end-to-end:
 
 ### 1. Backend — data model
 
-Add or extend a SQLAlchemy model in `backend/app/models/prompt.py` and a matching Pydantic schema in `backend/app/models/schemas.py`. Run Alembic migrations if you change the schema (or update the `Base.metadata.create_all` call for SQLite dev mode).
+Add or extend a SQLAlchemy model in `backend/app/models/prompt.py` and a matching Pydantic schema in `backend/app/models/schemas.py`. The database schema is managed at startup via `create_tables()` (which calls `Base.metadata.create_all`), so changes to the models will be applied when you restart the backend. For breaking schema changes in development, you may need to drop and recreate your local database.
 
 ### 2. Backend — service layer
 
