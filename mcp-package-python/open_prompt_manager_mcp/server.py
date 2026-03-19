@@ -11,7 +11,7 @@ Configure via environment variables:
 
 import json
 import os
-from typing import Any, Optional
+from typing import Any, Optional, TypedDict, Union
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -22,6 +22,14 @@ from mcp.server.fastmcp import FastMCP
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000").rstrip("/")
 API_KEY = os.getenv("API_KEY", "")
+
+
+class ErrorResponse(TypedDict):
+    error: str
+
+
+Prompt = dict[str, Any]
+PromptListResult = Union[list[Prompt], ErrorResponse]
 
 # ── HTTP helpers ──────────────────────────────────────────────────────────────
 
@@ -104,7 +112,7 @@ def list_prompts(
     agent_id: Optional[int] = None,
     skip: int = 0,
     limit: int = 50,
-) -> Any:
+) -> PromptListResult:
     """
     List available prompts.
 
