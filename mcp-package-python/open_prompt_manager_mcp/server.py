@@ -306,6 +306,7 @@ def create_agent(
     name: str,
     description: str = "",
     agent_type: str = "generic",
+    type: Optional[str] = None,
     status: str = "active",
 ) -> dict:
     """
@@ -314,10 +315,16 @@ def create_agent(
     Args:
         name:        Human-readable name for the agent.
         description: Optional description of what the agent does.
-        agent_type:  Agent type identifier (default: "generic").
+        agent_type:  Agent type identifier (default: "generic"). Deprecated in favor of `type`.
+        type:        Agent type identifier, matching the Node implementation. If provided,
+                     this value is used instead of `agent_type`.
         status:      Agent status — "active" or "inactive" (default: "active").
     """
-    return _post("/api/agents/", {"name": name, "description": description, "type": agent_type, "status": status})
+    effective_type = type if type is not None else agent_type
+    return _post(
+        "/api/agents/",
+        {"name": name, "description": description, "type": effective_type, "status": status},
+    )
 
 
 @mcp.tool()
@@ -326,6 +333,7 @@ def update_agent(
     name: Optional[str] = None,
     description: Optional[str] = None,
     agent_type: Optional[str] = None,
+    type: Optional[str] = None,
     status: Optional[str] = None,
 ) -> dict:
     """
@@ -335,7 +343,9 @@ def update_agent(
         agent_id:    ID of the agent to update.
         name:        New name.
         description: New description.
-        agent_type:  New type identifier.
+        agent_type:  New type identifier. Deprecated in favor of `type`.
+        type:        New type identifier, matching the Node implementation. If provided,
+                     this value is used instead of `agent_type`.
         status:      New status ("active" or "inactive").
     """
     payload: dict[str, Any] = {}
@@ -343,8 +353,9 @@ def update_agent(
         payload["name"] = name
     if description is not None:
         payload["description"] = description
-    if agent_type is not None:
-        payload["type"] = agent_type
+    effective_type = type if type is not None else agent_type
+    if effective_type is not None:
+        payload["type"] = effective_type
     if status is not None:
         payload["status"] = status
     return _put(f"/api/agents/{agent_id}", payload)
