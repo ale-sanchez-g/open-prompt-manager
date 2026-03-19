@@ -18,13 +18,13 @@ It communicates over **stdio** (required by Claude Desktop) and calls the backen
 ### Option A — install directly from the repo
 
 ```bash
-pip install ./mcp-package
+pip install ./mcp-package-python
 ```
 
 ### Option B — install in editable/development mode
 
 ```bash
-pip install -e ./mcp-package
+pip install -e ./mcp-package-python
 ```
 
 ---
@@ -112,7 +112,7 @@ Once connected, Claude can use these tools:
 
 ```bash
 # Install
-pip install ./mcp-package
+pip install ./mcp-package-python
 
 # Verify the entry point works
 BACKEND_URL=http://localhost:8000 open-prompt-manager-mcp
