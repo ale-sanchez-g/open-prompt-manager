@@ -195,7 +195,7 @@ pytest tests/ --cov=app --cov-report=term-missing -v
 
 - Tests live in `backend/tests/`.
 - Aim for **≥ 80% coverage** on any new code you add.
-- Use `httpx.AsyncClient` and FastAPI's `TestClient` for API integration tests.
+- Use FastAPI's `TestClient` for API integration tests (see existing examples in `backend/tests/`). For advanced async scenarios, you may also use `httpx.AsyncClient`.
 
 ### Frontend
 
