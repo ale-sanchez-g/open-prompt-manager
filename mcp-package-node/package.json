@@ -1,0 +1,24 @@
+{
+  "name": "open-prompt-manager-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Open Prompt Manager — connect Claude Desktop to your prompt library",
+  "type": "module",
+  "bin": {
+    "open-prompt-manager-mcp": "./bin/server.js"
+  },
+  "files": [
+    "bin/"
+  ],
+  "scripts": {
+    "start": "node bin/server.js"
+  },
+  "keywords": ["mcp", "claude", "prompt-management", "ai"],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.10.0",
+    "zod": "^3.23.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
