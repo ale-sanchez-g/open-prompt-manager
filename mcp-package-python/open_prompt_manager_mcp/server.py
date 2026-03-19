@@ -11,7 +11,6 @@ Configure via environment variables:
 
 import json
 import os
-import sys
 from typing import Any, Optional
 import urllib.error
 import urllib.parse
@@ -105,7 +104,7 @@ def list_prompts(
     agent_id: Optional[int] = None,
     skip: int = 0,
     limit: int = 50,
-) -> list[dict]:
+) -> Any:
     """
     List available prompts.
 
@@ -116,6 +115,7 @@ def list_prompts(
         skip:     Number of records to skip (pagination).
         limit:    Maximum records to return (1–200).
     """
+    limit = max(1, min(limit, 200))
     params = {"skip": skip, "limit": limit}
     if search:
         params["search"] = search
@@ -242,7 +242,7 @@ def render_prompt(
 # ── Tag tools ─────────────────────────────────────────────────────────────────
 
 @mcp.tool()
-def list_tags() -> list[dict]:
+def list_tags() -> Any:
     """Return all tags defined in the system."""
     return _get("/api/tags/")
 
@@ -273,7 +273,7 @@ def delete_tag(tag_id: int) -> dict:
 # ── Agent tools ───────────────────────────────────────────────────────────────
 
 @mcp.tool()
-def list_agents() -> list[dict]:
+def list_agents() -> Any:
     """Return all agents registered in the system."""
     return _get("/api/agents/")
 
@@ -293,7 +293,7 @@ def get_agent(agent_id: int) -> dict:
 def create_agent(
     name: str,
     description: str = "",
-    type: str = "generic",
+    agent_type: str = "generic",
     status: str = "active",
 ) -> dict:
     """
@@ -302,10 +302,10 @@ def create_agent(
     Args:
         name:        Human-readable name for the agent.
         description: Optional description of what the agent does.
-        type:        Agent type identifier (default: "generic").
+        agent_type:  Agent type identifier (default: "generic").
         status:      Agent status — "active" or "inactive" (default: "active").
     """
-    return _post("/api/agents/", {"name": name, "description": description, "type": type, "status": status})
+    return _post("/api/agents/", {"name": name, "description": description, "type": agent_type, "status": status})
 
 
 @mcp.tool()
@@ -313,7 +313,7 @@ def update_agent(
     agent_id: int,
     name: Optional[str] = None,
     description: Optional[str] = None,
-    type: Optional[str] = None,
+    agent_type: Optional[str] = None,
     status: Optional[str] = None,
 ) -> dict:
     """
@@ -323,7 +323,7 @@ def update_agent(
         agent_id:    ID of the agent to update.
         name:        New name.
         description: New description.
-        type:        New type identifier.
+        agent_type:  New type identifier.
         status:      New status ("active" or "inactive").
     """
     payload: dict[str, Any] = {}
@@ -331,8 +331,8 @@ def update_agent(
         payload["name"] = name
     if description is not None:
         payload["description"] = description
-    if type is not None:
-        payload["type"] = type
+    if agent_type is not None:
+        payload["type"] = agent_type
     if status is not None:
         payload["status"] = status
     return _put(f"/api/agents/{agent_id}", payload)
