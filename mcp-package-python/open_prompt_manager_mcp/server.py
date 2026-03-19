@@ -18,6 +18,10 @@ import urllib.request
 
 from mcp.server.fastmcp import FastMCP
 
+# A successful "list" response is typically a list of JSON objects; on error,
+# the backend is expected to return a JSON object describing the error.
+JSONListOrError = list[dict[str, Any]] | dict[str, Any]
+
 # ── Configuration ─────────────────────────────────────────────────────────────
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000").rstrip("/")
@@ -40,7 +44,7 @@ def _headers() -> dict:
     return h
 
 
-def _get(path: str, params: Optional[dict] = None) -> Any:
+def _get(path: str, params: Optional[dict] = None) -> JSONListOrError:
     url = f"{BACKEND_URL}{path}"
     if params:
         url = f"{url}?{urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})}"
@@ -250,7 +254,7 @@ def render_prompt(
 # ── Tag tools ─────────────────────────────────────────────────────────────────
 
 @mcp.tool()
-def list_tags() -> Any:
+def list_tags() -> JSONListOrError:
     """Return all tags defined in the system."""
     return _get("/api/tags/")
 
@@ -281,7 +285,7 @@ def delete_tag(tag_id: int) -> dict:
 # ── Agent tools ───────────────────────────────────────────────────────────────
 
 @mcp.tool()
-def list_agents() -> Any:
+def list_agents() -> JSONListOrError:
     """Return all agents registered in the system."""
     return _get("/api/agents/")
 
