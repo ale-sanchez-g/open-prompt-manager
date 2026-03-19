@@ -19,6 +19,9 @@ dependencies = [
     "mcp>=1.26.0",
 ]
 
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
 [project.scripts]
 open-prompt-manager-mcp = "open_prompt_manager_mcp.server:main"
 

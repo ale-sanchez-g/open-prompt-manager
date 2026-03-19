@@ -11,13 +11,16 @@ Configure via environment variables:
 
 import json
 import os
-import sys
 from typing import Any, Optional
 import urllib.error
 import urllib.parse
 import urllib.request
 
 from mcp.server.fastmcp import FastMCP
+
+# A successful "list" response is typically a list of JSON objects; on error,
+# the backend is expected to return a JSON object describing the error.
+JSONListOrError = list[dict[str, Any]] | dict[str, Any]
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
@@ -33,7 +36,7 @@ def _headers() -> dict:
     return h
 
 
-def _get(path: str, params: Optional[dict] = None) -> Any:
+def _get(path: str, params: Optional[dict] = None) -> JSONListOrError:
     url = f"{BACKEND_URL}{path}"
     if params:
         url = f"{url}?{urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})}"
@@ -105,7 +108,7 @@ def list_prompts(
     agent_id: Optional[int] = None,
     skip: int = 0,
     limit: int = 50,
-) -> list[dict]:
+) -> JSONListOrError:
     """
     List available prompts.
 
@@ -116,6 +119,7 @@ def list_prompts(
         skip:     Number of records to skip (pagination).
         limit:    Maximum records to return (1–200).
     """
+    limit = max(1, min(limit, 200))
     params = {"skip": skip, "limit": limit}
     if search:
         params["search"] = search
@@ -242,7 +246,7 @@ def render_prompt(
 # ── Tag tools ─────────────────────────────────────────────────────────────────
 
 @mcp.tool()
-def list_tags() -> list[dict]:
+def list_tags() -> JSONListOrError:
     """Return all tags defined in the system."""
     return _get("/api/tags/")
 
@@ -273,7 +277,7 @@ def delete_tag(tag_id: int) -> dict:
 # ── Agent tools ───────────────────────────────────────────────────────────────
 
 @mcp.tool()
-def list_agents() -> list[dict]:
+def list_agents() -> JSONListOrError:
     """Return all agents registered in the system."""
     return _get("/api/agents/")
 
@@ -293,7 +297,8 @@ def get_agent(agent_id: int) -> dict:
 def create_agent(
     name: str,
     description: str = "",
-    type: str = "generic",
+    agent_type: str = "generic",
+    type: Optional[str] = None,
     status: str = "active",
 ) -> dict:
     """
@@ -302,10 +307,16 @@ def create_agent(
     Args:
         name:        Human-readable name for the agent.
         description: Optional description of what the agent does.
-        type:        Agent type identifier (default: "generic").
+        agent_type:  Agent type identifier (default: "generic"). Deprecated in favor of `type`.
+        type:        Agent type identifier, matching the Node implementation. If provided,
+                     this value is used instead of `agent_type`.
         status:      Agent status — "active" or "inactive" (default: "active").
     """
-    return _post("/api/agents/", {"name": name, "description": description, "type": type, "status": status})
+    effective_type = type if type is not None else agent_type
+    return _post(
+        "/api/agents/",
+        {"name": name, "description": description, "type": effective_type, "status": status},
+    )
 
 
 @mcp.tool()
@@ -313,6 +324,7 @@ def update_agent(
     agent_id: int,
     name: Optional[str] = None,
     description: Optional[str] = None,
+    agent_type: Optional[str] = None,
     type: Optional[str] = None,
     status: Optional[str] = None,
 ) -> dict:
@@ -323,7 +335,9 @@ def update_agent(
         agent_id:    ID of the agent to update.
         name:        New name.
         description: New description.
-        type:        New type identifier.
+        agent_type:  New type identifier. Deprecated in favor of `type`.
+        type:        New type identifier, matching the Node implementation. If provided,
+                     this value is used instead of `agent_type`.
         status:      New status ("active" or "inactive").
     """
     payload: dict[str, Any] = {}
@@ -331,8 +345,9 @@ def update_agent(
         payload["name"] = name
     if description is not None:
         payload["description"] = description
-    if type is not None:
-        payload["type"] = type
+    effective_type = type if type is not None else agent_type
+    if effective_type is not None:
+        payload["type"] = effective_type
     if status is not None:
         payload["status"] = status
     return _put(f"/api/agents/{agent_id}", payload)

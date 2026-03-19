@@ -31,8 +31,8 @@ always use the **full absolute path** to a Node 18+ binary.
 {
   "mcpServers": {
     "open-prompt-manager": {
-      "command": "/Users/alejandrosanchez-giraldo/.nvm/versions/node/v21.7.0/bin/node",
-      "args": ["/Users/alejandrosanchez-giraldo/git/open-prompt-manager/mcp-package-node/bin/server.js"],
+      "command": "/absolute/path/to/node",
+      "args": ["/absolute/path/to/mcp-package-node/bin/server.js"],
       "env": {
         "BACKEND_URL": "http://localhost:8000"
       }
@@ -41,7 +41,7 @@ always use the **full absolute path** to a Node 18+ binary.
 }
 ```
 
-> **Tip:** find your node path with `nvm which 21` (or whichever version ≥ 18 you use).
+> **Tip:** find your node path with `which node` or `nvm which 21` (or whichever version ≥ 18 you use), and replace `/absolute/path/to/node` accordingly.
 
 ### Option B — after publishing to npm
 
@@ -51,7 +51,7 @@ Once the package is published to the npm registry you can use npx:
 {
   "mcpServers": {
     "open-prompt-manager": {
-      "command": "/Users/alejandrosanchez-giraldo/.nvm/versions/node/v21.7.0/bin/npx",
+      "command": "/absolute/path/to/npx",
       "args": ["-y", "open-prompt-manager-mcp"],
       "env": {
         "BACKEND_URL": "http://localhost:8000"
