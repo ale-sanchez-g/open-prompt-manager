@@ -10,7 +10,7 @@ COPY . .
 RUN DISABLE_ESLINT_PLUGIN=true npm run build
 
 # Production stage
-FROM nginx:1.29.6-alpine
+FROM nginx:1-alpine-slim
 
 COPY --from=build /app/build /usr/share/nginx/html
 # Use templates/ so nginx's built-in entrypoint runs envsubst, injecting BACKEND_URL at container start
