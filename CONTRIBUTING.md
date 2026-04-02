@@ -215,7 +215,7 @@ npm test -- --watchAll=false --ci --coverage
 ```bash
 make up
 curl http://localhost:8000/api/health
-# Expected: {"status":"ok","version":"1.0.0"}
+# Expected JSON shape: {"status":"ok","version":"<runtime-version>"}
 ```
 
 ---
