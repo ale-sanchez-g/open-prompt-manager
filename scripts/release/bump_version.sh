@@ -45,9 +45,11 @@ case "${BUMP_TYPE}" in
 esac
 
 NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-printf '%s\n' "${NEW_VERSION}" > "${VERSION_FILE}"
+VERSION_TMP="${VERSION_FILE}.$$".tmp
+printf '%s\n' "${NEW_VERSION}" > "${VERSION_TMP}"
 
 "${SCRIPT_DIR}/sync_versions.sh" "${NEW_VERSION}"
+mv "${VERSION_TMP}" "${VERSION_FILE}"
 
 echo "Bumped ${CURRENT_VERSION} -> ${NEW_VERSION}"
 echo "${NEW_VERSION}"
