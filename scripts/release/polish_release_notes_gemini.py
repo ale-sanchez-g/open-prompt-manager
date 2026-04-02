@@ -60,7 +60,8 @@ def main() -> int:
 
         output_file.write_text(content + "\n", encoding="utf-8")
         return 0
-    except (urllib.error.URLError, KeyError, IndexError, TimeoutError, json.JSONDecodeError):
+    except (urllib.error.URLError, KeyError, IndexError, TimeoutError, json.JSONDecodeError) as exc:
+        print(f"Warning: Failed to polish release notes via Gemini: {exc!r}", file=sys.stderr)
         output_file.write_text(draft, encoding="utf-8")
         return 0
 
