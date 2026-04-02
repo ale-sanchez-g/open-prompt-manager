@@ -41,7 +41,7 @@ The backend exposes both a REST API (`/api/*`) and an MCP endpoint (`/mcp`) via 
 
 - The Python MCP package (`mcp-package-python/`) uses only `urllib` for HTTP — no `requests` or `httpx` dependency.
 - The Node MCP package (`mcp-package-node/`) uses native `fetch` — no `axios` or `node-fetch`.
-- Both packages read `BACKEND_URL` and `API_KEY` from environment variables at runtime.
+- Both packages are configured via `BACKEND_URL` and `API_KEY` environment variables at startup (the Python package reads them on import).
 
 ## Build & Test
 
