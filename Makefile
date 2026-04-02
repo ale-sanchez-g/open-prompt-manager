@@ -1,6 +1,6 @@
 .PHONY: up down build logs clean help helm-install helm-upgrade helm-uninstall
 
-VERSION := $(shell cat .version)
+VERSION ?= $(shell [ -f .version ] && cat .version || echo latest)
 REGISTRY ?= your-registry
 BACKEND_IMAGE = $(REGISTRY)/prompt-manager-backend
 FRONTEND_IMAGE = $(REGISTRY)/prompt-manager-frontend
