@@ -43,6 +43,7 @@ jobs:
         with:
           ref: ${{ inputs.target_ref }}
           fetch-depth: 0
+          token: ${{ secrets.RELEASE_PR_TOKEN }}
 
       - name: Validate release input
         env:
