@@ -23,9 +23,7 @@ on:
         default: true
         type: boolean
 
-permissions:
-  contents: write
-  pull-requests: read
+permissions: {}  # Deny all at workflow level — each job opts in explicitly
 
 concurrency:
   group: release-${{ inputs.target_ref }}
@@ -35,6 +33,9 @@ jobs:
   release:
     name: Create Tag and Release Notes
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
 
     steps:
       - name: Checkout code
