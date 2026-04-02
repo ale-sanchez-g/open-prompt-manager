@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: read
+      pull-requests: write
 
     steps:
       - name: Checkout code
@@ -102,23 +102,17 @@ jobs:
           git add .version backend/app/__init__.py frontend/package.json mcp-package-node/package.json mcp-package-python/pyproject.toml helm/prompt-manager/Chart.yaml helm/prompt-manager/values.yaml
           git commit -m "chore(release): v${NEW_VERSION}"
 
-      - name: Create and push tag
+      - name: Push release branch and open PR
         env:
           NEW_VERSION: ${{ steps.bump.outputs.new_version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
-          git push origin "HEAD:${{ inputs.target_ref }}"
-          git push origin "v${NEW_VERSION}"
-
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ steps.bump.outputs.new_version }}
-          name: v${{ steps.bump.outputs.new_version }}
-          body_path: release_notes.md
-          generate_release_notes: false
-          draft: false
-          prerelease: false
+          git push origin "HEAD:refs/heads/release/v${NEW_VERSION}"
+          gh pr create \
+            --base "${{ inputs.target_ref }}" \
+            --head "release/v${NEW_VERSION}" \
+            --title "chore(release): v${NEW_VERSION}" \
+            --body-file release_notes.md
+          gh pr merge --auto --squash "release/v${NEW_VERSION}" \
+            || { echo "::error::Failed to enable auto-merge. Ensure auto-merge is allowed in repository settings, then merge the release PR manually."; exit 1; }

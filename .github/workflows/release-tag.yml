@@ -1,0 +1,88 @@
+name: Tag and Publish Release
+
+# Triggered automatically when a release/* PR is merged into main.
+# This second half of the release process creates the annotated git tag
+# and the GitHub release, using the PR body as the release notes.
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions: {}  # Deny all at workflow level — each job opts in explicitly
+
+concurrency:
+  group: release-tag-${{ github.event.pull_request.head.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tag-and-release:
+    name: Create Tag and GitHub Release
+    # Only run when a release/* branch was squash-merged into main
+    if: >
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'release/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+
+    steps:
+      - name: Extract version from branch name
+        id: version
+        env:
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          VERSION="${BRANCH#release/v}"
+          if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Could not parse a semver version from branch '${BRANCH}'" >&2
+            exit 1
+          fi
+          echo "new_version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Abort if tag already exists
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+        run: |
+          set -euo pipefail
+          if git rev-parse -q --verify "refs/tags/v${NEW_VERSION}" >/dev/null; then
+            echo "Tag v${NEW_VERSION} already exists" >&2
+            exit 1
+          fi
+
+      - name: Create and push tag
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+        run: |
+          set -euo pipefail
+          git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
+          git push origin "v${NEW_VERSION}"
+
+      - name: Save release notes from PR body
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr view "${PR_NUMBER}" --json body --jq '.body' > release_notes.md
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.version.outputs.new_version }}
+          name: v${{ steps.version.outputs.new_version }}
+          body_path: release_notes.md
+          generate_release_notes: false
+          draft: false
+          prerelease: false
