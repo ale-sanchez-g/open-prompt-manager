@@ -1,0 +1,124 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: Semantic version bump type
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      target_ref:
+        description: Branch to release from (must be a branch name, not a SHA or tag)
+        required: true
+        default: main
+        type: string
+      use_ai_notes:
+        description: Use AI to polish deterministic release notes
+        required: true
+        default: true
+        type: boolean
+
+permissions: {}  # Deny all at workflow level — each job opts in explicitly
+
+concurrency:
+  group: release-${{ inputs.target_ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Create Tag and Release Notes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.target_ref }}
+          fetch-depth: 0
+
+      - name: Validate release input
+        env:
+          TARGET_REF: ${{ inputs.target_ref }}
+          BUMP_TYPE: ${{ inputs.bump_type }}
+        run: |
+          set -euo pipefail
+          case "${BUMP_TYPE}" in
+            major|minor|patch) ;;
+            *) echo "Invalid bump_type: ${BUMP_TYPE}" >&2; exit 1 ;;
+          esac
+          if [[ ! "${TARGET_REF}" =~ ^[a-zA-Z0-9._/-]+$ ]] || [[ "${TARGET_REF}" == *".."* ]]; then
+            echo "target_ref '${TARGET_REF}' contains invalid characters. Only alphanumerics, '.', '_', '/', and '-' are allowed (no '..' sequences)." >&2
+            exit 1
+          fi
+          if ! git ls-remote --exit-code origin "refs/heads/${TARGET_REF}" >/dev/null 2>&1; then
+            echo "target_ref '${TARGET_REF}' is not a valid branch on origin. Only branch names are supported." >&2
+            exit 1
+          fi
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Make release scripts executable
+        run: chmod +x scripts/release/*.sh
+
+      - name: Build release notes
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_BASE_URL: ${{ vars.GEMINI_BASE_URL }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+        run: |
+          set -euo pipefail
+          scripts/release/build_release_notes.sh "${{ inputs.use_ai_notes }}" release_notes_draft.md release_notes.md
+
+      - name: Bump version and sync files
+        id: bump
+        run: scripts/release/bump_version.sh "${{ inputs.bump_type }}"
+
+      - name: Abort if tag already exists
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.new_version }}
+        run: |
+          set -euo pipefail
+          if git rev-parse -q --verify "refs/tags/v${NEW_VERSION}" >/dev/null; then
+            echo "Tag v${NEW_VERSION} already exists" >&2
+            exit 1
+          fi
+
+      - name: Commit release version updates
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.new_version }}
+        run: |
+          set -euo pipefail
+          git add .version backend/app/__init__.py frontend/package.json mcp-package-node/package.json mcp-package-python/pyproject.toml helm/prompt-manager/Chart.yaml helm/prompt-manager/values.yaml
+          git commit -m "chore(release): v${NEW_VERSION}"
+
+      - name: Create and push tag
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.new_version }}
+        run: |
+          set -euo pipefail
+          git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
+          git push origin "HEAD:${{ inputs.target_ref }}"
+          git push origin "v${NEW_VERSION}"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.bump.outputs.new_version }}
+          name: v${{ steps.bump.outputs.new_version }}
+          body_path: release_notes.md
+          generate_release_notes: false
+          draft: false
+          prerelease: false

@@ -1,6 +1,6 @@
 {
   "name": "open-prompt-manager-mcp",
-  "version": "0.1.0",
+  "version": "1.0.1",
   "description": "MCP server for Open Prompt Manager — connect Claude Desktop to your prompt library",
   "type": "module",
   "bin": {

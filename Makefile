@@ -1,6 +1,6 @@
 .PHONY: up down build logs clean help helm-install helm-upgrade helm-uninstall
 
-VERSION ?= 1.0.0
+VERSION ?= $(shell [ -f .version ] && cat .version || echo latest)
 REGISTRY ?= your-registry
 BACKEND_IMAGE = $(REGISTRY)/prompt-manager-backend
 FRONTEND_IMAGE = $(REGISTRY)/prompt-manager-frontend
@@ -66,3 +66,12 @@ dev-backend:
 ## dev-frontend: Run frontend in development mode
 dev-frontend:
 	cd frontend && npm install && npm start
+
+## sync-version: Sync all manifest versions from .version
+sync-version:
+	./scripts/release/sync_versions.sh $(VERSION)
+
+## bump-version: Bump semantic version (BUMP=patch|minor|major)
+bump-version:
+	@test -n "$(BUMP)" || (echo "Usage: make bump-version BUMP=patch|minor|major" && exit 1)
+	./scripts/release/bump_version.sh $(BUMP)

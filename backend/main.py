@@ -7,6 +7,7 @@ from app.database.base import create_tables
 from app.api.prompts import router as prompts_router
 from app.api.tags_agents import tags_router, agents_router
 from app.mcp_server import build_mcp_server
+from app import __version__
 
 # Ensure data directory exists for SQLite
 os.makedirs('./data', exist_ok=True)
@@ -34,7 +35,7 @@ def create_app() -> FastAPI:
     application = FastAPI(
         title='Prompt Management Framework',
         description='A production-ready framework for managing AI prompts across agents and organizations.',
-        version='1.0.0',
+        version=__version__,
         docs_url='/api/docs',
         redoc_url='/api/redoc',
         openapi_url='/api/openapi.json',
@@ -58,7 +59,7 @@ def create_app() -> FastAPI:
 
     @application.get('/api/health')
     def health_check():
-        return {'status': 'ok', 'version': '1.0.0'}
+        return {'status': 'ok', 'version': __version__}
 
     # Mount MCP server – AI agents connect via Streamable HTTP transport.
     # The SDK's default streamable_http_path is /mcp, so the endpoint is

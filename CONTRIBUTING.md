@@ -11,6 +11,7 @@ Thank you for your interest in contributing! Open Prompt Manager is a community-
 - [Project Structure](#project-structure)
 - [Coding Standards](#coding-standards)
 - [Testing](#testing)
+- [Release Process](#release-process)
 - [Submitting a Pull Request](#submitting-a-pull-request)
 - [Reporting Bugs](#reporting-bugs)
 - [Requesting Features](#requesting-features)
@@ -214,8 +215,16 @@ npm test -- --watchAll=false --ci --coverage
 ```bash
 make up
 curl http://localhost:8000/api/health
-# Expected: {"status":"ok","version":"0.1.0"}
+# Expected JSON shape: {"status":"ok","version":"<runtime-version>"}
 ```
+
+---
+
+## Release Process
+
+Releases are created on demand using the GitHub Actions workflow at `.github/workflows/release.yml`.
+
+For full details (inputs, fallback behavior, and rollback), see `docs/RELEASE_PROCESS.md`.
 
 ---
 
