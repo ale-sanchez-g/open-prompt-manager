@@ -53,7 +53,7 @@ pytest tests/ --cov=app --cov-report=term-missing -v
 
 # ── Frontend ─────────────────────────────────────────────
 cd frontend
-npm ci
+npm ci --legacy-peer-deps
 npm test -- --watchAll=false
 
 # ── MCP Python package ───────────────────────────────────
