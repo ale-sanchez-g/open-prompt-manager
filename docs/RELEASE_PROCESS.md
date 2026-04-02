@@ -10,7 +10,7 @@ This repository supports manually requested releases through the GitHub Actions 
    - Repository secret: `GEMINI_API_KEY`
   - Optional repository variables:
       - `GEMINI_BASE_URL` (default: `https://generativelanguage.googleapis.com/v1beta/openai`)
-      - `GEMINI_MODEL` (default: `gemini-2.0-flash`)
+      - `GEMINI_MODEL` (default: `gemini-2.5-flash`)
 
 ## Manual Release Steps
 
