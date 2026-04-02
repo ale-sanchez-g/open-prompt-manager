@@ -13,7 +13,7 @@ on:
           - minor
           - major
       target_ref:
-        description: Branch or commit-ish to release from
+        description: Branch to release from (must be a branch name, not a SHA or tag)
         required: true
         default: main
         type: string
@@ -45,12 +45,23 @@ jobs:
           fetch-depth: 0
 
       - name: Validate release input
+        env:
+          TARGET_REF: ${{ inputs.target_ref }}
+          BUMP_TYPE: ${{ inputs.bump_type }}
         run: |
           set -euo pipefail
-          case "${{ inputs.bump_type }}" in
+          case "${BUMP_TYPE}" in
             major|minor|patch) ;;
-            *) echo "Invalid bump_type: ${{ inputs.bump_type }}" >&2; exit 1 ;;
+            *) echo "Invalid bump_type: ${BUMP_TYPE}" >&2; exit 1 ;;
           esac
+          if [[ ! "${TARGET_REF}" =~ ^[a-zA-Z0-9._/-]+$ ]] || [[ "${TARGET_REF}" == *".."* ]]; then
+            echo "target_ref '${TARGET_REF}' contains invalid characters. Only alphanumerics, '.', '_', '/', and '-' are allowed (no '..' sequences)." >&2
+            exit 1
+          fi
+          if ! git ls-remote --exit-code origin "refs/heads/${TARGET_REF}" >/dev/null 2>&1; then
+            echo "target_ref '${TARGET_REF}' is not a valid branch on origin. Only branch names are supported." >&2
+            exit 1
+          fi
 
       - name: Configure git identity
         run: |
