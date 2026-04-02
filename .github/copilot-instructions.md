@@ -137,3 +137,29 @@ Three versioning workflows coexist:
 - New frontend routes must be documented in the README Frontend Routes table.
 - See [CONTRIBUTING.md](../CONTRIBUTING.md) for full contributor guidelines.
 - **Quality gate:** All PRs must pass CI (tests + `pip-audit`) and maintain ≥ 80% coverage on new code before merging.
+
+## Key Exemplar Files
+
+When in doubt about patterns, read these files first:
+
+| File | What it demonstrates |
+|------|---------------------|
+| `backend/main.py` | App factory, MCP server mount order, CORS, lifespan |
+| `backend/app/mcp_server.py` | MCP tool definitions, DB session usage, error dict returns |
+| `backend/app/api/prompts.py` | Thin REST route handlers, `Depends(get_db)`, HTTPException |
+| `backend/app/models/schemas.py` | Pydantic v2 schemas, `model_config = {"from_attributes": True}` |
+| `backend/app/services/prompt_service.py` | Business logic, recursive component resolution, circular-ref detection |
+| `backend/tests/conftest.py` | In-memory SQLite setup, `SessionLocal` patch for MCP tools |
+| `frontend/src/services/api.js` | Centralized axios client, `promptsApi`/`tagsApi`/`agentsApi` wrappers |
+| `frontend/src/App.js` | Route registration, layout, React Router v7 structure |
+
+## Common Pitfalls
+
+- **MCP mount must be last** — any `app.mount('/mcp', ...)` call before the `/api/*` routers will shadow them. Keep it last in `main.py`.
+- **Never return raw ORM objects** — always wrap SQLAlchemy models in a Pydantic schema before returning from an endpoint.
+- **MCP tools must return error dicts, not raise** — raising an exception tears down the MCP session. Return `{"error": "..."}` for expected failures.
+- **MCP tool DB sessions** — MCP tools open `SessionLocal()` directly (not via FastAPI `Depends`). Tests patch `db_module.SessionLocal` in `conftest.py`; new tools must follow the same open/close pattern or the test DB patch won't apply.
+- **Frontend: `npm ci --legacy-peer-deps` is required** — React 19 peer dep conflicts with some testing libraries; omitting the flag will fail installs.
+- **Frontend: no direct fetch/axios in components** — all HTTP calls must go through `src/services/api.js` to preserve centralized auth/error handling.
+- **Never edit version strings manually** — `.version` is the single source of truth; `scripts/release/sync_versions.sh` propagates it everywhere. Manual edits will be overwritten.
+- **Schema changes must be additive** — no migrations exist yet; adding a non-nullable column without a default breaks existing rows.
