@@ -1,0 +1,130 @@
+name: Security Checks
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+permissions: {}  # Deny all at workflow level — each job opts in explicitly
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Secrets scan: detect hardcoded credentials and secrets in source code
+  # ─────────────────────────────────────────────────────────────────────────────
+  secrets-scan:
+    name: Secrets Scan (gitleaks)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0   # full history so gitleaks can diff all commits
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Python SAST: static analysis for common security issues in backend code
+  # ─────────────────────────────────────────────────────────────────────────────
+  python-sast:
+    name: Python SAST (bandit)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install bandit
+        run: pip install bandit[toml]
+
+      - name: Run bandit (medium severity and above)
+        run: |
+          bandit -r backend/app/ \
+            --severity-level medium \
+            --confidence-level medium \
+            --format json \
+            --output bandit-report.json \
+            || true
+          bandit -r backend/app/ \
+            --severity-level medium \
+            --confidence-level medium
+
+      - name: Upload bandit report
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bandit-report
+          path: bandit-report.json
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Frontend: npm audit for known CVEs in frontend dependencies
+  # ─────────────────────────────────────────────────────────────────────────────
+  npm-audit-frontend:
+    name: npm audit (frontend)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # MCP Node package: npm audit for known CVEs in MCP Node dependencies
+  # ─────────────────────────────────────────────────────────────────────────────
+  npm-audit-mcp-node:
+    name: npm audit (mcp-package-node)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: mcp-package-node
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: mcp-package-node/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high
