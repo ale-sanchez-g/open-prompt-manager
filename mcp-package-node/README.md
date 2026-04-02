@@ -8,7 +8,7 @@ It communicates over **stdio** (required by Claude Desktop) and calls the backen
 
 ## Requirements
 
-- Node.js 18+
+- Node.js 20+
 - A running Open Prompt Manager backend (default: `http://localhost:8000`)
 
 ---

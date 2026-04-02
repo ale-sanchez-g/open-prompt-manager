@@ -34,7 +34,7 @@ When you open the application, you will first land on the **Landing Page** (`/`)
 |-------|-----------|
 | Backend | Python 3.11, FastAPI, SQLAlchemy 2.0, Pydantic v2 |
 | Database | SQLite (upgradeable to PostgreSQL/MySQL) |
-| Frontend | React 18, Tailwind CSS, React Router v6, Axios |
+| Frontend | React 20, Tailwind CSS, React Router v6, Axios |
 | Infrastructure | Docker, Kubernetes, Helm 3 |
 | AI Connectivity | MCP (Model Context Protocol) via `mcp==1.23.3` |
 
