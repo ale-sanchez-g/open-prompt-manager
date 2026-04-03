@@ -211,7 +211,7 @@ jobs:
         run: npm ci --legacy-peer-deps
 
       - name: Run tests (CI mode, no watch)
-        run: npm test -- --watchAll=false --ci --coverage --coverageDirectory=coverage
+        run: npm test -- --coverage --coverage.reporter=lcov --coverage.reporter=text --coverage.outDir=coverage
         env:
           CI: true
 
@@ -252,10 +252,6 @@ jobs:
 
       - name: Build production bundle
         run: npm run build
-        env:
-          CI: false                    # treat warnings as warnings, not errors
-          REACT_APP_API_URL: http://localhost:8000
-          DISABLE_ESLINT_PLUGIN: true  # ESLint runs in frontend-test; skip it during webpack build
 
       - name: Check build output exists
         run: test -d build && test -f build/index.html

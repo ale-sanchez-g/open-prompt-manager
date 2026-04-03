@@ -4,7 +4,7 @@
 variable "aws_region" {
   description = "AWS region where all resources will be deployed."
   type        = string
-  default     = "us-east-1"
+  default     = "ap-southeast-2"
 }
 
 variable "project_name" {
@@ -43,7 +43,7 @@ variable "private_subnet_cidrs" {
 variable "availability_zones" {
   description = "List of Availability Zones in which to create subnets."
   type        = list(string)
-  default     = ["us-east-1a", "us-east-1b"]
+  default     = ["ap-southeast-2a", "ap-southeast-2b"]
 }
 
 # ─────────────────────────────────────────────
