@@ -33,7 +33,7 @@ def _build_prompt_response(prompt: Prompt, db: Session) -> PromptResponse:
     return resp
 
 
-def _build_list_responses(prompts: list, db: Session) -> list[PromptListResponse]:
+def _build_list_responses(prompts: list[Prompt], db: Session) -> list[PromptListResponse]:
     """Build PromptListResponse objects with is_latest computed in one batch query."""
     if not prompts:
         return []

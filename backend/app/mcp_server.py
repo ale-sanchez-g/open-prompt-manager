@@ -7,6 +7,7 @@ the root of the Starlette sub-app and exposed via FastAPI at /mcp
 (the MCP SDK's default ``streamable_http_path``).
 """
 import os
+from collections import deque
 from typing import Any, Optional
 
 from mcp.server.fastmcp import FastMCP
@@ -209,8 +210,8 @@ def build_mcp_server() -> FastMCP:
         Retrieve the full version history for a prompt, including which version is latest.
 
         The returned list covers the entire version chain (root and all descendants),
-        ordered from oldest to newest.  Each entry contains an ``is_latest`` field
-        that is ``true`` only for the most recent version in the chain.
+        ordered from oldest to newest.  Each entry contains an `is_latest` field
+        that is `true` only for the most recent version in the chain.
 
         Args:
             prompt_id: The integer ID of any prompt in the version chain.
@@ -229,9 +230,9 @@ def build_mcp_server() -> FastMCP:
                 root = parent
             # BFS to collect all descendants
             versions: list[Prompt] = []
-            queue = [root]
+            queue: deque[Prompt] = deque([root])
             while queue:
-                current = queue.pop(0)
+                current = queue.popleft()
                 versions.append(current)
                 children = db.query(Prompt).filter(Prompt.parent_id == current.id).all()
                 queue.extend(children)

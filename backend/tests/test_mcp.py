@@ -322,6 +322,7 @@ def test_get_prompt_versions_not_found(mcp_client: TestClient):
     result = call_tool(mcp_client, "get_prompt_versions", {"prompt_id": 99999})
     assert len(result) == 1
     assert "error" in result[0]
+    assert "99999" in result[0]["error"]
 
 
 # ── is_latest in existing tools ───────────────────────────────────────────────

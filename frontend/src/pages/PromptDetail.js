@@ -262,7 +262,10 @@ export default function PromptDetail() {
                       <span className="truncate">{v.name}</span>
                       <span className="flex items-center gap-1 flex-shrink-0 ml-2">
                         {v.is_latest && (
-                          <span className="text-xs bg-green-700 text-green-100 px-1.5 py-0.5 rounded-full font-medium">
+                          <span
+                            className="text-xs bg-green-700 text-green-100 px-1.5 py-0.5 rounded-full font-medium"
+                            aria-label="Latest version"
+                          >
                             Latest
                           </span>
                         )}
