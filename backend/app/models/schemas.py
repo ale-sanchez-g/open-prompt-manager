@@ -84,6 +84,7 @@ class PromptUpdate(BaseModel):
 class PromptResponse(PromptBase):
     id: int
     parent_id: Optional[int] = None
+    is_latest: bool = False
     created_at: datetime
     updated_at: datetime
     avg_rating: float = 0.0
@@ -100,6 +101,8 @@ class PromptListResponse(BaseModel):
     name: str
     description: Optional[str] = None
     version: str
+    parent_id: Optional[int] = None
+    is_latest: bool = False
     created_at: datetime
     updated_at: datetime
     avg_rating: float = 0.0

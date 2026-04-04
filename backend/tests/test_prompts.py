@@ -196,6 +196,53 @@ def test_get_versions(client):
     assert len(response.json()) == 3  # original + 2 versions
 
 
+# ── is_latest ─────────────────────────────────────────────────────────────────
+
+def test_create_prompt_is_latest(client):
+    data = client.post("/api/prompts/", json=PROMPT_PAYLOAD).json()
+    assert data["is_latest"] is True
+
+
+def test_get_prompt_is_latest_when_no_children(client):
+    created = client.post("/api/prompts/", json=PROMPT_PAYLOAD).json()
+    data = client.get(f"/api/prompts/{created['id']}").json()
+    assert data["is_latest"] is True
+
+
+def test_get_prompt_is_not_latest_after_new_version(client):
+    parent = client.post("/api/prompts/", json=PROMPT_PAYLOAD).json()
+    client.post(f"/api/prompts/{parent['id']}/versions", json={})
+    data = client.get(f"/api/prompts/{parent['id']}").json()
+    assert data["is_latest"] is False
+
+
+def test_create_version_is_latest(client):
+    parent = client.post("/api/prompts/", json=PROMPT_PAYLOAD).json()
+    child = client.post(
+        f"/api/prompts/{parent['id']}/versions",
+        json={"content": "Updated content."},
+    ).json()
+    assert child["is_latest"] is True
+
+
+def test_list_prompts_is_latest_flags(client):
+    parent = client.post("/api/prompts/", json=PROMPT_PAYLOAD).json()
+    child = client.post(f"/api/prompts/{parent['id']}/versions", json={}).json()
+    prompts = client.get("/api/prompts/").json()
+    by_id = {p["id"]: p for p in prompts}
+    assert by_id[parent["id"]]["is_latest"] is False
+    assert by_id[child["id"]]["is_latest"] is True
+
+
+def test_get_versions_is_latest_flags(client):
+    parent = client.post("/api/prompts/", json=PROMPT_PAYLOAD).json()
+    child = client.post(f"/api/prompts/{parent['id']}/versions", json={}).json()
+    versions = client.get(f"/api/prompts/{parent['id']}/versions").json()
+    by_id = {v["id"]: v for v in versions}
+    assert by_id[parent["id"]]["is_latest"] is False
+    assert by_id[child["id"]]["is_latest"] is True
+
+
 # ── Executions ────────────────────────────────────────────────────────────────
 
 def test_create_execution(client):

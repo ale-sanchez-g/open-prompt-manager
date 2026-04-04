@@ -32,8 +32,8 @@ const mockPromptV2 = {
 
 // Version history includes both v1.0.0 and v1.0.1
 const mockVersions = [
-  { id: 2, name: 'Sales Pitch Generator', version: '1.0.0' },
-  { id: 4, name: 'Sales Pitch Generator', version: '1.0.1' },
+  { id: 2, name: 'Sales Pitch Generator', version: '1.0.0', is_latest: false },
+  { id: 4, name: 'Sales Pitch Generator', version: '1.0.1', is_latest: true },
 ];
 
 beforeEach(() => {
@@ -68,6 +68,15 @@ describe('PromptDetail — version diff', () => {
 
     // v1.0.0 should have a compare button; v1.0.1 (current) should not
     expect(screen.getByRole('button', { name: /compare v1\.0\.0.*v1\.0\.1/i })).toBeInTheDocument();
+  });
+
+  it('shows a "Latest" badge only on the most recent version', async () => {
+    renderDetail('4');
+    await screen.findByRole('heading', { name: 'Sales Pitch Generator' });
+
+    // Only one "Latest" badge should appear and it should be present
+    const latestBadges = await screen.findAllByText('Latest');
+    expect(latestBadges).toHaveLength(1);
   });
 
   it('does not render a compare button for the current version', async () => {

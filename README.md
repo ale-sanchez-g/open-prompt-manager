@@ -133,8 +133,9 @@ The server uses the **Streamable HTTP** transport (`stateless_http=True`), which
 
 | Tool | Description |
 |------|-------------|
-| `list_prompts` | List prompts, optionally filtered by a search string |
-| `get_prompt` | Retrieve a single prompt by ID |
+| `list_prompts` | List prompts, optionally filtered by a search string. Each result includes `is_latest` |
+| `get_prompt` | Retrieve a single prompt by ID. Includes `is_latest` to indicate whether it is the most recent version |
+| `get_prompt_versions` | Retrieve the full version history for a prompt. Each entry includes `is_latest` |
 | `render_prompt` | Render a prompt, substituting variables and resolving components |
 | `create_prompt` | Create a new prompt |
 | `list_tags` | List all tags |
@@ -312,6 +313,8 @@ curl -X POST http://localhost:8000/api/prompts/1/versions \
 ```
 
 Versions are automatically given the next patch version (e.g., `1.0.0` → `1.0.1`). Supply a custom `version` field to override.
+
+Every prompt response (REST API and MCP tools) includes an `is_latest` boolean field that is `true` when the prompt has no newer version in its chain. Use `GET /api/prompts/{id}/versions` to list all versions in a chain with their `is_latest` flags, or the `get_prompt_versions` MCP tool for the same information from an AI agent.
 
 ## Tracking Executions
 

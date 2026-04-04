@@ -22,6 +22,32 @@ def _get_prompt_or_404(prompt_id: int, db: Session) -> Prompt:
     return prompt
 
 
+def _is_latest(prompt_id: int, db: Session) -> bool:
+    """Return True if no other prompt lists this prompt as its parent."""
+    return db.query(Prompt).filter(Prompt.parent_id == prompt_id).first() is None
+
+
+def _build_prompt_response(prompt: Prompt, db: Session) -> PromptResponse:
+    resp = PromptResponse.model_validate(prompt)
+    resp.is_latest = _is_latest(prompt.id, db)
+    return resp
+
+
+def _build_list_responses(prompts: list, db: Session) -> list[PromptListResponse]:
+    """Build PromptListResponse objects with is_latest computed in one batch query."""
+    if not prompts:
+        return []
+    prompt_ids = [p.id for p in prompts]
+    rows = db.query(Prompt.parent_id).filter(Prompt.parent_id.in_(prompt_ids)).distinct().all()
+    has_children = {row[0] for row in rows}
+    result = []
+    for p in prompts:
+        resp = PromptListResponse.model_validate(p)
+        resp.is_latest = p.id not in has_children
+        result.append(resp)
+    return result
+
+
 @router.get('/', response_model=list[PromptListResponse])
 def list_prompts(
     search: Optional[str] = Query(None),
@@ -40,7 +66,8 @@ def list_prompts(
         query = query.filter(Prompt.tags.any(Tag.id == tag_id))
     if agent_id is not None:
         query = query.filter(Prompt.agents.any(Agent.id == agent_id))
-    return query.order_by(Prompt.updated_at.desc()).offset(skip).limit(limit).all()
+    prompts = query.order_by(Prompt.updated_at.desc()).offset(skip).limit(limit).all()
+    return _build_list_responses(prompts, db)
 
 
 @router.post('/', response_model=PromptResponse, status_code=201)
@@ -61,12 +88,13 @@ def create_prompt(payload: PromptCreate, db: Session = Depends(get_db)):
     db.add(db_prompt)
     db.commit()
     db.refresh(db_prompt)
-    return db_prompt
+    return _build_prompt_response(db_prompt, db)
 
 
 @router.get('/{prompt_id}', response_model=PromptResponse)
 def get_prompt(prompt_id: int, db: Session = Depends(get_db)):
-    return _get_prompt_or_404(prompt_id, db)
+    prompt = _get_prompt_or_404(prompt_id, db)
+    return _build_prompt_response(prompt, db)
 
 
 @router.put('/{prompt_id}', response_model=PromptResponse)
@@ -90,7 +118,7 @@ def update_prompt(prompt_id: int, payload: PromptUpdate, db: Session = Depends(g
         prompt.agents = db.query(Agent).filter(Agent.id.in_(payload.agent_ids)).all()
     db.commit()
     db.refresh(prompt)
-    return prompt
+    return _build_prompt_response(prompt, db)
 
 
 @router.delete('/{prompt_id}', status_code=204)
@@ -119,7 +147,7 @@ def create_version(prompt_id: int, payload: VersionCreate, db: Session = Depends
     db.add(new_prompt)
     db.commit()
     db.refresh(new_prompt)
-    return new_prompt
+    return _build_prompt_response(new_prompt, db)
 
 
 @router.get('/{prompt_id}/versions', response_model=list[PromptListResponse])
@@ -143,7 +171,7 @@ def get_versions(prompt_id: int, db: Session = Depends(get_db)):
         versions.append(current)
         children = db.query(Prompt).filter(Prompt.parent_id == current.id).all()
         queue.extend(children)
-    return versions
+    return _build_list_responses(versions, db)
 
 
 @router.post('/{prompt_id}/render', response_model=RenderResponse)

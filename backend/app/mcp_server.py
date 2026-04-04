@@ -30,13 +30,20 @@ _allowed_hosts = [
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _prompt_to_dict(prompt: Prompt) -> dict[str, Any]:
+def _is_latest(prompt: Prompt, db) -> bool:
+    """Return True if no other prompt lists this prompt as its parent."""
+    return db.query(Prompt).filter(Prompt.parent_id == prompt.id).first() is None
+
+
+def _prompt_to_dict(prompt: Prompt, db) -> dict[str, Any]:
     return {
         "id": prompt.id,
         "name": prompt.name,
         "description": prompt.description,
         "content": prompt.content,
         "version": prompt.version,
+        "parent_id": prompt.parent_id,
+        "is_latest": _is_latest(prompt, db),
         "created_by": prompt.created_by,
         "variables": prompt.variables or [],
         "tags": [{"id": t.id, "name": t.name, "color": t.color} for t in prompt.tags],
@@ -91,7 +98,7 @@ def build_mcp_server() -> FastMCP:
                     Prompt.name.ilike(f"%{search}%") | Prompt.description.ilike(f"%{search}%")
                 )
             prompts = query.order_by(Prompt.updated_at.desc()).offset(skip).limit(limit).all()
-            return [_prompt_to_dict(p) for p in prompts]
+            return [_prompt_to_dict(p, db) for p in prompts]
         finally:
             db.close()
 
@@ -108,7 +115,7 @@ def build_mcp_server() -> FastMCP:
             prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
             if prompt is None:
                 return {"error": f"Prompt {prompt_id} not found"}
-            return _prompt_to_dict(prompt)
+            return _prompt_to_dict(prompt, db)
         finally:
             db.close()
 
@@ -192,7 +199,43 @@ def build_mcp_server() -> FastMCP:
             db.add(db_prompt)
             db.commit()
             db.refresh(db_prompt)
-            return _prompt_to_dict(db_prompt)
+            return _prompt_to_dict(db_prompt, db)
+        finally:
+            db.close()
+
+    @mcp.tool()
+    def get_prompt_versions(prompt_id: int) -> list[dict]:
+        """
+        Retrieve the full version history for a prompt, including which version is latest.
+
+        The returned list covers the entire version chain (root and all descendants),
+        ordered from oldest to newest.  Each entry contains an ``is_latest`` field
+        that is ``true`` only for the most recent version in the chain.
+
+        Args:
+            prompt_id: The integer ID of any prompt in the version chain.
+        """
+        db = _db_module.SessionLocal()
+        try:
+            prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
+            if prompt is None:
+                return [{"error": f"Prompt {prompt_id} not found"}]
+            # Walk up to the root
+            root = prompt
+            while root.parent_id:
+                parent = db.get(Prompt, root.parent_id)
+                if parent is None:
+                    return [{"error": "Prompt ancestry is inconsistent or parent was not found."}]
+                root = parent
+            # BFS to collect all descendants
+            versions: list[Prompt] = []
+            queue = [root]
+            while queue:
+                current = queue.pop(0)
+                versions.append(current)
+                children = db.query(Prompt).filter(Prompt.parent_id == current.id).all()
+                queue.extend(children)
+            return [_prompt_to_dict(v, db) for v in versions]
         finally:
             db.close()
 
