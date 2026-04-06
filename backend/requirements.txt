@@ -6,4 +6,4 @@ pydantic==2.12.5
 pydantic-settings==2.13.1
 python-multipart==0.0.22
 psycopg2-binary==2.9.11
-mcp==1.26.0
+mcp==1.27.0
