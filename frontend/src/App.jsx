@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, Link } from 'react-router-dom';
 import { LayoutDashboard, FileText, Tag, Bot } from 'lucide-react';
 
@@ -9,6 +9,7 @@ import PromptEditor from './pages/PromptEditor';
 import PromptDetail from './pages/PromptDetail';
 import TagsManagement from './pages/TagsManagement';
 import AgentsManagement from './pages/AgentsManagement';
+import { healthApi } from './services/api';
 
 function NavItem({ to, icon: Icon, label }) {
   return (
@@ -29,6 +30,22 @@ function NavItem({ to, icon: Icon, label }) {
 }
 
 export function AppLayout() {
+  const [appVersion, setAppVersion] = useState('Loading...');
+
+  useEffect(() => {
+    const fetchVersion = async () => {
+      try {
+        const response = await healthApi.check();
+        setAppVersion(response.data.version);
+      } catch (error) {
+        console.error('Failed to fetch version:', error);
+        setAppVersion('Unknown');
+      }
+    };
+
+    fetchVersion();
+  }, []);
+
   return (
     <div className="flex h-screen bg-gray-900 text-gray-100">
       {/* Sidebar */}
@@ -36,7 +53,7 @@ export function AppLayout() {
         <div className="px-4 mb-4">
           <Link to="/" className="block hover:opacity-80 transition-opacity">
             <h1 className="text-lg font-bold text-white">Prompt Manager</h1>
-            <p className="text-xs text-gray-400">v1.0.0</p>
+            <p className="text-xs text-gray-400">v{appVersion}</p>
           </Link>
         </div>
         <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" />

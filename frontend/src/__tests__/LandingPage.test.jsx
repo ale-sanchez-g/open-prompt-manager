@@ -1,7 +1,10 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import LandingPage from '../pages/LandingPage';
+import * as apiService from '../services/api';
+
+jest.mock('../services/api');
 
 function renderLandingPage() {
   return render(
@@ -12,9 +15,18 @@ function renderLandingPage() {
 }
 
 describe('LandingPage', () => {
-  it('renders the app title', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    apiService.healthApi = {
+      check: jest.fn().mockResolvedValue({ data: { version: '1.0.0' } }),
+    };
+  });
+
+  it('renders the app title', async () => {
     renderLandingPage();
-    expect(screen.getAllByText('Prompt Manager')[0]).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getAllByText('Prompt Manager')[0]).toBeInTheDocument();
+    });
   });
 
   it('renders the hero heading', () => {
@@ -58,6 +70,25 @@ describe('LandingPage', () => {
     renderLandingPage();
     const link = screen.getByRole('link', { name: /open dashboard/i });
     expect(link).toHaveAttribute('href', '/dashboard');
+  });
+
+  it('fetches and displays the app version from the health endpoint', async () => {
+    renderLandingPage();
+    await waitFor(() => {
+      expect(apiService.healthApi.check).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(screen.getByText('v1.0.0')).toBeInTheDocument();
+    });
+  });
+
+  it('displays "Unknown" when version fetch fails', async () => {
+    apiService.healthApi.check = jest.fn().mockRejectedValue(new Error('API error'));
+    renderLandingPage();
+    await waitFor(() => {
+      expect(screen.getByText('vUnknown')).toBeInTheDocument();
+    });
+  });
   });
 
   it('renders the step numbers', () => {

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { promptsApi, tagsApi, agentsApi } from '../services/api';
+import { promptsApi, tagsApi, agentsApi, healthApi } from '../services/api';
 
 jest.mock('axios');
 
@@ -43,5 +43,9 @@ describe('API service structure', () => {
     expect(typeof agentsApi.create).toBe('function');
     expect(typeof agentsApi.update).toBe('function');
     expect(typeof agentsApi.delete).toBe('function');
+  });
+
+  it('healthApi has required methods', () => {
+    expect(typeof healthApi.check).toBe('function');
   });
 });
