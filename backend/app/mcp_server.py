@@ -31,12 +31,15 @@ _allowed_hosts = [
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _is_latest(prompt: Prompt, db) -> bool:
-    """Return True if no other prompt lists this prompt as its parent."""
-    return db.query(Prompt).filter(Prompt.parent_id == prompt.id).first() is None
+def _build_has_children(prompt_ids: list[int], db) -> set[int]:
+    """Return the subset of `prompt_ids` that have at least one child version."""
+    if not prompt_ids:
+        return set()
+    rows = db.query(Prompt.parent_id).filter(Prompt.parent_id.in_(prompt_ids)).distinct().all()
+    return {row[0] for row in rows}
 
 
-def _prompt_to_dict(prompt: Prompt, db) -> dict[str, Any]:
+def _prompt_to_dict(prompt: Prompt, has_children_ids: set[int]) -> dict[str, Any]:
     return {
         "id": prompt.id,
         "name": prompt.name,
@@ -44,7 +47,7 @@ def _prompt_to_dict(prompt: Prompt, db) -> dict[str, Any]:
         "content": prompt.content,
         "version": prompt.version,
         "parent_id": prompt.parent_id,
-        "is_latest": _is_latest(prompt, db),
+        "is_latest": prompt.id not in has_children_ids,
         "created_by": prompt.created_by,
         "variables": prompt.variables or [],
         "tags": [{"id": t.id, "name": t.name, "color": t.color} for t in prompt.tags],
@@ -99,7 +102,8 @@ def build_mcp_server() -> FastMCP:
                     Prompt.name.ilike(f"%{search}%") | Prompt.description.ilike(f"%{search}%")
                 )
             prompts = query.order_by(Prompt.updated_at.desc()).offset(skip).limit(limit).all()
-            return [_prompt_to_dict(p, db) for p in prompts]
+            has_children = _build_has_children([p.id for p in prompts], db)
+            return [_prompt_to_dict(p, has_children) for p in prompts]
         finally:
             db.close()
 
@@ -116,7 +120,8 @@ def build_mcp_server() -> FastMCP:
             prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
             if prompt is None:
                 return {"error": f"Prompt {prompt_id} not found"}
-            return _prompt_to_dict(prompt, db)
+            has_children = _build_has_children([prompt.id], db)
+            return _prompt_to_dict(prompt, has_children)
         finally:
             db.close()
 
@@ -200,7 +205,8 @@ def build_mcp_server() -> FastMCP:
             db.add(db_prompt)
             db.commit()
             db.refresh(db_prompt)
-            return _prompt_to_dict(db_prompt, db)
+            has_children = _build_has_children([db_prompt.id], db)
+            return _prompt_to_dict(db_prompt, has_children)
         finally:
             db.close()
 
@@ -210,8 +216,9 @@ def build_mcp_server() -> FastMCP:
         Retrieve the full version history for a prompt, including which version is latest.
 
         The returned list covers the entire version chain (root and all descendants),
-        ordered from oldest to newest.  Each entry contains an `is_latest` field
-        that is `true` only for the most recent version in the chain.
+        sorted by creation date (oldest first). Because `create_version` can be called
+        on any existing version, history may branch; in that case multiple leaf versions
+        will each have `is_latest=true`.
 
         Args:
             prompt_id: The integer ID of any prompt in the version chain.
@@ -236,7 +243,10 @@ def build_mcp_server() -> FastMCP:
                 versions.append(current)
                 children = db.query(Prompt).filter(Prompt.parent_id == current.id).all()
                 queue.extend(children)
-            return [_prompt_to_dict(v, db) for v in versions]
+            # Sort by creation date so the list is deterministically oldest-first
+            versions.sort(key=lambda p: p.created_at)
+            has_children = _build_has_children([v.id for v in versions], db)
+            return [_prompt_to_dict(v, has_children) for v in versions]
         finally:
             db.close()
 

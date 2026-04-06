@@ -314,7 +314,7 @@ curl -X POST http://localhost:8000/api/prompts/1/versions \
 
 Versions are automatically given the next patch version (e.g., `1.0.0` → `1.0.1`). Supply a custom `version` field to override.
 
-Every prompt response (REST API and MCP tools) includes an `is_latest` boolean field that is `true` when the prompt has no newer version in its chain. Use `GET /api/prompts/{id}/versions` to list all versions in a chain with their `is_latest` flags, or the `get_prompt_versions` MCP tool for the same information from an AI agent.
+Every prompt response (REST API and MCP tools) includes an `is_latest` boolean field. A prompt is `is_latest=true` when it has no child versions created from it. Because `POST /api/prompts/{id}/versions` can be called on any existing version, version history can branch, and a branched history may therefore contain multiple versions with `is_latest=true` (one for each leaf branch). Use `GET /api/prompts/{id}/versions` to list all versions in a chain with their `is_latest` flags, or the `get_prompt_versions` MCP tool for the same information from an AI agent.
 
 ## Tracking Executions
 

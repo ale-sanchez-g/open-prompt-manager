@@ -1,3 +1,4 @@
+from collections import deque
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -164,10 +165,10 @@ def get_versions(prompt_id: int, db: Session = Depends(get_db)):
             )
         root = parent
     # Collect all descendants of the root
-    versions = []
-    queue = [root]
+    versions: list[Prompt] = []
+    queue: deque[Prompt] = deque([root])
     while queue:
-        current = queue.pop(0)
+        current = queue.popleft()
         versions.append(current)
         children = db.query(Prompt).filter(Prompt.parent_id == current.id).all()
         queue.extend(children)
