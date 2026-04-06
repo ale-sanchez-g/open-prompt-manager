@@ -11,7 +11,7 @@ function jestCompatPlugin() {
     transform(code, id) {
       // Apply to any test/spec file in the project (not inside node_modules).
       if (id.includes('node_modules')) return
-      if (!id.endsWith('.test.js') && !id.endsWith('.spec.js') && !id.includes('/__tests__/')) return
+      if (!id.endsWith('.test.js') && !id.endsWith('.test.jsx') && !id.endsWith('.spec.js') && !id.endsWith('.spec.jsx') && !id.includes('/__tests__/')) return
 
       let result = code
         .replace(/\bjest\.mock\(/g, 'vi.mock(')
@@ -41,18 +41,6 @@ function jestCompatPlugin() {
 
 export default defineConfig({
   plugins: [react(), jestCompatPlugin()],
-  esbuild: {
-    include: /src\/.*\.js$/,
-    loader: 'jsx',
-    exclude: [],
-  },
-  optimizeDeps: {
-    esbuildOptions: {
-      loader: {
-        '.js': 'jsx',
-      },
-    },
-  },
   server: {
     port: 3000,
     open: true,
