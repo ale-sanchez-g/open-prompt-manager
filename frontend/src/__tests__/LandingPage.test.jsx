@@ -89,7 +89,6 @@ describe('LandingPage', () => {
       expect(screen.getByText('vUnknown')).toBeInTheDocument();
     });
   });
-  });
 
   it('renders the step numbers', () => {
     renderLandingPage();

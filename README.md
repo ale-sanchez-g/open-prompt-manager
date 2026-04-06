@@ -6,6 +6,8 @@ A production-ready open-source framework for managing AI prompts across agents a
 
 When you open the application, you will first land on the **Landing Page** (`/`), which introduces Prompt Manager and explains how it works. From there, clicking **Get Started** or **Go to Dashboard** takes you to the **Dashboard** (`/dashboard`) where you can view statistics, recent prompts, and quality metrics.
 
+The application version displayed in the sidebar and landing page header is fetched dynamically from the `GET /api/health` endpoint, so it always reflects the current backend version.
+
 ### Frontend Routes
 
 | Path | Page | Description |
@@ -115,7 +117,7 @@ cd frontend && npm install && npm start
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/health` | Health check |
+| GET | `/api/health` | Health check — returns `{ "status": "ok", "version": "<app_version>" }`. The `version` field is consumed by the frontend to display the current application version. |
 
 ## MCP Server
 
