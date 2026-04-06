@@ -253,13 +253,13 @@ export default function PromptDetail() {
                   <li key={v.id} className="flex items-center gap-1">
                     <Link
                       to={`/prompts/${v.id}`}
-                      className={`flex-1 flex justify-between items-center text-sm px-2 py-1.5 rounded-lg transition-colors ${
+                      className={`flex-1 flex justify-between items-start gap-2 text-sm px-2 py-1.5 rounded-lg transition-colors ${
                         v.id === parseInt(id, 10)
                           ? 'bg-blue-600 text-white'
                           : 'text-gray-300 hover:bg-gray-700'
                       }`}
                     >
-                      <span className="truncate">{v.name}</span>
+                      <span className="min-w-0 whitespace-normal break-words leading-snug">{v.name}</span>
                       <span className="flex items-center gap-1 flex-shrink-0 ml-2">
                         {v.is_latest && (
                           <span

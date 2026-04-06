@@ -79,6 +79,24 @@ describe('PromptDetail — version diff', () => {
     expect(latestBadges).toHaveLength(1);
   });
 
+  it('allows long version names to wrap instead of truncating', async () => {
+    const longName = 'This is a very long prompt name that should wrap in the version history section without being truncated';
+    promptsApi.getVersions.mockResolvedValue({
+      data: [
+        { id: 2, name: longName, version: '1.0.0', is_latest: false },
+        { id: 4, name: longName, version: '1.0.1', is_latest: true },
+      ],
+    });
+
+    renderDetail('4');
+    await screen.findByRole('heading', { name: 'Sales Pitch Generator' });
+
+    const wrappedName = await screen.findByText(longName);
+    expect(wrappedName).toHaveClass('whitespace-normal');
+    expect(wrappedName).toHaveClass('break-words');
+    expect(wrappedName).not.toHaveClass('truncate');
+  });
+
   it('does not render a compare button for the current version', async () => {
     renderDetail('4');
     await screen.findByRole('heading', { name: 'Sales Pitch Generator' });
