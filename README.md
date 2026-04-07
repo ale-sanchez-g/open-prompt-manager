@@ -273,7 +273,7 @@ make push VERSION=1.0.0 REGISTRY=your-registry
 make helm-install VERSION=1.0.0 REGISTRY=your-registry
 
 # Upgrade existing deployment
-make helm-upgrade VERSION=1.1.0 REGISTRY=your-registry
+make helm-upgrade VERSION=1.2.0 REGISTRY=your-registry
 
 # Uninstall
 make helm-uninstall
