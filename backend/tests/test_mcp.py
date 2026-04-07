@@ -139,6 +139,7 @@ def test_mcp_tools_list(mcp_client: TestClient):
     assert tool_names == {
         "list_prompts",
         "get_prompt",
+        "get_prompt_versions",
         "render_prompt",
         "create_prompt",
         "list_tags",
@@ -288,3 +289,72 @@ def test_list_agents_returns_created_agent(mcp_client: TestClient, client: TestC
     client.post("/api/agents/", json={"name": "mcp-agent", "type": "bot", "status": "active"})
     result = call_tool(mcp_client, "list_agents")
     assert any(a["name"] == "mcp-agent" for a in result)
+
+
+# ── Tool: get_prompt_versions ─────────────────────────────────────────────────
+
+def test_get_prompt_versions_single(mcp_client: TestClient, client: TestClient):
+    created = client.post(
+        "/api/prompts/",
+        json={"name": "Solo", "content": "v1", "version": "1.0.0",
+              "variables": [], "tag_ids": [], "agent_ids": []},
+    ).json()
+    result = call_tool(mcp_client, "get_prompt_versions", {"prompt_id": created["id"]})
+    assert len(result) == 1
+    assert result[0]["id"] == created["id"]
+    assert result[0]["is_latest"] is True
+
+
+def test_get_prompt_versions_chain(mcp_client: TestClient, client: TestClient):
+    parent = client.post(
+        "/api/prompts/",
+        json={"name": "Chain", "content": "v1", "version": "1.0.0",
+              "variables": [], "tag_ids": [], "agent_ids": []},
+    ).json()
+    child = client.post(f"/api/prompts/{parent['id']}/versions", json={}).json()
+    result = call_tool(mcp_client, "get_prompt_versions", {"prompt_id": parent["id"]})
+    by_id = {r["id"]: r for r in result}
+    assert by_id[parent["id"]]["is_latest"] is False
+    assert by_id[child["id"]]["is_latest"] is True
+
+
+def test_get_prompt_versions_not_found(mcp_client: TestClient):
+    result = call_tool(mcp_client, "get_prompt_versions", {"prompt_id": 99999})
+    assert len(result) == 1
+    assert "error" in result[0]
+    assert "99999" in result[0]["error"]
+
+
+# ── is_latest in existing tools ───────────────────────────────────────────────
+
+def test_get_prompt_includes_is_latest(mcp_client: TestClient, client: TestClient):
+    created = client.post(
+        "/api/prompts/",
+        json={"name": "Latest Check", "content": "v1", "version": "1.0.0",
+              "variables": [], "tag_ids": [], "agent_ids": []},
+    ).json()
+    result = call_tool(mcp_client, "get_prompt", {"prompt_id": created["id"]})
+    assert result["is_latest"] is True
+
+
+def test_get_prompt_is_not_latest_after_new_version(mcp_client: TestClient, client: TestClient):
+    parent = client.post(
+        "/api/prompts/",
+        json={"name": "Old Version", "content": "v1", "version": "1.0.0",
+              "variables": [], "tag_ids": [], "agent_ids": []},
+    ).json()
+    client.post(f"/api/prompts/{parent['id']}/versions", json={})
+    result = call_tool(mcp_client, "get_prompt", {"prompt_id": parent["id"]})
+    assert result["is_latest"] is False
+
+
+def test_list_prompts_includes_is_latest(mcp_client: TestClient, client: TestClient):
+    client.post(
+        "/api/prompts/",
+        json={"name": "MCP Latest", "content": "v1", "version": "1.0.0",
+              "variables": [], "tag_ids": [], "agent_ids": []},
+    )
+    result = call_tool(mcp_client, "list_prompts")
+    assert len(result) == 1
+    assert "is_latest" in result[0]
+    assert result[0]["is_latest"] is True

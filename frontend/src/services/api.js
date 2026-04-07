@@ -37,4 +37,9 @@ export const agentsApi = {
   delete: (id) => api.delete(`/api/agents/${id}`),
 };
 
+// ── Health ────────────────────────────────────────────────────────────────────
+export const healthApi = {
+  check: () => api.get('/api/health'),
+};
+
 export default api;

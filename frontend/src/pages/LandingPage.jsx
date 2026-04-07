@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FileText, Tag, Bot, TrendingUp, GitBranch, Layers, ArrowRight } from 'lucide-react';
+import { healthApi } from '../services/api';
 
 function FeatureCard({ icon: Icon, title, description, color }) {
   return (
@@ -29,13 +30,29 @@ function StepCard({ step, title, description }) {
 }
 
 export default function LandingPage() {
+  const [appVersion, setAppVersion] = useState('Loading...');
+
+  useEffect(() => {
+    const fetchVersion = async () => {
+      try {
+        const response = await healthApi.check();
+        setAppVersion(response.data.version);
+      } catch (error) {
+        console.error('Failed to fetch version:', error);
+        setAppVersion('Unknown');
+      }
+    };
+
+    fetchVersion();
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100">
       {/* Header */}
       <header className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-white">Prompt Manager</h1>
-          <p className="text-xs text-gray-400">v1.0.0</p>
+          <p className="text-xs text-gray-400">v{appVersion}</p>
         </div>
         <Link
           to="/dashboard"

@@ -1,7 +1,8 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppLayout } from '../App';
+import * as apiService from '../services/api';
 
 // Stub page components so the test has no external API dependencies
 jest.mock('../pages/Dashboard', () => () => <div>Dashboard</div>);
@@ -10,6 +11,7 @@ jest.mock('../pages/PromptEditor', () => () => <div>PromptEditor</div>);
 jest.mock('../pages/PromptDetail', () => () => <div>PromptDetail</div>);
 jest.mock('../pages/TagsManagement', () => () => <div>TagsManagement</div>);
 jest.mock('../pages/AgentsManagement', () => () => <div>AgentsManagement</div>);
+jest.mock('../services/api');
 
 function renderAppLayout(initialPath = '/dashboard') {
   return render(
@@ -20,18 +22,47 @@ function renderAppLayout(initialPath = '/dashboard') {
 }
 
 describe('AppLayout sidebar', () => {
-  it('renders a Prompt Manager link that navigates to the homepage (/)', () => {
-    renderAppLayout();
-    const homeLink = screen.getByRole('link', { name: /prompt manager/i });
-    expect(homeLink).toBeInTheDocument();
-    expect(homeLink).toHaveAttribute('href', '/');
+  beforeEach(() => {
+    jest.clearAllMocks();
+    apiService.healthApi = {
+      check: jest.fn().mockResolvedValue({ data: { version: '1.0.0' } }),
+    };
   });
 
-  it('renders navigation links for Dashboard, Prompts, Tags and Agents', () => {
+  it('renders a Prompt Manager link that navigates to the homepage (/)', async () => {
     renderAppLayout();
-    expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /prompts/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /tags/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /agents/i })).toBeInTheDocument();
+    await waitFor(() => {
+      const homeLink = screen.getByRole('link', { name: /prompt manager/i });
+      expect(homeLink).toBeInTheDocument();
+      expect(homeLink).toHaveAttribute('href', '/');
+    });
+  });
+
+  it('renders navigation links for Dashboard, Prompts, Tags and Agents', async () => {
+    renderAppLayout();
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /prompts/i })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /tags/i })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /agents/i })).toBeInTheDocument();
+    });
+  });
+
+  it('fetches and displays the app version from the health endpoint', async () => {
+    renderAppLayout();
+    await waitFor(() => {
+      expect(apiService.healthApi.check).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(screen.getByText('v1.0.0')).toBeInTheDocument();
+    });
+  });
+
+  it('displays "Unknown" when version fetch fails', async () => {
+    apiService.healthApi.check = jest.fn().mockRejectedValue(new Error('API error'));
+    renderAppLayout();
+    await waitFor(() => {
+      expect(screen.getByText('vUnknown')).toBeInTheDocument();
+    });
   });
 });

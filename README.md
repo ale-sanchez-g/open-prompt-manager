@@ -6,6 +6,8 @@ A production-ready open-source framework for managing AI prompts across agents a
 
 When you open the application, you will first land on the **Landing Page** (`/`), which introduces Prompt Manager and explains how it works. From there, clicking **Get Started** or **Go to Dashboard** takes you to the **Dashboard** (`/dashboard`) where you can view statistics, recent prompts, and quality metrics.
 
+The application version displayed in the sidebar and landing page header is fetched dynamically from the `GET /api/health` endpoint, so it always reflects the current backend version.
+
 ### Frontend Routes
 
 | Path | Page | Description |
@@ -115,7 +117,7 @@ cd frontend && npm install && npm start
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/health` | Health check |
+| GET | `/api/health` | Health check — returns `{ "status": "ok", "version": "<app_version>" }`. The `version` field is consumed by the frontend to display the current application version. |
 
 ## MCP Server
 
@@ -133,8 +135,9 @@ The server uses the **Streamable HTTP** transport (`stateless_http=True`), which
 
 | Tool | Description |
 |------|-------------|
-| `list_prompts` | List prompts, optionally filtered by a search string |
-| `get_prompt` | Retrieve a single prompt by ID |
+| `list_prompts` | List prompts, optionally filtered by a search string. Each result includes `is_latest` |
+| `get_prompt` | Retrieve a single prompt by ID. Includes `is_latest` to indicate whether it is the most recent version |
+| `get_prompt_versions` | Retrieve the full version history for a prompt. Each entry includes `is_latest` |
 | `render_prompt` | Render a prompt, substituting variables and resolving components |
 | `create_prompt` | Create a new prompt |
 | `list_tags` | List all tags |
@@ -312,6 +315,8 @@ curl -X POST http://localhost:8000/api/prompts/1/versions \
 ```
 
 Versions are automatically given the next patch version (e.g., `1.0.0` → `1.0.1`). Supply a custom `version` field to override.
+
+Every prompt response (REST API and MCP tools) includes an `is_latest` boolean field. A prompt is `is_latest=true` when it has no child versions created from it. Because `POST /api/prompts/{id}/versions` can be called on any existing version, version history can branch, and a branched history may therefore contain multiple versions with `is_latest=true` (one for each leaf branch). Use `GET /api/prompts/{id}/versions` to list all versions in a chain with their `is_latest` flags, or the `get_prompt_versions` MCP tool for the same information from an AI agent.
 
 ## Tracking Executions
 

@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import PromptDetail from '../pages/PromptDetail';
-import { promptsApi } from '../services/api';
+import { promptsApi, healthApi } from '../services/api';
 
 jest.mock('../services/api');
 
@@ -32,8 +32,8 @@ const mockPromptV2 = {
 
 // Version history includes both v1.0.0 and v1.0.1
 const mockVersions = [
-  { id: 2, name: 'Sales Pitch Generator', version: '1.0.0' },
-  { id: 4, name: 'Sales Pitch Generator', version: '1.0.1' },
+  { id: 2, name: 'Sales Pitch Generator', version: '1.0.0', is_latest: false },
+  { id: 4, name: 'Sales Pitch Generator', version: '1.0.1', is_latest: true },
 ];
 
 beforeEach(() => {
@@ -44,6 +44,7 @@ beforeEach(() => {
   promptsApi.getVersions.mockResolvedValue({ data: mockVersions });
   promptsApi.delete.mockResolvedValue({});
   promptsApi.render.mockResolvedValue({ data: { rendered_content: 'Rendered output' } });
+  healthApi.check = jest.fn().mockResolvedValue({ data: { version: '1.0.0' } });
 });
 
 afterEach(() => jest.clearAllMocks());
@@ -68,6 +69,28 @@ describe('PromptDetail — version diff', () => {
 
     // v1.0.0 should have a compare button; v1.0.1 (current) should not
     expect(screen.getByRole('button', { name: /compare v1\.0\.0.*v1\.0\.1/i })).toBeInTheDocument();
+  });
+
+  it('shows a "Latest" badge only on the most recent version', async () => {
+    renderDetail('4');
+    await screen.findByRole('heading', { name: 'Sales Pitch Generator' });
+
+    // Only one "Latest" badge should appear and it should be present
+    const latestBadges = await screen.findAllByText('Latest');
+    expect(latestBadges).toHaveLength(1);
+  });
+
+  it('displays version history with proper styling', async () => {
+    renderDetail('4');
+    await screen.findByRole('heading', { name: 'Sales Pitch Generator' });
+
+    // Verify the version history section renders
+    const versionHistorySection = await screen.findByText('Version History');
+    expect(versionHistorySection).toBeInTheDocument();
+    
+    // Verify version badges are displayed
+    const versionBadges = await screen.findAllByText(/v1\.0\./);
+    expect(versionBadges.length).toBeGreaterThan(0);
   });
 
   it('does not render a compare button for the current version', async () => {
