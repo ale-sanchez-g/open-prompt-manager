@@ -10,7 +10,7 @@ set -euo pipefail
 # ─────────────────────────────────────────────
 # Defaults (override via flags)
 # ─────────────────────────────────────────────
-AWS_REGION="us-east-1"
+AWS_REGION="ap-southeast-2"
 ENVIRONMENT="prod"
 PROJECT_NAME="open-prompt-manager"
 DESTROY=false
@@ -32,6 +32,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TERRAFORM_DIR="${SCRIPT_DIR}/terraform"
 BACKEND_DIR="${SCRIPT_DIR}/backend"
 FRONTEND_DIR="${SCRIPT_DIR}/frontend"
+TF_WORKSPACE="${PROJECT_NAME}-${ENVIRONMENT}-${AWS_REGION}"
 
 # ─────────────────────────────────────────────
 # Helpers
@@ -40,6 +41,53 @@ log()  { echo ""; echo "▶  $*"; }
 ok()   { echo "   ✓  $*"; }
 warn() { echo "   ⚠  $*"; }
 fail() { echo "   ✗  $*" >&2; exit 1; }
+
+prepare_terraform_workspace() {
+  terraform init -input=false -reconfigure
+  terraform workspace select "${TF_WORKSPACE}" >/dev/null 2>&1 \
+    || terraform workspace new "${TF_WORKSPACE}" >/dev/null
+  ok "Terraform workspace selected: ${TF_WORKSPACE}"
+}
+
+ensure_ecr_repo_in_state() {
+  local tf_address="$1"
+  local repo_name="$2"
+
+  if terraform state show "${tf_address}" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if aws ecr describe-repositories \
+    --repository-names "${repo_name}" \
+    --region "${AWS_REGION}" >/dev/null 2>&1; then
+    warn "ECR repository '${repo_name}' already exists; importing into Terraform state..."
+    terraform import \
+      -var="aws_region=${AWS_REGION}" \
+      -var="environment=${ENVIRONMENT}" \
+      -var="project_name=${PROJECT_NAME}" \
+      "${tf_address}" "${repo_name}" >/dev/null
+    ok "Imported ${tf_address}"
+  fi
+}
+
+ensure_iam_role_in_state() {
+  local tf_address="$1"
+  local role_name="$2"
+
+  if terraform state show "${tf_address}" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if aws iam get-role --role-name "${role_name}" >/dev/null 2>&1; then
+    warn "IAM role '${role_name}' already exists; importing into Terraform state..."
+    terraform import \
+      -var="aws_region=${AWS_REGION}" \
+      -var="environment=${ENVIRONMENT}" \
+      -var="project_name=${PROJECT_NAME}" \
+      "${tf_address}" "${role_name}" >/dev/null
+    ok "Imported ${tf_address}"
+  fi
+}
 
 # ─────────────────────────────────────────────
 # 0. Pre-flight checks
@@ -61,7 +109,7 @@ ok "AWS credentials valid (account: ${AWS_ACCOUNT_ID})"
 if [[ "$DESTROY" == "true" ]]; then
   log "Destroying all infrastructure..."
   cd "${TERRAFORM_DIR}"
-  terraform init -input=false -reconfigure
+  prepare_terraform_workspace
   terraform destroy -auto-approve \
     -var="aws_region=${AWS_REGION}" \
     -var="environment=${ENVIRONMENT}" \
@@ -75,7 +123,11 @@ fi
 # ─────────────────────────────────────────────
 log "Step 1/5 – Bootstrapping ECR repositories..."
 cd "${TERRAFORM_DIR}"
-terraform init -input=false -reconfigure
+prepare_terraform_workspace
+
+ensure_ecr_repo_in_state "aws_ecr_repository.backend" "${PROJECT_NAME}-backend"
+ensure_ecr_repo_in_state "aws_ecr_repository.frontend" "${PROJECT_NAME}-frontend"
+
 terraform apply -auto-approve \
   -target=aws_ecr_repository.backend \
   -target=aws_ecr_repository.frontend \
@@ -138,6 +190,10 @@ fi
 # ─────────────────────────────────────────────
 log "Step 5/5 – Applying full Terraform configuration..."
 cd "${TERRAFORM_DIR}"
+
+ensure_iam_role_in_state "aws_iam_role.ecs_task_execution" "${PROJECT_NAME}-ecs-task-execution-role"
+ensure_iam_role_in_state "aws_iam_role.ecs_task" "${PROJECT_NAME}-ecs-task-role"
+
 terraform apply -auto-approve \
   -var="aws_region=${AWS_REGION}" \
   -var="environment=${ENVIRONMENT}" \
