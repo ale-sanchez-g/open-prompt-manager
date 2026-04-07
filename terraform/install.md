@@ -326,10 +326,10 @@ To deploy a new version of the application:
 # 1. Build and push a new image with a specific tag
 #    Always include --platform linux/amd64 when building on Apple Silicon
 docker buildx build --platform linux/amd64 \
-  -t "${BACKEND_REPO}:v1.1.0" ../backend/ --push
+  -t "${BACKEND_REPO}:v1.2.0" ../backend/ --push
 
 # 2. Update the variable and re-apply
-terraform apply -var="backend_image=${BACKEND_REPO}:v1.1.0"
+terraform apply -var="backend_image=${BACKEND_REPO}:v1.2.0"
 ```
 
 ECS performs a rolling update with zero downtime.
