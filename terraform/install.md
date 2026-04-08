@@ -769,19 +769,14 @@ echo "MCP endpoint: ${MCP_URL}"
 
 Replace `<alb-dns-name>` with the value of `terraform output -raw alb_dns_name`.
 
-### Adding a custom domain to MCP_ALLOWED_HOSTS
+### Custom domains and MCP_ALLOWED_HOSTS
 
-If you front the ALB with a custom domain (e.g., via Route 53), you must add it to the allowed hosts list. Override the environment variable in the ECS task definition by adding a `tfvars` entry or by editing `ecs.tf`:
+When you pass `domain_name` / `domain_names` (for example via `deploy.sh --domain ...`), the ECS backend task now automatically sets `MCP_ALLOWED_HOSTS` to include both:
 
-```hcl
-# In ecs.tf – extend the environment block of the backend container
-{
-  name  = "MCP_ALLOWED_HOSTS"
-  value = "${aws_lb.main.dns_name},prompts.example.com"
-}
-```
+- the ALB DNS name
+- every configured custom domain
 
-Then run `terraform apply` to redeploy the backend task.
+If you still get host-header errors after adding a domain, run `terraform apply` so ECS registers a new task definition revision with the updated environment values.
 
 ---
 

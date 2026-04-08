@@ -58,6 +58,7 @@ resource "aws_ecs_cluster_capacity_providers" "main" {
 locals {
   backend_image_uri  = var.backend_image != "" ? var.backend_image : "${aws_ecr_repository.backend.repository_url}:latest"
   frontend_image_uri = var.frontend_image != "" ? var.frontend_image : "${aws_ecr_repository.frontend.repository_url}:latest"
+  mcp_allowed_hosts  = join(",", distinct(compact(concat([aws_lb.main.dns_name], var.domain_names, var.domain_name != "" ? [var.domain_name] : []))))
 }
 
 resource "aws_ecs_task_definition" "backend" {
@@ -91,7 +92,7 @@ resource "aws_ecs_task_definition" "backend" {
           # Allow MCP clients connecting through the ALB.  The default only
           # permits localhost, which would cause 403s in production.
           name  = "MCP_ALLOWED_HOSTS"
-          value = aws_lb.main.dns_name
+          value = local.mcp_allowed_hosts
         }
       ]
 
