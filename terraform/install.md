@@ -82,6 +82,113 @@ You also need:
 
 ---
 
+## Quickstart: One-Command Deployment (Recommended)
+
+For production deployments, use the `deploy.sh` script at the repo root. It automates all steps including Docker builds, ACM certificate creation, and Terraform provisioning:
+
+### HTTP-only deployment (testing)
+
+```bash
+cd ..  # back to repo root
+./deploy.sh
+```
+
+### HTTPS deployment with auto-generated certificate
+
+```bash
+./deploy.sh --https --domain example.com
+```
+
+### HTTPS with multiple domains
+
+```bash
+./deploy.sh --https --domain example.com --domain www.example.com
+```
+
+### Custom region and environment
+
+```bash
+./deploy.sh --region eu-west-1 --env staging --https --domain staging.example.com
+```
+
+### Common real-world examples
+
+```bash
+# Production, single domain, Route 53 managed by this stack
+./deploy.sh --region ap-southeast-2 --env prod --https --domain opm-dx1.com --route53
+
+# Existing DNS hosted elsewhere (no Route 53 zone creation)
+./deploy.sh --region ap-southeast-2 --env prod --https --domain opm-dx1.com
+
+# Staging with two domains and Route 53 in Terraform
+./deploy.sh --region ap-southeast-2 --env staging --https \
+  --domain staging.example.com --domain www.staging.example.com --route53
+```
+
+### Tear down all infrastructure
+
+```bash
+./deploy.sh --destroy
+```
+
+That's it! The script handles ECR setup, certificate creation, Docker builds, and full Terraform deployment. You'll see the deployment URLs printed at the end.
+
+### Understanding the Deploy Workflow
+
+The `deploy.sh` script now uses a **staged plan-to-file workflow** for safer deployments:
+
+1. **Steps 1–4**: Initialize infrastructure (ECR bootstrap, Docker auth, image builds, secret cleanup)
+2. **Step 5**: Ensure ACM certificate is created and **already ISSUED** before full deploy
+3. **Step 6**: Generate a **Terraform plan** and save it to `.terraform.plans/<workspace>.tfplan`
+   - Plan output and warnings are captured to `.terraform.plans/<workspace>.tfplan.log`
+   - You'll be prompted to review the plan:
+     ```
+     Review the plan before applying:
+       cat terraform/.terraform.plans/open-prompt-manager-prod-us-east-1.tfplan.log
+     
+     Continue with apply? (y/N):
+     ```
+4. **Step 7**: If you confirm (`y`), apply the saved plan using `terraform apply ${PLAN_FILE}`
+   - All apply output is appended to the plan log for a complete audit trail
+
+If ACM is still `PENDING_VALIDATION`, the script exits early with validation details instead of continuing to ALB/ECS creation.
+
+### Saving Plans for Later Review
+
+If you cancel at the prompt or want to apply a plan later:
+
+```bash
+# Cancel the script at step 5 (Ctrl+C or type 'n')
+# The plan file is saved
+
+# Later, apply the saved plan:
+cd terraform
+terraform apply .terraform.plans/open-prompt-manager-prod-us-east-1.tfplan
+```
+
+### Reviewing Warnings and Changes
+
+All Terraform warnings, addition, deletions, and modifications are captured in the log file:
+
+```bash
+# View the complete plan including all warnings:
+cat terraform/.terraform.plans/open-prompt-manager-prod-us-east-1.tfplan.log
+
+# Grep for warnings specifically:
+grep -i warning terraform/.terraform.plans/open-prompt-manager-prod-us-east-1.tfplan.log
+
+# Grep for resource changes (+ = add, - = delete, ~ = modify):
+grep -E '^\s+[+~-]' terraform/.terraform.plans/open-prompt-manager-prod-us-east-1.tfplan.log
+```
+
+> **For advanced scenarios or troubleshooting**, follow the manual deployment steps below.
+
+---
+
+## Manual Deployment (Step-by-Step)
+
+---
+
 ## Step 1 – Configure AWS Credentials
 
 ```bash
@@ -157,31 +264,43 @@ Terraform has been successfully initialized!
 
 ## Step 4 – Review the Deployment Plan
 
+Generate and save a plan file:
+
 ```bash
-terraform plan
+mkdir -p .terraform.plans
+terraform plan -out=.terraform.plans/deployment.tfplan | tee .terraform.plans/deployment.tfplan.log
 ```
 
+This saves the plan to a file (rather than just displaying it), which allows you to safely apply it later. You'll see Terraform output to the terminal with all proposed changes.
+
 Review the resources that will be created. Key items to confirm:
-- 1 VPC
-- 2 public subnets, 2 private subnets
-- 1 Internet Gateway
-- 1 NAT Gateway + 1 Elastic IP
-- 2 Route Tables (public and private) with associations
-- 1 Application Load Balancer with **2 backend listener rules**:
+  - 1 VPC
+  - 2 public subnets, 2 private subnets
+  - 1 Internet Gateway
+  - 1 NAT Gateway + 1 Elastic IP
+  - 2 Route Tables (public and private) with associations
+  - 1 Application Load Balancer with listener rules:
   - priority 10: `/api/*` → backend REST API
   - priority 20: `/mcp`, `/mcp/*` → backend MCP server
-- 2 ECS services (backend, frontend) in private subnets
-- 2 ECR repositories
-- IAM roles for ECS task execution
-- 1 RDS PostgreSQL 16 instance (`db.t4g.micro`) in private subnets
-- 1 Secrets Manager secret containing the `DATABASE_URL`
+  - 2 ECS services (backend, frontend) in private subnets
+  - 2 ECR repositories
+  - IAM roles for ECS task execution
+  - 1 RDS PostgreSQL 16 instance (`db.t4g.micro`) in private subnets
+  - 1 Secrets Manager secret containing the `DATABASE_URL`
+
+If you spot any warnings or issues in the plan output, review them before proceeding. To review the plan later:
+```bash
+cat .terraform.plans/deployment.tfplan.log  # if you saved it
+```
 
 ---
 
 ## Step 5 – Apply the Terraform Configuration
 
+Apply using the saved plan file:
+
 ```bash
-terraform apply
+terraform apply .terraform.plans/deployment.tfplan
 ```
 
 Type `yes` when prompted to confirm. The full deployment takes approximately **3–5 minutes**.
@@ -285,6 +404,233 @@ terraform apply \
   -var="aws_region=eu-west-1" \
   -var="environment=staging" \
   -var="backend_desired_count=3"
+```
+
+---
+
+## HTTPS/TLS Configuration (Production)
+
+The load balancer supports both HTTP (port 80) and HTTPS (port 443). You have two options:
+
+### Option 1: Automated Deployment with deploy.sh (Recommended)
+
+The `deploy.sh` script can automatically create and manage ACM certificates:
+
+```bash
+# Create an ACM certificate and enable HTTPS
+../deploy.sh --https --domain example.com
+
+# Multiple domains
+../deploy.sh --https --domain example.com --domain www.example.com --domain api.example.com
+```
+
+The script will:
+1. Create an ACM certificate for your domain(s)
+2. Stop early unless ACM status is `ISSUED`
+3. Print validation details (domain, record name/type/value) when validation is pending
+4. Continue to ALB HTTPS listener creation only after certificate issuance
+5. Deploy the ALB with HTTPS listener on port 443
+6. Automatically redirect HTTP (port 80) → HTTPS
+
+### Option 2: Manual Terraform Configuration
+
+If you prefer to manage certificates separately:
+
+#### Create an ACM Certificate
+
+```bash
+# Request a new certificate
+aws acm request-certificate \
+  --domain-name example.com \
+  --subject-alternative-names www.example.com \
+  --validation-method DNS \
+  --region us-east-1
+```
+
+#### Deploy with HTTPS
+
+Add to your `terraform.tfvars`:
+
+```hcl
+enable_https = true
+create_certificate = false
+acm_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/..."
+```
+
+Or pass via CLI:
+
+```bash
+terraform apply \
+  -var="enable_https=true" \
+  -var="acm_certificate_arn=arn:aws:acm:..."
+```
+
+### How It Works
+
+| Port | Protocol | Behaviour |
+|------|----------|-----------|
+| 80 | HTTP | Redirects to HTTPS (301 permanent) when HTTPS enabled; forwards normally when disabled |
+| 443 | HTTPS | TLS 1.2+ only; routes `/api/*` → backend, `/mcp/*` → MCP, others → frontend |
+
+The ALB uses `ELBSecurityPolicy-TLS-1-2-2017-01` (AWS-recommended) which enforces TLS 1.2+ and disables weak ciphers.
+
+---
+
+## DNS & Domain Management (Route 53)
+
+Terraform can create and manage a Route 53 hosted zone for your domain and point it to your ALB. ACM validation is still required before HTTPS resources proceed.
+
+### Creating a Domain with Route 53 via Terraform
+
+#### Step 1: Register your domain
+
+Register your domain via:
+- **AWS Route 53** – Use `aws route53domain:RegisterDomain` API
+- **Third-party registrar** – GoDaddy, Namecheap, etc. (most common)
+
+> Even if you register elsewhere, Route 53 will handle DNS for you.
+
+#### Step 2: Create a hosted zone with deploy.sh
+
+```bash
+# Create Route 53 hosted zone + auto-managed DNS records for the ALB
+../deploy.sh --https --domain example.com --route53
+
+# Multiple domains (all registered to hosted zone + ALB)
+../deploy.sh --https --domain example.com --domain www.example.com --route53
+```
+
+The script will:
+1. Create an ACM certificate for your domain(s)
+2. Create a Route 53 **Hosted Zone** for your domain
+3. Create A records pointing `example.com` and `www.example.com` → ALB
+4. Display the Route 53 nameservers in the output
+
+#### Step 3: Validate the ACM Certificate
+
+The ACM certificate will validate via **email** by default (AWS sends validation emails to the domain registrant):
+
+**Option A: Email Validation (Easiest)**
+- After `deploy.sh` completes, check your email for ACM validation requests
+- Click the validation link in the email
+- Certificate validates automatically (~5-10 minutes)
+
+**Option B: Manual Route 53 DNS Validation (Advanced)**
+If you prefer DNS validation (no email step):
+```bash
+# 1. Get the certificate ARN by domain name:
+CERT_ARN=$(aws acm list-certificates \
+  --region ap-southeast-2 \
+  --query "CertificateSummaryList[?DomainName=='example.com'].CertificateArn | [0]" \
+  --output text)
+
+# 2. Get the validation record details:
+aws acm describe-certificate \
+  --certificate-arn "${CERT_ARN}" \
+  --region ap-southeast-2 \
+  --query 'Certificate.DomainValidationOptions[*].[DomainName,ValidationMethod,ResourceRecord]' \
+  --output table
+
+# 3. Manually create the CNAME records in Route 53:
+#    (Copy the values from the table above)
+aws route53 change-resource-record-sets \
+  --hosted-zone-id $(terraform output -raw route53_zone_id) \
+  --change-batch file:///tmp/validation-records.json
+```
+
+#### Step 4: Update your registrar's nameservers
+
+After `deploy.sh` completes, update your domain registrar to use the Route 53 nameservers.
+
+Example output:
+```
+Route 53 Hosted Zone created!
+Update your registrar's nameservers to:
+  - ns-123.awsdns-45.com.
+  - ns-678.awsdns-90.uk.
+  - ns-234.awsdns-56.edu.
+  - ns-901.awsdns-23.co.uk.
+```
+
+> DNS propagation typically takes 24–48 hours. You can check propagation with:
+> ```bash
+> dig example.com @ns-123.awsdns-45.com
+> ```
+
+### Manual Route 53 Configuration
+
+If you prefer to manage Route 53 separately:
+
+```hcl
+enable_https = true
+create_certificate = true
+domain_name = "example.com"
+domain_names = ["www.example.com"]
+create_route53_zone = true
+```
+
+Or via CLI:
+
+```bash
+terraform apply \
+  -var="enable_https=true" \
+  -var="create_route53_zone=true" \
+  -var="domain_name=example.com" \
+  -var="domain_names=[\"www.example.com\"]"
+```
+
+### How It Works
+
+The `dns.tf` module:
+- Creates a Route 53 **Hosted Zone** for your primary domain
+- Creates **A records** for your domain + www
+- **Aliases** all records to your ALB (so traffic routes automatically)
+
+Certificate validation behavior:
+- The script currently uses ACM certificate creation plus validation checks.
+- If validation is not complete, deployment stops with actionable output.
+- You can complete validation by email (default ACM path) or by manually adding the DNS validation records shown by ACM.
+
+Once DNS propagates and Terraform completes, your domain will:
+- Resolve to your ALB
+- Serve your application over HTTPS
+- Have a valid, auto-renewed ACM certificate
+
+### Existing domain / hosted zone examples
+
+#### Case A: Domain exists at registrar, but you want Terraform to manage Route 53
+
+```bash
+./deploy.sh --https --domain opm-dx1.com --route53
+```
+
+Then update your registrar nameservers to the values Terraform prints.
+
+#### Case B: Domain already has a Route 53 hosted zone you manage outside this stack
+
+```bash
+# Do not create another hosted zone
+./deploy.sh --https --domain opm-dx1.com
+```
+
+Then manually create/update alias records in your existing hosted zone to point to the ALB.
+
+#### Case C: Existing certificate validation is pending
+
+Expected script behavior:
+- Script creates/plans certificate resources
+- Script checks ACM status
+- If not `ISSUED`, script exits with validation details and does not continue to ALB/ECS apply
+
+Rerun the same deploy command after validation completes.
+
+### Route 53 Terraform Outputs
+
+After deployment, get the hosted zone details:
+
+```bash
+terraform output route53_zone_id       # Zone ID for manual DNS management
+terraform output route53_nameservers   # Nameservers to point your registrar at
 ```
 
 ---
