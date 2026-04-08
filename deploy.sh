@@ -190,6 +190,7 @@ fi
 # ─────────────────────────────────────────────
 log "Step 5/5 – Applying full Terraform configuration..."
 cd "${TERRAFORM_DIR}"
+prepare_terraform_workspace
 
 ensure_iam_role_in_state "aws_iam_role.ecs_task_execution" "${PROJECT_NAME}-ecs-task-execution-role"
 ensure_iam_role_in_state "aws_iam_role.ecs_task" "${PROJECT_NAME}-ecs-task-role"
