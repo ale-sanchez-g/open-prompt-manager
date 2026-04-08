@@ -20,6 +20,7 @@ DESTROY=false
 ENABLE_HTTPS=false
 CREATE_CERTIFICATE=false
 CREATE_ROUTE53_ZONE=false
+ROUTE53_ZONE_ID=""
 PRIMARY_DOMAIN=""
 DOMAIN_NAMES=()
 
@@ -54,6 +55,49 @@ log()  { echo ""; echo "▶  $*"; }
 ok()   { echo "   ✓  $*"; }
 warn() { echo "   ⚠  $*"; }
 fail() { echo "   ✗  $*" >&2; exit 1; }
+
+get_delegated_public_zone_id() {
+  [[ -n "${PRIMARY_DOMAIN}" ]] || return 0
+
+  local delegated_ns
+  delegated_ns=$(dig +short NS "${PRIMARY_DOMAIN}" 2>/dev/null | sed 's/\.$//' | sort)
+
+  local zone_ids
+  zone_ids=$(aws route53 list-hosted-zones-by-name \
+    --dns-name "${PRIMARY_DOMAIN}" \
+    --query "HostedZones[?Name=='${PRIMARY_DOMAIN}.'].Id" \
+    --output text 2>/dev/null)
+
+  [[ -n "${zone_ids}" ]] || return 0
+
+  local fallback_zone_id=""
+  local raw_zone_id
+  for raw_zone_id in ${zone_ids}; do
+    local zone_id
+    zone_id=${raw_zone_id#/hostedzone/}
+
+    if [[ -z "${fallback_zone_id}" ]]; then
+      fallback_zone_id="${zone_id}"
+    fi
+
+    local zone_ns
+    zone_ns=$(aws route53 get-hosted-zone \
+      --id "${zone_id}" \
+      --query 'DelegationSet.NameServers' \
+      --output text 2>/dev/null | tr '\t' '\n' | sed 's/\.$//' | sort)
+
+    if [[ -n "${delegated_ns}" && -n "${zone_ns}" && "${delegated_ns}" == "${zone_ns}" ]]; then
+      echo "${zone_id}"
+      return 0
+    fi
+  done
+
+  # No exact nameserver match found (for example, resolver cache or newly delegated domain).
+  # Reuse an existing zone anyway to avoid creating duplicate zones with the same name.
+  if [[ -n "${fallback_zone_id}" ]]; then
+    echo "${fallback_zone_id}"
+  fi
+}
 
 wait_for_acm_certificate_issued() {
   local certificate_arn="$1"
@@ -90,10 +134,13 @@ upsert_acm_validation_records() {
   [[ -n "${PRIMARY_DOMAIN}" ]] || return 0
 
   local zone_id
-  zone_id=$(aws route53 list-hosted-zones-by-name \
-    --dns-name "${PRIMARY_DOMAIN}" \
-    --query "HostedZones[?Name=='${PRIMARY_DOMAIN}.' && Config.PrivateZone==\`false\`].Id | [0]" \
-    --output text 2>/dev/null | sed 's|/hostedzone/||')
+  zone_id="${ROUTE53_ZONE_ID}"
+  if [[ -z "${zone_id}" ]]; then
+    zone_id=$(aws route53 list-hosted-zones-by-name \
+      --dns-name "${PRIMARY_DOMAIN}" \
+      --query "HostedZones[?Name=='${PRIMARY_DOMAIN}.' && Config.PrivateZone==\`false\`].Id | [0]" \
+      --output text 2>/dev/null | sed 's|/hostedzone/||')
+  fi
 
   if [[ -z "${zone_id}" || "${zone_id}" == "None" ]]; then
     warn "No public Route 53 hosted zone found for ${PRIMARY_DOMAIN}; skipping ACM DNS record auto-creation."
@@ -222,6 +269,7 @@ ensure_acm_certificate_is_issued() {
     -var="create_certificate=${CREATE_CERTIFICATE}" \
     -var="domain_name=${PRIMARY_DOMAIN}" \
     -var="domain_names=${DOMAIN_NAMES_ARG}" \
+    -var="route53_zone_id=${ROUTE53_ZONE_ID}" \
     -var="create_route53_zone=${CREATE_ROUTE53_ZONE}" 2>&1 | tee "${PLAN_FILE}.cert.log"
 
   terraform apply -auto-approve "${PLAN_FILE}.cert" 2>&1 | tee -a "${PLAN_FILE}.cert.log"
@@ -239,7 +287,7 @@ ensure_acm_certificate_is_issued() {
     --output text)
 
   if [[ "${certificate_status}" != "ISSUED" ]]; then
-    if [[ "${CREATE_ROUTE53_ZONE}" == "true" ]]; then
+    if [[ "${CREATE_ROUTE53_ZONE}" == "true" || -n "${ROUTE53_ZONE_ID}" ]]; then
       log "Attempting Route 53 ACM DNS validation record auto-creation..."
       upsert_acm_validation_records "${certificate_arn}"
 
@@ -265,16 +313,18 @@ ensure_acm_certificate_is_issued() {
       certificate_status="ISSUED"
     fi
 
-    warn "ACM certificate status is '${certificate_status}'."
-    warn "Validate the domain and rerun deploy.sh to continue with ALB listener and ECS services."
-    echo ""
-    echo "Validation details:"
-    aws acm describe-certificate \
-      --certificate-arn "${certificate_arn}" \
-      --region "${AWS_REGION}" \
-      --query 'Certificate.DomainValidationOptions[].{Domain:DomainName,Status:ValidationStatus,RecordName:ResourceRecord.Name,RecordType:ResourceRecord.Type,RecordValue:ResourceRecord.Value}' \
-      --output table || true
-    fail "Certificate is not ISSUED yet (current status: ${certificate_status})."
+    if [[ "${certificate_status}" != "ISSUED" ]]; then
+      warn "ACM certificate status is '${certificate_status}'."
+      warn "Validate the domain and rerun deploy.sh to continue with ALB listener and ECS services."
+      echo ""
+      echo "Validation details:"
+      aws acm describe-certificate \
+        --certificate-arn "${certificate_arn}" \
+        --region "${AWS_REGION}" \
+        --query 'Certificate.DomainValidationOptions[].{Domain:DomainName,Status:ValidationStatus,RecordName:ResourceRecord.Name,RecordType:ResourceRecord.Type,RecordValue:ResourceRecord.Value}' \
+        --output table || true
+      fail "Certificate is not ISSUED yet (current status: ${certificate_status})."
+    fi
   fi
 
   ok "ACM certificate is issued: ${certificate_arn}"
@@ -296,6 +346,14 @@ ok "AWS credentials valid (account: ${AWS_ACCOUNT_ID})"
 
 DOMAIN_NAMES_ARG=$(build_domain_names_arg)
 
+if [[ "${CREATE_ROUTE53_ZONE}" == "true" && -n "${PRIMARY_DOMAIN}" ]]; then
+  ROUTE53_ZONE_ID=$(get_delegated_public_zone_id)
+  if [[ -n "${ROUTE53_ZONE_ID}" ]]; then
+    warn "Found existing hosted zone for ${PRIMARY_DOMAIN}; reusing zone ${ROUTE53_ZONE_ID} instead of creating a new one."
+    CREATE_ROUTE53_ZONE=false
+  fi
+fi
+
 # ─────────────────────────────────────────────
 # Destroy path
 # ─────────────────────────────────────────────
@@ -311,6 +369,7 @@ if [[ "$DESTROY" == "true" ]]; then
     -var="create_certificate=${CREATE_CERTIFICATE}" \
     -var="domain_name=${PRIMARY_DOMAIN}" \
     -var="domain_names=${DOMAIN_NAMES_ARG}" \
+    -var="route53_zone_id=${ROUTE53_ZONE_ID}" \
     -var="create_route53_zone=${CREATE_ROUTE53_ZONE}"
   ok "Infrastructure destroyed."
   exit 0
@@ -406,6 +465,7 @@ terraform plan -out="${PLAN_FILE}" \
   -var="create_certificate=${CREATE_CERTIFICATE}" \
   -var="domain_name=${PRIMARY_DOMAIN}" \
   -var="domain_names=${DOMAIN_NAMES_ARG}" \
+  -var="route53_zone_id=${ROUTE53_ZONE_ID}" \
   -var="create_route53_zone=${CREATE_ROUTE53_ZONE}" 2>&1 | tee "${PLAN_FILE}.log"
 
 ok "Plan saved to: ${PLAN_FILE}"
@@ -446,12 +506,17 @@ if [[ "$ENABLE_HTTPS" == "true" ]]; then
     echo "  Domains     : ${DOMAIN_NAMES[@]}"
   fi
 fi
-if [[ "$CREATE_ROUTE53_ZONE" == "true" ]]; then
+if [[ "$CREATE_ROUTE53_ZONE" == "true" || -n "${ROUTE53_ZONE_ID}" ]]; then
   NAMESERVERS=$(terraform output -raw route53_nameservers 2>/dev/null || echo "")
   if [[ -n "$NAMESERVERS" ]]; then
     echo ""
-    echo "  Route 53 Hosted Zone created!"
-    echo "  Update your registrar's nameservers to:"
+    if [[ "$CREATE_ROUTE53_ZONE" == "true" ]]; then
+      echo "  Route 53 Hosted Zone created!"
+      echo "  Update your registrar's nameservers to:"
+    else
+      echo "  Route 53 Hosted Zone reused: ${ROUTE53_ZONE_ID}"
+      echo "  Current nameservers:"
+    fi
     for ns in ${NAMESERVERS//,/ }; do
       echo "    - $ns"
     done

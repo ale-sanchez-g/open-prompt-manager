@@ -184,6 +184,12 @@ variable "create_route53_zone" {
   default     = false
 }
 
+variable "route53_zone_id" {
+  description = "Existing public Route 53 hosted zone ID to use for DNS records. If set, Terraform will not create a new hosted zone."
+  type        = string
+  default     = ""
+}
+
 variable "domain_name" {
   description = "Primary domain name (e.g., example.com). Required if create_route53_zone=true. Used for Route 53 hosted zone and certificate SANs."
   type        = string

@@ -4,9 +4,24 @@
 # Supports HTTPS certificate validation via DNS.
 # ─────────────────────────────────────────────
 
+locals {
+  route53_zone_id = (
+    var.route53_zone_id != ""
+      ? var.route53_zone_id
+      : var.create_route53_zone && var.domain_name != ""
+        ? aws_route53_zone.main[0].zone_id
+        : ""
+  )
+}
+
+data "aws_route53_zone" "existing" {
+  count   = var.route53_zone_id != "" ? 1 : 0
+  zone_id = var.route53_zone_id
+}
+
 # Route 53 Hosted Zone (DNS management for your domain)
 resource "aws_route53_zone" "main" {
-  count = var.create_route53_zone ? 1 : 0
+  count = var.create_route53_zone && var.domain_name != "" && var.route53_zone_id == "" ? 1 : 0
   name  = var.domain_name
 
   tags = {
@@ -18,8 +33,8 @@ resource "aws_route53_zone" "main" {
 
 # A record: Point root domain to ALB
 resource "aws_route53_record" "alb" {
-  count   = var.create_route53_zone && var.domain_name != "" ? 1 : 0
-  zone_id = aws_route53_zone.main[0].zone_id
+  count   = local.route53_zone_id != "" && var.domain_name != "" ? 1 : 0
+  zone_id = local.route53_zone_id
   name    = var.domain_name
   type    = "A"
 
@@ -32,8 +47,8 @@ resource "aws_route53_record" "alb" {
 
 # CNAME records: Point www and other subdomains to ALB
 resource "aws_route53_record" "alb_www" {
-  count   = var.create_route53_zone && var.domain_name != "" ? 1 : 0
-  zone_id = aws_route53_zone.main[0].zone_id
+  count   = local.route53_zone_id != "" && var.domain_name != "" ? 1 : 0
+  zone_id = local.route53_zone_id
   name    = "www.${var.domain_name}"
   type    = "A"
 
@@ -80,10 +95,16 @@ resource "aws_acm_certificate_validation" "main" {
 # ─────────────────────────────────────────────
 output "route53_nameservers" {
   description = "Route 53 nameservers for your domain. Update your registrar with these values."
-  value       = var.create_route53_zone ? aws_route53_zone.main[0].name_servers : []
+  value = (
+    var.route53_zone_id != ""
+      ? try(data.aws_route53_zone.existing[0].name_servers, [])
+      : var.create_route53_zone
+        ? aws_route53_zone.main[0].name_servers
+        : []
+  )
 }
 
 output "route53_zone_id" {
   description = "Route 53 hosted zone ID for manual DNS record management."
-  value       = var.create_route53_zone ? aws_route53_zone.main[0].zone_id : ""
+  value       = local.route53_zone_id
 }

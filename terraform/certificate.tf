@@ -13,10 +13,18 @@ locals {
         ? var.domain_names[0] 
         : "${var.project_name}.local"
   )
+
+  # When the primary domain is an apex domain, also include www by default.
+  auto_www_domain = (
+    var.domain_name != "" && !startswith(var.domain_name, "www.")
+      ? "www.${var.domain_name}"
+      : ""
+  )
   
   # SANs: include domain_name if different from cert_domain, plus all domain_names
   cert_sans = concat(
     var.domain_name != "" && var.domain_name != local.cert_domain ? [var.domain_name] : [],
+    local.auto_www_domain != "" && local.auto_www_domain != local.cert_domain ? [local.auto_www_domain] : [],
     var.domain_names
   )
 }
