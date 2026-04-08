@@ -10,42 +10,50 @@ This guide walks you through deploying **Open Prompt Manager** on AWS using the 
 Internet
     │
     ▼
-┌──────────────────────────────────────────────────┐
-│                AWS VPC (10.0.0.0/16)             │
-│                                                  │
-│  ┌───────────────┐   ┌───────────────┐           │
-│  │ Public Subnet │   │ Public Subnet │           │
-│  │ap-southeast-2a│   │ap-southeast-2b│           │
-│  │               │   │               │           │
-│  │  ┌──────────┐ │   │               │           │
-│  │  │   ALB    │ │   │               │           │
-│  │  └────┬─────┘ │   │               │           │
-│  │       │       │   │               │           │
-│  │  ┌────▼─────┐ │   │               │           │
-│  │  │  NAT GW  │ │   │               │           │
-│  │  └────┬─────┘ │   │               │           │
-│  └────────┼───────┘   └───────────────┘           │
-│           │                                       │
-│  ┌────────▼───────┐   ┌───────────────┐           │
-│  │ Private Subnet │   │ Private Subnet│           │
-│  │ap-southeast-2a │   │ap-southeast-2b│           │
-│  │                │   │               │           │
-│  │  ┌──────────┐  │   │ ┌──────────┐  │           │
-│  │  │ Backend  │  │   │ │ Backend  │  │           │
-│  │  │  (ECS)   │  │   │ │  (ECS)   │  │           │
-│  │  └────┬─────┘  │   │ └────┬─────┘  │           │
-│  │       │        │   │      │        │           │
-│  │  ┌────▼─────┐  │   │ ┌────▼─────┐  │           │
-│  │  │ Frontend │  │   │ │ Frontend │  │           │
-│  │  │  (ECS)   │  │   │ │  (ECS)   │  │           │
-│  │  └──────────┘  │   │ └──────────┘  │           │
-│  │                │   │               │           │
-│  │  ┌─────────────┴───┴──────────┐    │           │
-│  │  │   RDS PostgreSQL 16         │   │           │
-│  │  │   (private, encrypted)      │   │           │
-│  └──┤   db.t4g.micro / gp3        ├───┘           │
-│     └─────────────────────────────┘               │
-└──────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                    AWS VPC (10.0.0.0/16)                      │
+│                                                               │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │                    Internet Gateway                     │ │
+│  └────────────────────────────┬────────────────────────────┘ │
+│                               │                               │
+│  ┌─────────────────┐   ┌──────┴──────────┐                   │
+│  │  Public Subnet  │   │  Public Subnet  │                   │
+│  │ ap-southeast-2a │   │ ap-southeast-2b │                   │
+│  │                 │   │                 │                   │
+│  │  ┌───────────┐  │   │                 │                   │
+│  │  │  NAT GW   │  │   │                 │                   │
+│  │  └───────────┘  │   │                 │                   │
+│  └────────┬────────┘   └────────┬────────┘                   │
+│           │     ALB (spans      │                             │
+│           │   both public       │                             │
+│           └──────┬──────────────┘                            │
+│                  │  (HTTP :80 / HTTPS :443)                   │
+│         ┌────────┴────────┐                                   │
+│         │  /api/*  /mcp*  │  (→ Backend)                      │
+│         │  everything else│  (→ Frontend)                     │
+│         └────────┬────────┘                                   │
+│                  │                                            │
+│  ┌───────────────┴──────────┐   ┌──────────────────────────┐ │
+│  │    Private Subnet        │   │    Private Subnet        │ │
+│  │   ap-southeast-2a        │   │   ap-southeast-2b        │ │
+│  │                          │   │                          │ │
+│  │  ┌────────────────────┐  │   │  ┌────────────────────┐  │ │
+│  │  │  Backend  (ECS)    │  │   │  │  Backend  (ECS)    │  │ │
+│  │  │  512 CPU / 1024 MB │  │   │  │  512 CPU / 1024 MB │  │ │
+│  │  └────────────────────┘  │   │  └────────────────────┘  │ │
+│  │  ┌────────────────────┐  │   │  ┌────────────────────┐  │ │
+│  │  │  Frontend (ECS)    │  │   │  │  Frontend (ECS)    │  │ │
+│  │  │  256 CPU /  512 MB │  │   │  │  256 CPU /  512 MB │  │ │
+│  │  └────────────────────┘  │   │  └────────────────────┘  │ │
+│  └──────────────────────────┘   └──────────────────────────┘ │
+│                                                               │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │         RDS PostgreSQL 16  (private, encrypted)        │  │
+│  │         db.t4g.micro · gp3 · 20 GiB  (configurable)   │  │
+│  │         Port 5432 open only from backend SG            │  │
+│  └────────────────────────────────────────────────────────┘  │
+└───────────────────────────────────────────────────────────────┘
 ```
 
 ### Components
@@ -53,16 +61,19 @@ Internet
 | Component | Description |
 |-----------|-------------|
 | **VPC** | Isolated virtual network (`10.0.0.0/16`) for all resources. |
-| **Public Subnets** | Two subnets (one per AZ) with a route to the Internet Gateway. Host the ALB and NAT Gateway. |
-| **Private Subnets** | Two subnets (one per AZ) without a direct internet route. Host the ECS Fargate tasks. |
+| **Public Subnets** | Two subnets (one per AZ: `10.0.1.0/24`, `10.0.2.0/24`) with a route to the Internet Gateway. Host the NAT Gateway. |
+| **Private Subnets** | Two subnets (one per AZ: `10.0.10.0/24`, `10.0.11.0/24`) without a direct internet route. Host the ECS Fargate tasks and RDS. |
 | **Internet Gateway (IGW)** | Enables inbound/outbound internet traffic for the public subnets. |
-| **NAT Gateway** | Sits in the public subnet; allows ECS tasks in private subnets to reach the internet (e.g. to pull images) without being publicly reachable. |
+| **NAT Gateway** | Single NAT GW in the first public subnet (`ap-southeast-2a`); allows ECS tasks in private subnets to reach the internet (e.g. to pull ECR images) without being publicly reachable. |
 | **Route Tables** | Public RT routes `0.0.0.0/0` → IGW. Private RT routes `0.0.0.0/0` → NAT GW. |
-| **Application Load Balancer (ALB)** | Internet-facing; two listener rules route traffic to the backend: priority 10 (`/api/*` → REST API) and priority 20 (`/mcp`, `/mcp/*` → MCP server). Everything else goes to the frontend React SPA. |
-| **RDS PostgreSQL 16** | Single-AZ `db.t4g.micro` in the private subnets. Password auto-generated and stored in AWS Secrets Manager; injected into the backend container at runtime. Port 5432 is open only from the backend ECS security group. |
-| **ECS Fargate** | Serverless container runtime. Runs backend and frontend tasks in private subnets. |
-| **ECR** | Private container image registry for backend and frontend Docker images. |
-| **CloudWatch Logs** | Centralised log storage for ECS tasks. |
+| **Application Load Balancer (ALB)** | Internet-facing, deployed across both public subnets. HTTP listener (port 80) redirects to HTTPS when enabled, otherwise forwards directly. Two listener rules: priority 10 (`/api/*` → backend REST API) and priority 20 (`/mcp`, `/mcp/*` → backend MCP server). All other traffic forwarded to the frontend React SPA. |
+| **Security Groups** | Four security groups: `alb-sg` (HTTP/HTTPS from `0.0.0.0/0`), `frontend-sg` (port 80 from ALB only), `backend-sg` (port 8000 from ALB only), `rds-sg` (port 5432 from backend SG only). |
+| **ACM Certificate** | Optional TLS certificate created via `certificate.tf` with DNS validation. Automatically adds `www.` SAN for apex domains. Can be provided externally via `acm_certificate_arn`. |
+| **ECS Fargate** | Serverless container runtime. Runs backend (512 CPU / 1024 MB, 2 tasks) and frontend (256 CPU / 512 MB, 2 tasks) in private subnets. Cluster has Container Insights enabled and supports both `FARGATE` and `FARGATE_SPOT`. |
+| **ECR** | Private container image registry with lifecycle policies for backend and frontend Docker images. |
+| **RDS PostgreSQL 16** | `db.t4g.micro` with 20 GiB gp3 storage, encrypted at rest, in the private subnets. Multi-AZ disabled by default (enable via `db_multi_az = true`). |
+| **Secrets Manager** | Stores the auto-generated PostgreSQL `DATABASE_URL` at `<project>/<env>/database-url`. Injected into the backend ECS container at task start — never a plain-text env var. |
+| **CloudWatch Logs** | Log groups `/ecs/<project>/backend` and `/ecs/<project>/frontend` with 30-day retention. |
 
 ---
 
@@ -274,19 +285,23 @@ terraform plan -out=.terraform.plans/deployment.tfplan | tee .terraform.plans/de
 This saves the plan to a file (rather than just displaying it), which allows you to safely apply it later. You'll see Terraform output to the terminal with all proposed changes.
 
 Review the resources that will be created. Key items to confirm:
-  - 1 VPC
-  - 2 public subnets, 2 private subnets
+  - 1 VPC (`10.0.0.0/16`)
+  - 2 public subnets, 2 private subnets (one per AZ)
   - 1 Internet Gateway
-  - 1 NAT Gateway + 1 Elastic IP
+  - 1 NAT Gateway + 1 Elastic IP (in first public subnet)
   - 2 Route Tables (public and private) with associations
-  - 1 Application Load Balancer with listener rules:
-  - priority 10: `/api/*` → backend REST API
-  - priority 20: `/mcp`, `/mcp/*` → backend MCP server
-  - 2 ECS services (backend, frontend) in private subnets
-  - 2 ECR repositories
-  - IAM roles for ECS task execution
-  - 1 RDS PostgreSQL 16 instance (`db.t4g.micro`) in private subnets
+  - 4 Security Groups: `alb-sg`, `frontend-sg`, `backend-sg`, `rds-sg`
+  - 1 Application Load Balancer (internet-facing, across both public subnets):
+    - HTTP listener (port 80): redirects to HTTPS if enabled, else forwards to frontend
+    - HTTPS listener (port 443, when `enable_https = true`): TLS 1.2+
+    - Listener rules: priority 10 `/api/*` → backend, priority 20 `/mcp` `/mcp/*` → backend
+  - 1 ECS cluster with Container Insights and FARGATE / FARGATE_SPOT capacity providers
+  - 2 ECS services (backend: 512 CPU/1024 MB × 2 tasks, frontend: 256 CPU/512 MB × 2 tasks)
+  - 2 ECR repositories (backend, frontend)
+  - 2 IAM roles: `ecs-task-execution-role` and `ecs-task-role`
+  - 1 RDS PostgreSQL 16 instance (`db.t4g.micro`, 20 GiB gp3, encrypted)
   - 1 Secrets Manager secret containing the `DATABASE_URL`
+  - (Optional) 1 ACM certificate when `create_certificate = true` and `enable_https = true`
 
 If you spot any warnings or issues in the plan output, review them before proceeding. To review the plan later:
 ```bash
@@ -508,15 +523,16 @@ The script will:
 
 #### Step 3: Validate the ACM Certificate
 
-The ACM certificate will validate via **email** by default (AWS sends validation emails to the domain registrant):
+ACM certificates created by this stack always use **DNS validation** (`validation_method = "DNS"`). When you pass `--route53`, the `deploy.sh` script automatically upserts the required CNAME records into Route 53 and waits up to 5 minutes for the certificate to reach `ISSUED` status.
 
-**Option A: Email Validation (Easiest)**
-- After `deploy.sh` completes, check your email for ACM validation requests
-- Click the validation link in the email
-- Certificate validates automatically (~5-10 minutes)
+**Option A: Automated DNS validation via deploy.sh (Recommended)**
+```bash
+# deploy.sh with --route53 upserts the validation CNAME records automatically
+../deploy.sh --https --domain example.com --route53
+```
 
-**Option B: Manual Route 53 DNS Validation (Advanced)**
-If you prefer DNS validation (no email step):
+**Option B: Manual DNS validation (no --route53)**
+If you manage DNS outside Route 53, retrieve the required CNAME records and add them yourself:
 ```bash
 # 1. Get the certificate ARN by domain name:
 CERT_ARN=$(aws acm list-certificates \
@@ -531,12 +547,11 @@ aws acm describe-certificate \
   --query 'Certificate.DomainValidationOptions[*].[DomainName,ValidationMethod,ResourceRecord]' \
   --output table
 
-# 3. Manually create the CNAME records in Route 53:
-#    (Copy the values from the table above)
-aws route53 change-resource-record-sets \
-  --hosted-zone-id $(terraform output -raw route53_zone_id) \
-  --change-batch file:///tmp/validation-records.json
+# 3. Create the CNAME records shown in the table at your DNS provider.
+#    Once propagated, ACM will automatically mark the certificate as ISSUED.
 ```
+
+> **Note:** ACM certificates for apex domains (e.g. `example.com`) automatically include `www.example.com` as a Subject Alternative Name (SAN). No extra flag is needed.
 
 #### Step 4: Update your registrar's nameservers
 
@@ -699,7 +714,7 @@ terraform destroy
 | Symptom | Likely Cause | Resolution |
 |---------|-------------|------------|
 | MCP clients receive `403 Forbidden` | `MCP_ALLOWED_HOSTS` not set or missing the ALB hostname | The ECS task definition automatically sets `MCP_ALLOWED_HOSTS` to the ALB DNS name. If you added a custom domain, add it via `terraform apply -var="..."` or override the env var | 
-| MCP clients receive `404` on `/mcp` | ALB listener rule for `/mcp` not created | Run `terraform apply`; the `aws_lb_listener_rule.backend_mcp` rule (priority 20) must exist |
+| MCP clients receive `404` on `/mcp` | ALB listener rule for `/mcp` not created | Run `terraform apply`; the `aws_lb_listener_rule.http_backend_mcp` (HTTP) or `aws_lb_listener_rule.https_backend_mcp` (HTTPS) rule (priority 20) must exist |
 | ECS tasks fail to start | Image not found in ECR | Re-push the Docker image (Step 2) |
 | `CannotPullContainerError: image Manifest does not contain descriptor matching platform 'linux/amd64'` | Image built on Apple Silicon (ARM) without `--platform linux/amd64` | Rebuild with `docker buildx build --platform linux/amd64 … --push` (Step 2b/2c) |
 | Tasks stuck in `PENDING` | IAM execution role missing permissions | Check `aws_iam_role.ecs_task_execution` attachments |
@@ -853,8 +868,10 @@ terraform/
 ├── iam.tf               # IAM roles for ECS task execution + Secrets Manager policy
 ├── ecr.tf               # ECR repositories and lifecycle policies
 ├── alb.tf               # Application Load Balancer, target groups, listener rules
-├── ecs.tf               # ECS cluster, task definitions, and services (Fargate)
+├── ecs.tf               # ECS cluster (Container Insights), task definitions, services
 ├── rds.tf               # RDS PostgreSQL, DB subnet group, and Secrets Manager secret
+├── certificate.tf       # ACM certificate creation and local certificate_arn resolution
+├── dns.tf               # Route 53 hosted zone, A/CNAME records, ACM DNS validation
 ├── outputs.tf           # Output values (URLs, IDs, DB endpoint, secret ARN)
 └── install.md           # This file
 ```
