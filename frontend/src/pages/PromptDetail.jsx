@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
-  ArrowLeft, Edit, Trash2, Copy, Play, Star, Activity, Clock, GitBranch, ArrowLeftRight, X
+  ArrowLeft, Edit, Trash2, Copy, Play, Star, Activity, Clock, GitBranch, ArrowLeftRight, X, Puzzle
 } from 'lucide-react';
 import { promptsApi } from '../services/api';
 
@@ -62,6 +62,7 @@ export default function PromptDetail() {
   const [copied, setCopied] = useState(false);
   const [diffTarget, setDiffTarget] = useState(null);   // { prompt, diff[] }
   const [diffLoading, setDiffLoading] = useState(false);
+  const [componentPrompts, setComponentPrompts] = useState([]);
 
   const handleCompare = async (otherId) => {
     setDiffLoading(true);
@@ -90,6 +91,22 @@ export default function PromptDetail() {
 
     promptsApi.getVersions(id).then((r) => setVersions(r.data)).catch(console.error);
   }, [id]);
+
+  useEffect(() => {
+    if (!prompt) return;
+    const ids = [
+      ...new Set(
+        [...prompt.content.matchAll(/\{\{component:(\d+)\}\}/g)].map((m) => parseInt(m[1], 10))
+      ),
+    ];
+    if (ids.length === 0) {
+      setComponentPrompts([]);
+      return;
+    }
+    Promise.all(ids.map((cid) => promptsApi.get(cid)))
+      .then((results) => setComponentPrompts(results.map((r) => r.data)))
+      .catch(console.error);
+  }, [prompt?.id, prompt?.content]);
 
   const handleDelete = async () => {
     if (!window.confirm('Delete this prompt?')) return;
@@ -301,6 +318,28 @@ export default function PromptDetail() {
                       a.status === 'inactive' ? 'bg-gray-700 text-gray-400' :
                       'bg-red-900 text-red-300'
                     }`}>{a.status}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Components */}
+          {componentPrompts.length > 0 && (
+            <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
+                <Puzzle size={14} className="text-purple-400" /> Components
+              </h3>
+              <ul className="space-y-1">
+                {componentPrompts.map((comp) => (
+                  <li key={comp.id}>
+                    <Link
+                      to={`/prompts/${comp.id}`}
+                      className="flex items-center justify-between gap-2 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                    >
+                      <span className="truncate">{comp.name}</span>
+                      <span className="text-xs text-gray-500 flex-shrink-0">v{comp.version}</span>
+                    </Link>
                   </li>
                 ))}
               </ul>

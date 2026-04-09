@@ -244,3 +244,87 @@ describe('computeLineDiff logic (integrated)', () => {
     expect(screen.getAllByText('+').length).toBeGreaterThanOrEqual(1);
   });
 });
+
+// ── Components sidebar card ───────────────────────────────────────────────────
+
+describe('PromptDetail — Components sidebar card', () => {
+  const mockComponentPrompt = {
+    id: 99,
+    name: 'Shared Intro Block',
+    version: '1.0.0',
+    content: 'Hello there.',
+    description: '',
+    variables: [],
+    tags: [],
+    agents: [],
+    avg_rating: 0.0,
+    usage_count: 0,
+    success_rate: 0.0,
+    created_at: '2026-01-01T00:00:00',
+    updated_at: '2026-01-01T00:00:00',
+  };
+
+  it('does not show Components card when content has no component references', async () => {
+    // mockPromptV2 content has no {{component:...}} references
+    renderDetail('4');
+    await screen.findByRole('heading', { name: 'Sales Pitch Generator' });
+    expect(screen.queryByText('Components')).not.toBeInTheDocument();
+  });
+
+  it('shows Components card when content contains a {{component:id}} reference', async () => {
+    promptsApi.get.mockImplementation((id) => {
+      if (String(id) === '99') return Promise.resolve({ data: mockComponentPrompt });
+      return Promise.resolve({
+        data: { ...mockPromptV2, content: 'Intro: {{component:99}} then pitch.' },
+      });
+    });
+
+    renderDetail('4');
+    await screen.findByRole('heading', { name: 'Sales Pitch Generator' });
+    expect(await screen.findByText('Components')).toBeInTheDocument();
+    expect(await screen.findByText('Shared Intro Block')).toBeInTheDocument();
+  });
+
+  it('renders component as a link to its detail page', async () => {
+    promptsApi.get.mockImplementation((id) => {
+      if (String(id) === '99') return Promise.resolve({ data: mockComponentPrompt });
+      return Promise.resolve({
+        data: { ...mockPromptV2, content: '{{component:99}}' },
+      });
+    });
+
+    renderDetail('4');
+    await screen.findByRole('heading', { name: 'Sales Pitch Generator' });
+    const link = await screen.findByRole('link', { name: /shared intro block/i });
+    expect(link).toHaveAttribute('href', '/prompts/99');
+  });
+
+  it('displays version label for each component', async () => {
+    promptsApi.get.mockImplementation((id) => {
+      if (String(id) === '99') return Promise.resolve({ data: mockComponentPrompt });
+      return Promise.resolve({
+        data: { ...mockPromptV2, content: '{{component:99}}' },
+      });
+    });
+
+    renderDetail('4');
+    await screen.findByRole('heading', { name: 'Sales Pitch Generator' });
+    await screen.findByText('Shared Intro Block');
+    expect(screen.getAllByText('v1.0.0').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('fetches each referenced component prompt via promptsApi.get', async () => {
+    promptsApi.get.mockImplementation((id) => {
+      if (String(id) === '99') return Promise.resolve({ data: mockComponentPrompt });
+      return Promise.resolve({
+        data: { ...mockPromptV2, content: '{{component:99}}' },
+      });
+    });
+
+    renderDetail('4');
+    await screen.findByRole('heading', { name: 'Sales Pitch Generator' });
+    await waitFor(() => {
+      expect(promptsApi.get).toHaveBeenCalledWith(99);
+    });
+  });
+});
