@@ -344,6 +344,9 @@ AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/de
   || fail "AWS credentials are not configured. Run 'aws configure' first."
 ok "AWS credentials valid (account: ${AWS_ACCOUNT_ID})"
 
+DEPLOY_TAG=$(git -C "${SCRIPT_DIR}" rev-parse --short HEAD 2>/dev/null || date +%Y%m%d%H%M%S)
+ok "Deploy image tag: ${DEPLOY_TAG}"
+
 DOMAIN_NAMES_ARG=$(build_domain_names_arg)
 
 if [[ "${CREATE_ROUTE53_ZONE}" == "true" && -n "${PRIMARY_DOMAIN}" ]]; then
@@ -414,13 +417,18 @@ ok "Docker authenticated to ECR."
 # ─────────────────────────────────────────────
 log "Step 3/6 – Building and pushing backend image (linux/amd64)..."
 docker buildx build --platform linux/amd64 \
+  -t "${BACKEND_REPO}:${DEPLOY_TAG}" \
   -t "${BACKEND_REPO}:latest" "${BACKEND_DIR}" --push
-ok "Backend image pushed: ${BACKEND_REPO}:latest"
+ok "Backend images pushed: ${BACKEND_REPO}:${DEPLOY_TAG}, ${BACKEND_REPO}:latest"
 
 log "           Building and pushing frontend image (linux/amd64)..."
 docker buildx build --platform linux/amd64 \
+  -t "${FRONTEND_REPO}:${DEPLOY_TAG}" \
   -t "${FRONTEND_REPO}:latest" "${FRONTEND_DIR}" --push
-ok "Frontend image pushed: ${FRONTEND_REPO}:latest"
+ok "Frontend images pushed: ${FRONTEND_REPO}:${DEPLOY_TAG}, ${FRONTEND_REPO}:latest"
+
+BACKEND_IMAGE_URI="${BACKEND_REPO}:${DEPLOY_TAG}"
+FRONTEND_IMAGE_URI="${FRONTEND_REPO}:${DEPLOY_TAG}"
 
 # ─────────────────────────────────────────────
 # 4. Clean up any stale Secrets Manager secrets
@@ -461,6 +469,8 @@ terraform plan -out="${PLAN_FILE}" \
   -var="aws_region=${AWS_REGION}" \
   -var="environment=${ENVIRONMENT}" \
   -var="project_name=${PROJECT_NAME}" \
+  -var="backend_image=${BACKEND_IMAGE_URI}" \
+  -var="frontend_image=${FRONTEND_IMAGE_URI}" \
   -var="enable_https=${ENABLE_HTTPS}" \
   -var="create_certificate=${CREATE_CERTIFICATE}" \
   -var="domain_name=${PRIMARY_DOMAIN}" \
@@ -470,6 +480,8 @@ terraform plan -out="${PLAN_FILE}" \
 
 ok "Plan saved to: ${PLAN_FILE}"
 ok "Plan log saved to: ${PLAN_FILE}.log"
+ok "Backend deploy image: ${BACKEND_IMAGE_URI}"
+ok "Frontend deploy image: ${FRONTEND_IMAGE_URI}"
 echo ""
 echo "Review the plan before applying:"
 echo "  cat ${PLAN_FILE}.log"

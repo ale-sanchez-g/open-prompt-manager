@@ -31,6 +31,23 @@ def replace_or_fail(path: pathlib.Path, pattern: str, repl: str, *, flags: int =
     path.write_text(new_text, encoding="utf-8")
 
 
+def sync_package_lock_version(path: pathlib.Path) -> None:
+    # Update lockfile root version under the top-level package metadata.
+    replace_or_fail(
+        path,
+        r'(?m)^(\s*"name"\s*:\s*"[^"]+",\n\s*"version"\s*:\s*")[^"]+(",)$',
+        lambda m: f'{m.group(1)}{version}{m.group(2)}',
+        count=1,
+    )
+    # Update lockfile version for the workspace package entry at packages[""].
+    replace_or_fail(
+        path,
+        r'(?s)("packages"\s*:\s*\{\n\s*""\s*:\s*\{\n\s*"name"\s*:\s*"[^"]+",\n\s*"version"\s*:\s*")[^"]+(",)',
+        lambda m: f'{m.group(1)}{version}{m.group(2)}',
+        count=1,
+    )
+
+
 # JSON package files
 for package_json in [
     root / "frontend" / "package.json",
@@ -41,6 +58,12 @@ for package_json in [
         r'(?m)^\s*"version"\s*:\s*"[^"]+",?$',
         f'  "version": "{version}",',
     )
+
+for package_lock in [
+    root / 'frontend' / 'package-lock.json',
+    root / 'mcp-package-node' / 'package-lock.json',
+]:
+    sync_package_lock_version(package_lock)
 
 # Python package metadata
 replace_or_fail(
