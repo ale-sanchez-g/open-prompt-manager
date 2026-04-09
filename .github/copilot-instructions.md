@@ -94,7 +94,7 @@ Always run the relevant test suite **before** committing. CI (`.github/workflows
 
 ### Versioning
 
-Semantic versioning across all manifests. The single source of truth is `.version` at the repo root. Never edit version strings in individual files manually — they are synced by `scripts/release/sync_versions.sh` to `backend/app/__init__.py`, `frontend/package.json`, `mcp-package-python/pyproject.toml`, `mcp-package-node/package.json`, and `helm/prompt-manager/Chart.yaml`.
+Semantic versioning across all manifests. The single source of truth is `.version` at the repo root. Never edit version strings in individual files manually — they are synced by `scripts/release/sync_versions.sh` to `backend/app/__init__.py`, `frontend/package.json`, `frontend/package-lock.json`, `mcp-package-python/pyproject.toml`, `mcp-package-node/package.json`, `mcp-package-node/package-lock.json`, and `helm/prompt-manager/Chart.yaml`.
 
 Three versioning workflows coexist:
 
