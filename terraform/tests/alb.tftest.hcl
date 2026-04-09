@@ -174,7 +174,7 @@ run "mcp_listener_rule_action_type_is_forward" {
   command = plan
 
   assert {
-    condition     = aws_lb_listener_rule.backend_mcp.action[0].type == "forward"
+    condition     = aws_lb_listener_rule.http_backend_mcp[0].action[0].type == "forward"
     error_message = "MCP listener rule action type must be 'forward'."
   }
 }
@@ -183,7 +183,7 @@ run "mcp_listener_rule_priority_is_20" {
   command = plan
 
   assert {
-    condition     = aws_lb_listener_rule.backend_mcp.priority == 20
+    condition     = aws_lb_listener_rule.http_backend_mcp[0].priority == 20
     error_message = "MCP listener rule priority must be 20."
   }
 }
@@ -192,7 +192,7 @@ run "mcp_listener_rule_has_lower_priority_than_api" {
   command = plan
 
   assert {
-    condition     = aws_lb_listener_rule.backend_mcp.priority > aws_lb_listener_rule.backend_api.priority
+    condition     = aws_lb_listener_rule.http_backend_mcp[0].priority > aws_lb_listener_rule.http_backend_api[0].priority
     error_message = "MCP listener rule priority must be numerically greater than the API rule priority."
   }
 }
@@ -201,7 +201,7 @@ run "mcp_listener_rule_matches_mcp_path" {
   command = plan
 
   assert {
-    condition     = contains(flatten([for c in aws_lb_listener_rule.backend_mcp.condition : [for pp in c.path_pattern : pp.values]]), "/mcp")
+    condition     = contains(flatten([for c in aws_lb_listener_rule.http_backend_mcp[0].condition : [for pp in c.path_pattern : pp.values]]), "/mcp")
     error_message = "MCP listener rule must match the exact /mcp path."
   }
 }
@@ -210,7 +210,7 @@ run "mcp_listener_rule_matches_mcp_wildcard" {
   command = plan
 
   assert {
-    condition     = contains(flatten([for c in aws_lb_listener_rule.backend_mcp.condition : [for pp in c.path_pattern : pp.values]]), "/mcp/*")
+    condition     = contains(flatten([for c in aws_lb_listener_rule.http_backend_mcp[0].condition : [for pp in c.path_pattern : pp.values]]), "/mcp/*")
     error_message = "MCP listener rule must match /mcp/* sub-paths."
   }
 }
