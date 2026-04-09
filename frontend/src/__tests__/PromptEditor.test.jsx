@@ -20,10 +20,15 @@ const mockPrompt = {
 
 const mockTags = [{ id: 1, name: 'Sales', color: '#F59E0B' }];
 const mockAgents = [{ id: 1, name: 'Sales Agent', status: 'active', created_at: '2024-01-01T00:00:00' }];
+const mockAllPrompts = [
+  { id: 1, name: 'Intro Prompt', version: '1.0.0', description: '' },
+  { id: 3, name: 'Closing Prompt', version: '2.0.0', description: '' },
+];
 
 beforeEach(() => {
   tagsApi.list.mockResolvedValue({ data: mockTags });
   agentsApi.list.mockResolvedValue({ data: mockAgents });
+  promptsApi.list.mockResolvedValue({ data: mockAllPrompts });
   promptsApi.get.mockResolvedValue({ data: mockPrompt });
   promptsApi.create.mockResolvedValue({ data: { ...mockPrompt, id: 10 } });
   promptsApi.update.mockResolvedValue({ data: mockPrompt });
@@ -193,5 +198,84 @@ describe('PromptEditor — edit mode version popup', () => {
 
     // Version cannot be bumped, so modal still shows original
     expect(screen.getAllByText(/v2/).length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ── Components section ───────────────────────────────────────────────────────
+
+describe('PromptEditor — Components section', () => {
+  it('renders the Components section label', async () => {
+    renderEditor('/prompts/new');
+    expect(await screen.findByPlaceholderText(/search prompts to insert as components/i)).toBeInTheDocument();
+  });
+
+  it('shows matching prompts when user types in the search box', async () => {
+    renderEditor('/prompts/new');
+    const searchInput = await screen.findByPlaceholderText(/search prompts to insert as components/i);
+    fireEvent.change(searchInput, { target: { value: 'Intro' } });
+    expect(await screen.findByText('Intro Prompt')).toBeInTheDocument();
+    expect(screen.queryByText('Closing Prompt')).not.toBeInTheDocument();
+  });
+
+  it('shows Insert button for each matching component prompt', async () => {
+    renderEditor('/prompts/new');
+    const searchInput = await screen.findByPlaceholderText(/search prompts to insert as components/i);
+    fireEvent.change(searchInput, { target: { value: 'Intro' } });
+    const insertBtn = await screen.findByRole('button', { name: /^insert$/i });
+    expect(insertBtn).toBeInTheDocument();
+  });
+
+  it('inserts {{component:id}} into content when Insert is clicked', async () => {
+    renderEditor('/prompts/new');
+    const searchInput = await screen.findByPlaceholderText(/search prompts to insert as components/i);
+    fireEvent.change(searchInput, { target: { value: 'Intro' } });
+    const insertBtn = await screen.findByRole('button', { name: /^insert$/i });
+    fireEvent.click(insertBtn);
+    const contentArea = screen.getByPlaceholderText(/use \{\{variable_name\}\}/i);
+    expect(contentArea.value).toContain('{{component:1}}');
+  });
+
+  it('shows active component chip when content contains a component reference', async () => {
+    promptsApi.get.mockResolvedValue({
+      data: { ...mockPrompt, content: '{{component:1}} some text' },
+    });
+    renderEditor('/prompts/2/edit');
+    await screen.findByText('Edit Prompt');
+    expect(await screen.findByText('Intro Prompt')).toBeInTheDocument();
+  });
+
+  it('shows "No prompts found" when search has no matches', async () => {
+    renderEditor('/prompts/new');
+    const searchInput = await screen.findByPlaceholderText(/search prompts to insert as components/i);
+    fireEvent.change(searchInput, { target: { value: 'xyznonexistent' } });
+    expect(await screen.findByText(/no prompts found/i)).toBeInTheDocument();
+  });
+
+  it('clears the search box after inserting a component', async () => {
+    renderEditor('/prompts/new');
+    const searchInput = await screen.findByPlaceholderText(/search prompts to insert as components/i);
+    fireEvent.change(searchInput, { target: { value: 'Intro' } });
+    const insertBtn = await screen.findByRole('button', { name: /^insert$/i });
+    fireEvent.click(insertBtn);
+    await waitFor(() => {
+      expect(searchInput.value).toBe('');
+    });
+  });
+
+  it('includes component IDs in payload when creating a prompt', async () => {
+    renderEditor('/prompts/new');
+    // Fill required fields
+    const nameInput = screen.getAllByRole('textbox')[0];
+    fireEvent.change(nameInput, { target: { value: 'My Prompt' } });
+    const contentArea = screen.getByPlaceholderText(/use \{\{variable_name\}\}/i);
+    fireEvent.change(contentArea, { target: { value: '{{component:1}} hello' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /create prompt/i }));
+
+    await waitFor(() => {
+      expect(promptsApi.create).toHaveBeenCalledWith(
+        expect.objectContaining({ components: [1] })
+      );
+    });
   });
 });
