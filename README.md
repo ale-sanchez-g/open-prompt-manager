@@ -1,6 +1,14 @@
 # Prompt Management Framework
 
+[![CI](https://github.com/ale-sanchez-g/open-prompt-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/ale-sanchez-g/open-prompt-manager/actions/workflows/ci.yml)
+[![Security Checks](https://github.com/ale-sanchez-g/open-prompt-manager/actions/workflows/security.yml/badge.svg)](https://github.com/ale-sanchez-g/open-prompt-manager/actions/workflows/security.yml)
+[![Latest Release](https://img.shields.io/github/v/release/ale-sanchez-g/open-prompt-manager?display_name=tag)](https://github.com/ale-sanchez-g/open-prompt-manager/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+
 A production-ready open-source framework for managing AI prompts across agents and organizations — with version control, quality metrics, and composability.
+
+<!-- OPM img -->
+![OPM Screenshot](./img/opm-home.png)
 
 ## Application Overview
 
