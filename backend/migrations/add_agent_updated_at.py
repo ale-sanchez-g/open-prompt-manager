@@ -14,6 +14,9 @@ def run_migration(database_url: str = DEFAULT_DATABASE_URL) -> bool:
 
     try:
         inspector = inspect(engine)
+        if not inspector.has_table('agents'):
+            print('agents table does not exist; skipping migration')
+            return False
         if any(column['name'] == 'updated_at' for column in inspector.get_columns('agents')):
             print('agents.updated_at already exists; skipping migration')
             return False
