@@ -69,6 +69,7 @@ class Agent(Base):
     type = Column(String(50))
     status = Column(String(20), default='active')
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     prompts = relationship('Prompt', secondary=prompt_agents, back_populates='agents')
     executions = relationship('PromptExecution', back_populates='agent')

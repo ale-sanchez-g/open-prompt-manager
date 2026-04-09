@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import AgentsManagement from '../pages/AgentsManagement';
 import { agentsApi } from '../services/api';
 
@@ -21,7 +21,14 @@ beforeEach(() => {
 afterEach(() => jest.clearAllMocks());
 
 function renderPage() {
-  return render(<MemoryRouter><AgentsManagement /></MemoryRouter>);
+  return render(
+    <MemoryRouter initialEntries={['/agents']}>
+      <Routes>
+        <Route path="/agents" element={<AgentsManagement />} />
+        <Route path="/agents/:id" element={<div>Agent Detail</div>} />
+      </Routes>
+    </MemoryRouter>
+  );
 }
 
 describe('AgentsManagement', () => {
@@ -49,6 +56,13 @@ describe('AgentsManagement', () => {
   it('shows agent count', async () => {
     renderPage();
     expect(await screen.findByText('All Agents (2)')).toBeInTheDocument();
+  });
+
+  it('clicking agent card navigates to detail page', async () => {
+    renderPage();
+    await screen.findByText('Chatbot');
+    fireEvent.click(screen.getByText('Chatbot').closest('div[class*="bg-gray-700"]'));
+    await screen.findByText('Agent Detail');
   });
 
   it('submits create agent form', async () => {

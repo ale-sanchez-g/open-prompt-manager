@@ -66,6 +66,49 @@ def test_delete_agent_not_found(client):
     assert response.status_code == 404
 
 
+def test_get_agent_detail_with_prompts(client):
+    agent = client.post('/api/agents/', json=AGENT_PAYLOAD).json()
+    client.post('/api/prompts/', json={
+        'name': 'Agent Prompt', 'content': 'c', 'tag_ids': [], 'agent_ids': [agent['id']],
+    })
+    response = client.get(f"/api/agents/{agent['id']}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data['id'] == agent['id']
+    assert len(data['prompts']) == 1
+    assert data['prompts'][0]['name'] == 'Agent Prompt'
+    assert 'execution_count' in data
+    assert 'success_rate' in data
+    assert 'avg_rating' in data
+    assert 'updated_at' in data
+
+
+def test_get_agent_detail_execution_stats(client):
+    agent = client.post('/api/agents/', json=AGENT_PAYLOAD).json()
+    prompt = client.post('/api/prompts/', json={
+        'name': 'P', 'content': 'c', 'tag_ids': [], 'agent_ids': [],
+    }).json()
+    client.post(f"/api/prompts/{prompt['id']}/executions", json={'agent_id': agent['id'], 'success': 1, 'rating': 4})
+    client.post(f"/api/prompts/{prompt['id']}/executions", json={'agent_id': agent['id'], 'success': 0, 'rating': 2})
+    response = client.get(f"/api/agents/{agent['id']}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data['execution_count'] == 2
+    assert data['success_rate'] == 0.5
+    assert data['avg_rating'] == 3.0
+
+
+def test_get_agent_detail_no_executions(client):
+    agent = client.post('/api/agents/', json=AGENT_PAYLOAD).json()
+    response = client.get(f"/api/agents/{agent['id']}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data['execution_count'] == 0
+    assert data['success_rate'] == 0.0
+    assert data['avg_rating'] == 0.0
+    assert data['prompts'] == []
+
+
 def test_prompt_with_agent(client):
     agent = client.post("/api/agents/", json=AGENT_PAYLOAD).json()
     prompt = client.post("/api/prompts/", json={

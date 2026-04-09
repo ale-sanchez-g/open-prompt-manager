@@ -5,7 +5,7 @@ from app.database.base import get_db
 from app.models.prompt import Tag, Agent
 from app.models.schemas import (
     TagCreate, TagResponse,
-    AgentCreate, AgentUpdate, AgentResponse,
+    AgentCreate, AgentUpdate, AgentResponse, AgentDetailResponse, PromptSummaryResponse,
 )
 
 router = APIRouter(tags=['tags-agents'])
@@ -69,12 +69,34 @@ def create_agent(payload: AgentCreate, db: Session = Depends(get_db)):
     return agent
 
 
-@agents_router.get('/{agent_id}', response_model=AgentResponse)
+@agents_router.get('/{agent_id}', response_model=AgentDetailResponse)
 def get_agent(agent_id: int, db: Session = Depends(get_db)):
     agent = db.query(Agent).filter(Agent.id == agent_id).first()
     if not agent:
         raise HTTPException(status_code=404, detail='Agent not found')
-    return agent
+    executions = agent.executions
+    execution_count = len(executions)
+    success_rate = 0.0
+    avg_rating = 0.0
+    if execution_count > 0:
+        success_count = sum(1 for e in executions if e.success)
+        success_rate = success_count / execution_count
+        ratings = [e.rating for e in executions if e.rating is not None]
+        if ratings:
+            avg_rating = sum(ratings) / len(ratings)
+    return AgentDetailResponse(
+        id=agent.id,
+        name=agent.name,
+        description=agent.description,
+        type=agent.type,
+        status=agent.status,
+        created_at=agent.created_at,
+        updated_at=agent.updated_at if agent.updated_at else agent.created_at,
+        prompts=[PromptSummaryResponse.model_validate(p) for p in agent.prompts],
+        execution_count=execution_count,
+        success_rate=success_rate,
+        avg_rating=avg_rating,
+    )
 
 
 @agents_router.put('/{agent_id}', response_model=AgentResponse)

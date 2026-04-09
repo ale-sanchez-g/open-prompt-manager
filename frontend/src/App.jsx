@@ -9,6 +9,7 @@ import PromptEditor from './pages/PromptEditor';
 import PromptDetail from './pages/PromptDetail';
 import TagsManagement from './pages/TagsManagement';
 import AgentsManagement from './pages/AgentsManagement';
+import AgentDetail from './pages/AgentDetail';
 import { healthApi } from './services/api';
 
 function NavItem({ to, icon: Icon, label }) {
@@ -72,6 +73,7 @@ export function AppLayout() {
           <Route path="/prompts/:id" element={<PromptDetail />} />
           <Route path="/tags" element={<TagsManagement />} />
           <Route path="/agents" element={<AgentsManagement />} />
+          <Route path="/agents/:id" element={<AgentDetail />} />
         </Routes>
       </main>
     </div>
