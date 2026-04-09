@@ -99,7 +99,20 @@ print(json.dumps({
 PY
 })"
 
-OVERRIDES='{"containerOverrides":[{"name":"backend","command":["python","-m","migrations.add_agent_updated_at"]}]}'
+OVERRIDES="$({
+	CONTAINER_NAME="$CONTAINER_NAME" python3 - <<'PY'
+import json
+import os
+
+container_name = os.environ['CONTAINER_NAME']
+print(json.dumps({
+		'containerOverrides': [{
+				'name': container_name,
+				'command': ['python3', '-m', 'migrations.add_agent_updated_at'],
+		}]
+}))
+PY
+})"
 
 echo "Running one-off migration task with task definition: $TASK_DEFINITION_ARN"
 
