@@ -216,7 +216,7 @@ Notes:
 |--------|------|-------------|
 | GET | `/api/agents/` | List all agents |
 | GET | `/api/agents/{id}` | Get agent |
-| POST | `/api/agents/` | Create agent |
+| POST | `/api/agents/` | Register agent |
 | PUT | `/api/agents/{id}` | Update agent |
 | DELETE | `/api/agents/{id}` | Delete agent |
 

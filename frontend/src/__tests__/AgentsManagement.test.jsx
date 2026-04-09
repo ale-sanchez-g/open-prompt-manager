@@ -66,7 +66,7 @@ describe('AgentsManagement', () => {
     await screen.findByText('Agent Detail');
   });
 
-  it('submits create agent form', async () => {
+  it('register agent form', async () => {
     agentsApi.list
       .mockResolvedValueOnce({ data: mockAgents })
       .mockResolvedValueOnce({ data: [...mockAgents, { id: 3, name: 'New Agent', status: 'active', created_at: '2024-01-03T00:00:00' }] });
@@ -77,7 +77,7 @@ describe('AgentsManagement', () => {
     // First textbox in the form is the Name field
     const nameInput = screen.getAllByRole('textbox')[0];
     fireEvent.change(nameInput, { target: { value: 'New Agent' } });
-    fireEvent.click(screen.getByText('Create'));
+    fireEvent.click(screen.getByText('Register'));
 
     await waitFor(() => {
       expect(agentsApi.create).toHaveBeenCalledWith(

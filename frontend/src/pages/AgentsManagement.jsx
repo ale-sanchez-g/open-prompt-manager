@@ -39,7 +39,7 @@ export default function AgentsManagement() {
       setForm(emptyForm);
       fetchAgents();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to save agent');
+      setError(err.response?.data?.detail || 'Failed to register agent');
     } finally {
       setSaving(false);
     }
@@ -68,7 +68,7 @@ export default function AgentsManagement() {
       {/* Form */}
       <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
         <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">
-          {editId ? 'Edit Agent' : 'Create Agent'}
+          {editId ? 'Edit Agent' : 'Register Agent'}
         </h3>
         {error && (
           <div className="mb-3 text-red-400 text-sm bg-red-900/30 px-3 py-2 rounded-lg">{error}</div>
@@ -116,7 +116,7 @@ export default function AgentsManagement() {
               disabled={saving}
               className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
             >
-              {editId ? <><Check size={14} /> Save</> : <><Plus size={14} /> Create</>}
+              {editId ? <><Check size={14} /> Save</> : <><Plus size={14} /> Register</>}
             </button>
             {editId && (
               <button
