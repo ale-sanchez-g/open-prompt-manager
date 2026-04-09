@@ -61,7 +61,8 @@ describe('AgentsManagement', () => {
   it('clicking agent card navigates to detail page', async () => {
     renderPage();
     await screen.findByText('Chatbot');
-    fireEvent.click(screen.getByText('Chatbot').closest('div[class*="bg-gray-700"]'));
+    const cards = screen.getAllByTestId('agent-card');
+    fireEvent.click(cards[0]);
     await screen.findByText('Agent Detail');
   });
 

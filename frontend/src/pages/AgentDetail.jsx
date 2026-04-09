@@ -31,7 +31,7 @@ export default function AgentDetail() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const fetchAgent = () =>
+  useEffect(() => {
     agentsApi.get(id).then((r) => {
       setAgent(r.data);
       setForm({
@@ -41,8 +41,7 @@ export default function AgentDetail() {
         status: r.data.status,
       });
     }).catch(console.error);
-
-  useEffect(() => { fetchAgent(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [id]);
 
   const handleDelete = async () => {
     if (!window.confirm('Delete this agent?')) return;
@@ -56,8 +55,9 @@ export default function AgentDetail() {
     setError('');
     try {
       await agentsApi.update(id, form);
+      const res = await agentsApi.get(id);
+      setAgent(res.data);
       setEditing(false);
-      fetchAgent();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to save agent');
     } finally {

@@ -143,6 +143,7 @@ export default function AgentsManagement() {
             {agents.map((a) => (
               <div
                 key={a.id}
+                data-testid="agent-card"
                 onClick={() => navigate(`/agents/${a.id}`)}
                 className="bg-gray-700 rounded-xl p-4 flex items-start justify-between cursor-pointer hover:ring-1 hover:ring-blue-500 transition-all"
               >
