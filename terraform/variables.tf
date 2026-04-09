@@ -147,3 +147,51 @@ variable "db_deletion_protection" {
   type        = bool
   default     = false
 }
+
+# ─────────────────────────────────────────────
+# TLS/HTTPS
+# ─────────────────────────────────────────────
+variable "enable_https" {
+  description = "Enable HTTPS/TLS with an ACM certificate. If true, either provide acm_certificate_arn or set create_certificate=true."
+  type        = bool
+  default     = false
+}
+
+variable "create_certificate" {
+  description = "If true and enable_https=true, create a self-signed ACM certificate. If false, use the acm_certificate_arn variable."
+  type        = bool
+  default     = false
+}
+
+variable "domain_names" {
+  description = "List of domain names for the certificate (e.g., ['example.com', 'www.example.com'])."
+  type        = list(string)
+  default     = []
+}
+
+variable "acm_certificate_arn" {
+  description = "ARN of an existing ACM certificate for HTTPS. If not provided and create_certificate=true, a new certificate will be created."
+  type        = string
+  default     = ""
+}
+
+# ─────────────────────────────────────────────
+# DNS / Route 53
+# ─────────────────────────────────────────────
+variable "create_route53_zone" {
+  description = "If true, create a Route 53 hosted zone for your domain. Requires domain_name to be set."
+  type        = bool
+  default     = false
+}
+
+variable "route53_zone_id" {
+  description = "Existing public Route 53 hosted zone ID to use for DNS records. If set, Terraform will not create a new hosted zone."
+  type        = string
+  default     = ""
+}
+
+variable "domain_name" {
+  description = "Primary domain name (e.g., example.com). Required if create_route53_zone=true. Used for Route 53 hosted zone and certificate SANs."
+  type        = string
+  default     = ""
+}

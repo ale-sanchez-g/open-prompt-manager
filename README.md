@@ -76,6 +76,78 @@ make dev-frontend
 cd frontend && npm install && npm start
 ```
 
+## AWS Terraform Deployment
+
+Use the deployment script from the repository root for AWS infrastructure, images, and application rollout.
+
+### Deploy examples
+
+```bash
+# HTTP-only deployment
+./deploy.sh
+
+# HTTPS + Route 53 hosted zone
+./deploy.sh --https --domain example.com --route53
+
+# HTTPS + multiple domains
+./deploy.sh --https --domain example.com --domain www.example.com --route53
+
+# Custom region/environment
+./deploy.sh --region ap-southeast-2 --env staging --https --domain staging.example.com --route53
+
+# Destroy deployment
+./deploy.sh --destroy --https --domain example.com --route53
+```
+
+The deploy workflow is staged and safer by default:
+- Runs plan-to-file before full apply
+- Stores plan logs under `terraform/.terraform.plans/`
+- Checks ACM certificate status before creating HTTPS listener-dependent resources
+
+### Domain Registration Script (Route 53 Domains)
+
+Use `domainRego.sh` to check availability and register a domain in AWS.
+
+```bash
+# Dry-run (default): validates inputs and checks availability only
+./domainRego.sh \
+  --domain opm-<your-company>.com \
+  --first-name Bob \
+  --last-name Smith \
+  --email example@example.com \
+  --phone +61.455222555 \
+  --address-1 "50 Example St" \
+  --city Sydney \
+  --state NSW \
+  --zip 2000 \
+  --country AU
+
+# Submit purchase/registration request
+./domainRego.sh \
+  --domain opm-<your-company>.com \
+  --first-name Bob \
+  --last-name Smith \
+  --email example@example.com \
+  --phone +61.455222555 \
+  --address-1 "50 Example St" \
+  --city Sydney \
+  --state NSW \
+  --zip 2000 \
+  --country AU \
+  --execute
+```
+
+Track registration status:
+
+```bash
+./domainRego.sh --check-operation <operation-id>
+```
+
+Notes:
+- Country must be a 2-letter ISO code (for example `AU`, `US`, `GB`).
+- Script uses `us-east-1` for Route 53 Domains by default.
+- Domain registration can still require registrar/ICANN email verification before ACM validation reaches `ISSUED`.
+
 ## API Reference
 
 ### Prompts

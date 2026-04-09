@@ -39,6 +39,7 @@ helm/prompt-manager/charts/
 
 # Terraform
 **/.terraform/
+**/.terraform.plans/
 *.tfstate
 *.tfstate.*
 *.tfvars
