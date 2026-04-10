@@ -307,6 +307,7 @@ jobs:
     needs: docker-build
     permissions:
       contents: read
+      pull-requests: write
 
     steps:
       - name: Checkout code
@@ -363,7 +364,7 @@ jobs:
         working-directory: e2e-test
 
       - name: Run Playwright E2E tests
-        run: npm run test:api -- --reporter=list
+        run: npm run test:api
         working-directory: e2e-test
 
       - name: Upload Playwright report
@@ -373,6 +374,46 @@ jobs:
           name: playwright-report
           path: e2e-test/playwright-report/
           retention-days: 7
+
+      - name: Upload Playwright test results
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: playwright-test-results
+          path: e2e-test/test-results/
+          retention-days: 7
+
+      - name: Add E2E report to run summary
+        if: always()
+        run: |
+          {
+            echo "## Playwright E2E Report"
+            echo ""
+            echo "- Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "- Download artifact: open this run and download the \`playwright-report\` artifact from the Artifacts section"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment E2E report link on PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              '## Playwright E2E Report',
+              '',
+              `- Run: ${runUrl}`,
+              '- Download the `playwright-report` artifact from the run Artifacts section.',
+              '- Test traces/screenshots are in the `playwright-test-results` artifact.'
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body
+            });
 
       - name: Print service logs on failure
         if: failure()

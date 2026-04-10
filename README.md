@@ -1,6 +1,7 @@
 # Prompt Management Framework
 
 [![CI](https://github.com/ale-sanchez-g/open-prompt-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/ale-sanchez-g/open-prompt-manager/actions/workflows/ci.yml)
+[![Playwright E2E](https://img.shields.io/github/actions/workflow/status/ale-sanchez-g/open-prompt-manager/ci.yml?branch=main&label=Playwright%20E2E&logo=https%3A%2F%2Fplaywright.dev%2Fimg%2Fplaywright-logo.svg)](https://github.com/ale-sanchez-g/open-prompt-manager/actions/workflows/ci.yml)
 [![Security Checks](https://github.com/ale-sanchez-g/open-prompt-manager/actions/workflows/security.yml/badge.svg)](https://github.com/ale-sanchez-g/open-prompt-manager/actions/workflows/security.yml)
 [![Latest Release](https://img.shields.io/github/v/release/ale-sanchez-g/open-prompt-manager?display_name=tag)](https://github.com/ale-sanchez-g/open-prompt-manager/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
