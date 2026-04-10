@@ -50,3 +50,8 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+
+
+# Playwright Test
+playwright-report/
+test-results/

@@ -11,6 +11,7 @@ jest.mock('../pages/PromptEditor', () => () => <div>PromptEditor</div>);
 jest.mock('../pages/PromptDetail', () => () => <div>PromptDetail</div>);
 jest.mock('../pages/TagsManagement', () => () => <div>TagsManagement</div>);
 jest.mock('../pages/AgentsManagement', () => () => <div>AgentsManagement</div>);
+jest.mock('../pages/AgentDetail', () => () => <div>AgentDetail</div>);
 jest.mock('../services/api');
 
 function renderAppLayout(initialPath = '/dashboard') {

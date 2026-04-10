@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import AgentsManagement from '../pages/AgentsManagement';
 import { agentsApi } from '../services/api';
 
@@ -21,7 +21,14 @@ beforeEach(() => {
 afterEach(() => jest.clearAllMocks());
 
 function renderPage() {
-  return render(<MemoryRouter><AgentsManagement /></MemoryRouter>);
+  return render(
+    <MemoryRouter initialEntries={['/agents']}>
+      <Routes>
+        <Route path="/agents" element={<AgentsManagement />} />
+        <Route path="/agents/:id" element={<div>Agent Detail</div>} />
+      </Routes>
+    </MemoryRouter>
+  );
 }
 
 describe('AgentsManagement', () => {
@@ -51,7 +58,15 @@ describe('AgentsManagement', () => {
     expect(await screen.findByText('All Agents (2)')).toBeInTheDocument();
   });
 
-  it('submits create agent form', async () => {
+  it('clicking agent card navigates to detail page', async () => {
+    renderPage();
+    await screen.findByText('Chatbot');
+    const cards = screen.getAllByTestId('agent-card');
+    fireEvent.click(cards[0]);
+    await screen.findByText('Agent Detail');
+  });
+
+  it('register agent form', async () => {
     agentsApi.list
       .mockResolvedValueOnce({ data: mockAgents })
       .mockResolvedValueOnce({ data: [...mockAgents, { id: 3, name: 'New Agent', status: 'active', created_at: '2024-01-03T00:00:00' }] });
@@ -62,7 +77,7 @@ describe('AgentsManagement', () => {
     // First textbox in the form is the Name field
     const nameInput = screen.getAllByRole('textbox')[0];
     fireEvent.change(nameInput, { target: { value: 'New Agent' } });
-    fireEvent.click(screen.getByText('Create'));
+    fireEvent.click(screen.getByText('Register'));
 
     await waitFor(() => {
       expect(agentsApi.create).toHaveBeenCalledWith(

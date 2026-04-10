@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Edit, Trash2, Check, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { agentsApi } from '../services/api';
 
 const STATUS_OPTIONS = ['active', 'inactive', 'deprecated'];
@@ -13,6 +14,7 @@ const statusStyle = {
 const emptyForm = { name: '', description: '', type: '', status: 'active' };
 
 export default function AgentsManagement() {
+  const navigate = useNavigate();
   const [agents, setAgents] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState(null);
@@ -37,7 +39,7 @@ export default function AgentsManagement() {
       setForm(emptyForm);
       fetchAgents();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to save agent');
+      setError(err.response?.data?.detail || 'Failed to register agent');
     } finally {
       setSaving(false);
     }
@@ -66,7 +68,7 @@ export default function AgentsManagement() {
       {/* Form */}
       <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
         <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">
-          {editId ? 'Edit Agent' : 'Create Agent'}
+          {editId ? 'Edit Agent' : 'Register Agent'}
         </h3>
         {error && (
           <div className="mb-3 text-red-400 text-sm bg-red-900/30 px-3 py-2 rounded-lg">{error}</div>
@@ -114,7 +116,7 @@ export default function AgentsManagement() {
               disabled={saving}
               className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
             >
-              {editId ? <><Check size={14} /> Save</> : <><Plus size={14} /> Create</>}
+              {editId ? <><Check size={14} /> Save</> : <><Plus size={14} /> Register</>}
             </button>
             {editId && (
               <button
@@ -139,7 +141,12 @@ export default function AgentsManagement() {
         ) : (
           <div className="space-y-3">
             {agents.map((a) => (
-              <div key={a.id} className="bg-gray-700 rounded-xl p-4 flex items-start justify-between">
+              <div
+                key={a.id}
+                data-testid="agent-card"
+                onClick={() => navigate(`/agents/${a.id}`)}
+                className="bg-gray-700 rounded-xl p-4 flex items-start justify-between cursor-pointer hover:ring-1 hover:ring-blue-500 transition-all"
+              >
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <h4 className="font-semibold text-white">{a.name}</h4>
@@ -157,14 +164,16 @@ export default function AgentsManagement() {
                 </div>
                 <div className="flex items-center gap-2 ml-4">
                   <button
-                    onClick={() => handleEdit(a)}
+                    onClick={(e) => { e.stopPropagation(); handleEdit(a); }}
                     className="text-gray-400 hover:text-blue-400 transition-colors"
+                    title="Edit"
                   >
                     <Edit size={16} />
                   </button>
                   <button
-                    onClick={() => handleDelete(a.id)}
+                    onClick={(e) => { e.stopPropagation(); handleDelete(a.id); }}
                     className="text-gray-400 hover:text-red-400 transition-colors"
+                    title="Delete"
                   >
                     <Trash2 size={16} />
                   </button>
