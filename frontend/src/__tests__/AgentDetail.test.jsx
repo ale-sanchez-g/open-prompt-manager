@@ -117,6 +117,18 @@ describe('AgentDetail', () => {
     await screen.findByText('Agents List');
   });
 
+  it('shows error and stays on page when delete fails', async () => {
+    window.confirm = jest.fn().mockReturnValue(true);
+    agentsApi.delete.mockRejectedValueOnce({ response: { data: { detail: 'Delete failed' } } });
+
+    renderPage();
+    await screen.findByText('SwagBot');
+    fireEvent.click(screen.getByText('Delete'));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Delete failed');
+    expect(screen.queryByText('Agents List')).not.toBeInTheDocument();
+  });
+
   it('shows empty state when no associated prompts', async () => {
     agentsApi.get.mockResolvedValue({ data: { ...mockAgent, prompts: [] } });
     renderPage();

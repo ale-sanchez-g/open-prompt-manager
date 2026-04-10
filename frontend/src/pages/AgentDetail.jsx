@@ -59,8 +59,13 @@ export default function AgentDetail() {
 
   const handleDelete = async () => {
     if (!window.confirm('Delete this agent?')) return;
-    await agentsApi.delete(id);
-    navigate('/agents');
+    setError('');
+    try {
+      await agentsApi.delete(id);
+      navigate('/agents');
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to delete agent');
+    }
   };
 
   const handleSave = async (e) => {
@@ -159,13 +164,14 @@ export default function AgentDetail() {
         </div>
       </div>
 
+      {error && (
+        <div role="alert" className="text-red-400 text-sm bg-red-900/30 px-3 py-2 rounded-lg">{error}</div>
+      )}
+
       {/* Inline edit form */}
       {editing && (
         <div className="bg-gray-800 rounded-xl p-5 border border-blue-600">
           <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">Edit Agent</h3>
-          {error && (
-            <div className="mb-3 text-red-400 text-sm bg-red-900/30 px-3 py-2 rounded-lg">{error}</div>
-          )}
           <form onSubmit={handleSave} className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-400 mb-1">Name *</label>
