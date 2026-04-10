@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, Edit, Trash2, Copy, Play, Star, Activity, Clock, GitBranch, ArrowLeftRight, X, Puzzle
@@ -149,14 +149,13 @@ export default function PromptDetail() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (!prompt) return <div className="text-gray-400">Loading...</div>;
-
   // Merge parent variables with variables from all component prompts (deduplicated by name).
   // All of these are required by the backend renderer when {{component:id}} refs are present.
-  const allVariables = (() => {
+  // Must be declared before the early return to satisfy Rules of Hooks.
+  const allVariables = useMemo(() => {
     const seen = new Set();
     const result = [];
-    for (const v of (prompt.variables || [])) {
+    for (const v of (prompt?.variables || [])) {
       if (!seen.has(v.name)) { seen.add(v.name); result.push(v); }
     }
     for (const comp of componentPrompts) {
@@ -165,7 +164,9 @@ export default function PromptDetail() {
       }
     }
     return result;
-  })();
+  }, [prompt?.variables, componentPrompts]);
+
+  if (!prompt) return <div className="text-gray-400">Loading...</div>;
 
   return (
     <div className="max-w-4xl space-y-6">
