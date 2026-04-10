@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy import func
+from sqlalchemy.orm import Session, selectinload
 
 from app.database.base import get_db
-from app.models.prompt import Tag, Agent
+from app.models.prompt import Tag, Agent, PromptExecution
 from app.models.schemas import (
     TagCreate, TagResponse,
     AgentCreate, AgentUpdate, AgentResponse, AgentDetailResponse, PromptSummaryResponse,
@@ -71,19 +72,26 @@ def create_agent(payload: AgentCreate, db: Session = Depends(get_db)):
 
 @agents_router.get('/{agent_id}', response_model=AgentDetailResponse)
 def get_agent(agent_id: int, db: Session = Depends(get_db)):
-    agent = db.query(Agent).filter(Agent.id == agent_id).first()
+    agent = (
+        db.query(Agent)
+        .options(selectinload(Agent.prompts))
+        .filter(Agent.id == agent_id)
+        .first()
+    )
     if not agent:
         raise HTTPException(status_code=404, detail='Agent not found')
-    executions = agent.executions
-    execution_count = len(executions)
-    success_rate = 0.0
-    avg_rating = 0.0
-    if execution_count > 0:
-        success_count = sum(1 for e in executions if e.success)
-        success_rate = success_count / execution_count
-        ratings = [e.rating for e in executions if e.rating is not None]
-        if ratings:
-            avg_rating = sum(ratings) / len(ratings)
+    stats = (
+        db.query(
+            func.count(PromptExecution.id).label('execution_count'),
+            func.avg(PromptExecution.success).label('success_rate'),
+            func.avg(PromptExecution.rating).label('avg_rating'),
+        )
+        .filter(PromptExecution.agent_id == agent_id)
+        .one()
+    )
+    execution_count = stats.execution_count or 0
+    success_rate = float(stats.success_rate or 0.0)
+    avg_rating = float(stats.avg_rating or 0.0)
     return AgentDetailResponse(
         id=agent.id,
         name=agent.name,
