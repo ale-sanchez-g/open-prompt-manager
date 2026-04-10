@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
-  ArrowLeft, Edit, Trash2, Activity, Clock, Check, X, FileText,
+  ArrowLeft, Edit, Trash2, Activity, Clock, Check, X, FileText, RefreshCw,
 } from 'lucide-react';
 import { agentsApi } from '../services/api';
 
@@ -26,13 +26,18 @@ export default function AgentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [agent, setAgent] = useState(null);
+  const [loadError, setLoadError] = useState('');
+  const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ name: '', description: '', type: '', status: 'active' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    agentsApi.get(id).then((r) => {
+  const loadAgent = useCallback(async () => {
+    setLoading(true);
+    setLoadError('');
+    try {
+      const r = await agentsApi.get(id);
       setAgent(r.data);
       setForm({
         name: r.data.name,
@@ -40,8 +45,17 @@ export default function AgentDetail() {
         type: r.data.type || '',
         status: r.data.status,
       });
-    }).catch(console.error);
+    } catch (err) {
+      setAgent(null);
+      setLoadError(err.response?.data?.detail || 'Failed to load agent');
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
+
+  useEffect(() => {
+    loadAgent();
+  }, [loadAgent]);
 
   const handleDelete = async () => {
     if (!window.confirm('Delete this agent?')) return;
@@ -65,7 +79,46 @@ export default function AgentDetail() {
     }
   };
 
-  if (!agent) return <div className="text-gray-400">Loading...</div>;
+  if (loadError) {
+    return (
+      <div className="max-w-4xl min-h-[60vh] flex items-center justify-center px-4">
+        <div role="alert" className="w-full max-w-3xl bg-gray-900/80 border border-gray-700 rounded-2xl p-8 md:p-10">
+          <div className="grid md:grid-cols-2 gap-8 items-center">
+            <div>
+              <p className="text-red-400 text-sm tracking-wide mb-2">ERROR</p>
+              <h2 className="text-4xl md:text-5xl font-semibold text-white leading-tight mb-4">Oops.</h2>
+              <p className="text-gray-300 text-sm md:text-base mb-2">We could not load this agent right now.</p>
+              <p className="text-gray-500 text-sm mb-6">{loadError}</p>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={loadAgent}
+                  className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                >
+                  <RefreshCw size={14} /> Try again
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/agents')}
+                  className="inline-flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-200 px-4 py-2 rounded-lg text-sm transition-colors"
+                >
+                  <ArrowLeft size={14} /> Back to agents
+                </button>
+              </div>
+            </div>
+            <div className="hidden md:flex justify-center">
+              <div className="w-48 h-48 rounded-2xl border border-dashed border-gray-600 bg-gray-800/70 flex items-center justify-center text-gray-500 text-6xl font-semibold">
+                404
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) return <div className="text-gray-400">Loading...</div>;
+  if (!agent) return <div className="text-red-400">Agent not found.</div>;
 
   return (
     <div className="max-w-4xl space-y-6">

@@ -128,4 +128,24 @@ describe('AgentDetail', () => {
     renderPage();
     expect(screen.getByText('Loading...')).toBeInTheDocument();
   });
+
+  it('shows user-visible error when initial fetch fails', async () => {
+    agentsApi.get.mockRejectedValue({ response: { data: { detail: 'Agent not found' } } });
+    renderPage();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Agent not found');
+  });
+
+  it('retries loading from the error state', async () => {
+    agentsApi.get
+      .mockRejectedValueOnce({ response: { data: { detail: 'Temporary failure' } } })
+      .mockResolvedValueOnce({ data: mockAgent });
+
+    renderPage();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Temporary failure');
+
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+
+    expect(await screen.findByText('SwagBot')).toBeInTheDocument();
+    expect(agentsApi.get).toHaveBeenCalledTimes(2);
+  });
 });
