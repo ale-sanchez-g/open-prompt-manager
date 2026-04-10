@@ -1,0 +1,24 @@
+{
+  "name": "open-prompt-manager-e2e",
+  "version": "1.0.0",
+  "description": "End-to-end API tests for Open Prompt Manager",
+  "scripts": {
+    "test": "playwright test",
+    "test:api": "playwright test specs/",
+    "test:health": "playwright test specs/health/",
+    "test:agents": "playwright test specs/agents/",
+    "test:tags": "playwright test specs/tags/",
+    "test:prompts": "playwright test specs/prompts/",
+    "test:edge-cases": "playwright test specs/edge-cases/",
+    "test:data-integrity": "playwright test specs/data-integrity/",
+    "test:performance": "playwright test specs/performance/",
+    "test:mcp": "playwright test specs/mcp/",
+    "test:report": "playwright show-report",
+    "install:browsers": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.43.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}
