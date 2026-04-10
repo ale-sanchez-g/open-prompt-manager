@@ -4,7 +4,11 @@ export default defineConfig({
   testDir: './specs',
   timeout: 30000,
   retries: 1,
-  reporter: [['html', { outputFolder: 'playwright-report' }], ['list']],
+  reporter: [
+    ['html', { outputFolder: 'playwright-report' }],
+    ['list'],
+    ['junit', { outputFile: 'test-results/junit.xml' }],
+  ],
   use: {
     baseURL: 'http://localhost',
     extraHTTPHeaders: {
