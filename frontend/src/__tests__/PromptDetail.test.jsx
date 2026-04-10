@@ -328,3 +328,106 @@ describe('PromptDetail — Components sidebar card', () => {
     });
   });
 });
+
+describe('PromptDetail — component variable merging in Test Rendering', () => {
+  const mockComponentWithVars = {
+    id: 99,
+    name: 'Persona Block',
+    version: '1.0.0',
+    content: 'You are {{persona}}.',
+    description: '',
+    variables: [
+      { name: 'persona', type: 'string', required: true, description: 'Agent persona', default: null },
+    ],
+    tags: [],
+    agents: [],
+    avg_rating: 0.0,
+    usage_count: 0,
+    success_rate: 0.0,
+    created_at: '2026-01-01T00:00:00',
+    updated_at: '2026-01-01T00:00:00',
+  };
+
+  const mockParentWithComponent = {
+    ...mockPromptV2,
+    content: '{{component:99}}\nYou must look for bugs in {{system}}.',
+    variables: [
+      { name: 'system', type: 'string', required: true, description: 'Application under test', default: null },
+    ],
+  };
+
+  beforeEach(() => {
+    promptsApi.get.mockImplementation((id) => {
+      if (String(id) === '99') return Promise.resolve({ data: mockComponentWithVars });
+      return Promise.resolve({ data: mockParentWithComponent });
+    });
+    promptsApi.getVersions.mockResolvedValue({ data: mockVersions });
+  });
+
+  it('shows input fields for both parent and component variables in Test Rendering', async () => {
+    renderDetail('4');
+    await screen.findByRole('heading', { name: 'Sales Pitch Generator' });
+    // Wait for component variables to be merged in
+    await waitFor(() => {
+      expect(screen.getByLabelText(/system/i, { selector: 'input' })).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText(/persona/i, { selector: 'input' })).toBeInTheDocument();
+  });
+
+  it('labels component-sourced variable with its component name', async () => {
+    renderDetail('4');
+    await screen.findByRole('heading', { name: 'Sales Pitch Generator' });
+    await waitFor(() => {
+      expect(screen.getAllByText(/from: Persona Block/i).length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  it('includes component variable values in render API call', async () => {
+    promptsApi.render.mockResolvedValue({ data: { rendered_content: 'Rendered' } });
+    renderDetail('4');
+    await screen.findByRole('heading', { name: 'Sales Pitch Generator' });
+
+    // Wait for both inputs to appear
+    const systemInput = await screen.findByLabelText(/system/i, { selector: 'input' });
+    const personaInput = await screen.findByLabelText(/persona/i, { selector: 'input' });
+
+    fireEvent.change(systemInput, { target: { value: 'opm' } });
+    fireEvent.change(personaInput, { target: { value: 'expert' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /render/i }));
+    await waitFor(() => {
+      expect(promptsApi.render).toHaveBeenCalledWith(
+        '4',
+        expect.objectContaining({ system: 'opm', persona: 'expert' }),
+      );
+    });
+  });
+
+  it('does not duplicate variables when parent and component share the same variable name', async () => {
+    const sharedVarComponent = {
+      ...mockComponentWithVars,
+      variables: [
+        { name: 'system', type: 'string', required: false, description: 'Shared', default: null },
+      ],
+    };
+    promptsApi.get.mockImplementation((id) => {
+      if (String(id) === '99') return Promise.resolve({ data: sharedVarComponent });
+      return Promise.resolve({ data: mockParentWithComponent });
+    });
+
+    renderDetail('4');
+    await screen.findByRole('heading', { name: 'Sales Pitch Generator' });
+    await waitFor(() => {
+      expect(screen.getAllByLabelText(/system/i, { selector: 'input' })).toHaveLength(1);
+    });
+  });
+
+  it('shows component variable in sidebar Variables card', async () => {
+    renderDetail('4');
+    await screen.findByRole('heading', { name: 'Sales Pitch Generator' });
+    // persona should appear in the sidebar Variables list
+    await waitFor(() => {
+      expect(screen.getAllByText(/\{\{persona\}\}/).length).toBeGreaterThanOrEqual(1);
+    });
+  });
+});
