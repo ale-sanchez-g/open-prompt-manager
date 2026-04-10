@@ -45,6 +45,32 @@ class AgentResponse(AgentBase):
     model_config = {"from_attributes": True}
 
 
+class PromptSummaryResponse(BaseModel):
+    id: int
+    name: str
+    version: str
+    description: Optional[str] = None
+    avg_rating: float = 0.0
+    usage_count: int = 0
+    success_rate: float = 0.0
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AgentDetailResponse(AgentBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+    prompts: list[PromptSummaryResponse] = Field(default_factory=list)
+    execution_count: int = 0
+    success_rate: float = 0.0
+    avg_rating: float = 0.0
+
+    model_config = {"from_attributes": True}
+
+
 # Variable schema
 class VariableSchema(BaseModel):
     name: str

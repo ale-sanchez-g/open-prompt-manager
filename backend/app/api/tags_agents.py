@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy import func
+from sqlalchemy.orm import Session, selectinload
 
 from app.database.base import get_db
-from app.models.prompt import Tag, Agent
+from app.models.prompt import Tag, Agent, PromptExecution
 from app.models.schemas import (
     TagCreate, TagResponse,
-    AgentCreate, AgentUpdate, AgentResponse,
+    AgentCreate, AgentUpdate, AgentResponse, AgentDetailResponse, PromptSummaryResponse,
 )
 
 router = APIRouter(tags=['tags-agents'])
@@ -69,12 +70,41 @@ def create_agent(payload: AgentCreate, db: Session = Depends(get_db)):
     return agent
 
 
-@agents_router.get('/{agent_id}', response_model=AgentResponse)
+@agents_router.get('/{agent_id}', response_model=AgentDetailResponse)
 def get_agent(agent_id: int, db: Session = Depends(get_db)):
-    agent = db.query(Agent).filter(Agent.id == agent_id).first()
+    agent = (
+        db.query(Agent)
+        .options(selectinload(Agent.prompts))
+        .filter(Agent.id == agent_id)
+        .first()
+    )
     if not agent:
         raise HTTPException(status_code=404, detail='Agent not found')
-    return agent
+    stats = (
+        db.query(
+            func.count(PromptExecution.id).label('execution_count'),
+            func.avg(PromptExecution.success).label('success_rate'),
+            func.avg(PromptExecution.rating).label('avg_rating'),
+        )
+        .filter(PromptExecution.agent_id == agent_id)
+        .one()
+    )
+    execution_count = stats.execution_count or 0
+    success_rate = float(stats.success_rate or 0.0)
+    avg_rating = float(stats.avg_rating or 0.0)
+    return AgentDetailResponse(
+        id=agent.id,
+        name=agent.name,
+        description=agent.description,
+        type=agent.type,
+        status=agent.status,
+        created_at=agent.created_at,
+        updated_at=agent.updated_at,
+        prompts=[PromptSummaryResponse.model_validate(p) for p in agent.prompts],
+        execution_count=execution_count,
+        success_rate=success_rate,
+        avg_rating=avg_rating,
+    )
 
 
 @agents_router.put('/{agent_id}', response_model=AgentResponse)

@@ -1,6 +1,7 @@
 # Prompt Management Framework
 
 [![CI](https://github.com/ale-sanchez-g/open-prompt-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/ale-sanchez-g/open-prompt-manager/actions/workflows/ci.yml)
+[![Playwright E2E](https://img.shields.io/github/actions/workflow/status/ale-sanchez-g/open-prompt-manager/ci.yml?branch=main&label=Playwright%20E2E&logo=https%3A%2F%2Fplaywright.dev%2Fimg%2Fplaywright-logo.svg)](https://github.com/ale-sanchez-g/open-prompt-manager/actions/workflows/ci.yml)
 [![Security Checks](https://github.com/ale-sanchez-g/open-prompt-manager/actions/workflows/security.yml/badge.svg)](https://github.com/ale-sanchez-g/open-prompt-manager/actions/workflows/security.yml)
 [![Latest Release](https://img.shields.io/github/v/release/ale-sanchez-g/open-prompt-manager?display_name=tag)](https://github.com/ale-sanchez-g/open-prompt-manager/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
@@ -87,6 +88,33 @@ cd frontend && npm install && npm start
 ## AWS Terraform Deployment
 
 Use the deployment script from the repository root for AWS infrastructure, images, and application rollout.
+
+### Important schema upgrade note
+
+If you are upgrading an environment that already has data in the `agents` table, you must run the `agents.updated_at` migration before or immediately after deploying backend code that expects that column.
+
+This is required because the backend ORM now reads `agents.updated_at` when serializing agent data. Existing databases created before this change do not get the new column automatically from `Base.metadata.create_all()`.
+
+Local Docker migration:
+
+```bash
+cd backend
+python -m migrations.add_agent_updated_at
+```
+
+AWS ECS migration:
+
+```bash
+AWS_REGION=us-east-1 ./scripts/migration/2026-apr-09-aws-mig-001.sh
+```
+
+Optional forced backend refresh after the migration:
+
+```bash
+AWS_REGION=us-east-1 FORCE_NEW_DEPLOYMENT=true ./scripts/migration/2026-apr-09-aws-mig-001.sh
+```
+
+Detailed rollout guidance is documented in `migration/2026-apr-09-mig-001.md`.
 
 ### Deploy examples
 
@@ -189,7 +217,7 @@ Notes:
 |--------|------|-------------|
 | GET | `/api/agents/` | List all agents |
 | GET | `/api/agents/{id}` | Get agent |
-| POST | `/api/agents/` | Create agent |
+| POST | `/api/agents/` | Register agent |
 | PUT | `/api/agents/{id}` | Update agent |
 | DELETE | `/api/agents/{id}` | Delete agent |
 
@@ -312,6 +340,8 @@ prompt-management-framework/
 │   │   ├── database/
 │   │   │   └── base.py            # Database configuration
 │   │   └── mcp_server.py          # MCP server (AI agent connectivity)
+│   ├── migrations/
+│   │   └── add_agent_updated_at.py # One-off schema migration for legacy agents tables
 │   ├── main.py
 │   ├── requirements.txt
 │   └── Dockerfile
@@ -339,6 +369,11 @@ prompt-management-framework/
 │       └── templates/
 ├── docker-compose.yml
 ├── Makefile
+├── migration/
+│   └── 2026-apr-09-mig-001.md     # Migration runbook and rollout notes
+├── scripts/
+│   └── migration/
+│       └── 2026-apr-09-aws-mig-001.sh # Run the agent migration as a one-off ECS task
 └── README.md
 ```
 
