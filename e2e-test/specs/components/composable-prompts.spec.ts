@@ -252,9 +252,7 @@ test.describe('Composable Prompts API Tests', () => {
 
     const updatedBody = await updateResponse.json();
     expect(updatedBody).toHaveProperty('components');
-    expect(updatedBody.components.some((c: { id: number } | number) =>
-      typeof c === 'number' ? c === newComponent.id : c.id === newComponent.id
-    )).toBe(true);
+    expect(updatedBody.components).toContain(newComponent.id);
   });
 
   test('Composable Prompts - Render component variables are resolved', async ({ request }) => {
