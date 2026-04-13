@@ -9,6 +9,7 @@
     "test:agents": "playwright test specs/agents/",
     "test:tags": "playwright test specs/tags/",
     "test:prompts": "playwright test specs/prompts/",
+    "test:components": "playwright test specs/components/",
     "test:edge-cases": "playwright test specs/edge-cases/",
     "test:data-integrity": "playwright test specs/data-integrity/",
     "test:performance": "playwright test specs/performance/",
