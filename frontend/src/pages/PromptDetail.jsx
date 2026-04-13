@@ -94,15 +94,15 @@ export default function PromptDetail() {
 
   useEffect(() => {
     if (!prompt) return;
+    // Clear stale component data immediately so the UI never shows components
+    // from a previously viewed prompt while the new fetch is in flight.
+    setComponentPrompts([]);
     const ids = [
       ...new Set(
         [...prompt.content.matchAll(/\{\{component:(\d+)\}\}/g)].map((m) => parseInt(m[1], 10))
       ),
     ];
-    if (ids.length === 0) {
-      setComponentPrompts([]);
-      return;
-    }
+    if (ids.length === 0) return;
     Promise.all(ids.map((cid) => promptsApi.get(cid)))
       .then((results) => {
         const comps = results.map((r) => r.data);
@@ -121,7 +121,11 @@ export default function PromptDetail() {
           return next;
         });
       })
-      .catch(console.error);
+      .catch((err) => {
+        // On error, ensure stale components are not left in state.
+        setComponentPrompts([]);
+        console.error(err);
+      });
   }, [prompt?.id, prompt?.content]);
 
   const handleDelete = async () => {
