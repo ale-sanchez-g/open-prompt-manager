@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Plus, Trash2, ArrowLeft, Puzzle } from 'lucide-react';
 import { promptsApi, tagsApi, agentsApi } from '../services/api';
@@ -156,11 +156,22 @@ export default function PromptEditor() {
     }, 0);
   };
 
-  const getComponentIds = (content) => [
-    ...new Set(
-      [...content.matchAll(/\{\{component:(\d+)\}\}/g)].map((m) => parseInt(m[1], 10))
-    ),
-  ];
+  const componentIds = useMemo(
+    () => [
+      ...new Set(
+        [...form.content.matchAll(/\{\{component:(\d+)\}\}/g)].map((m) => parseInt(m[1], 10))
+      ),
+    ],
+    [form.content]
+  );
+
+  const filteredSearchPrompts = useMemo(
+    () =>
+      allPrompts
+        .filter((p) => !(isEdit && p.id === parseInt(id, 10)))
+        .filter((p) => p.name.toLowerCase().includes(componentSearch.toLowerCase())),
+    [allPrompts, isEdit, id, componentSearch]
+  );
 
   const toggleId = (field, val) => {
     const arr = form[field];
@@ -179,7 +190,7 @@ export default function PromptEditor() {
     setSaving(true);
     setError('');
     try {
-      const res = await promptsApi.create({ ...form, components: getComponentIds(form.content) });
+      const res = await promptsApi.create({ ...form, components: componentIds });
       navigate(`/prompts/${res.data.id}`);
     } catch (err) {
       setError(err.response?.data?.detail || 'Save failed');
@@ -201,7 +212,7 @@ export default function PromptEditor() {
         });
         navigate(`/prompts/${res.data.id}`);
       } else {
-        await promptsApi.update(id, { ...form, components: getComponentIds(form.content) });
+        await promptsApi.update(id, { ...form, components: componentIds });
         navigate(`/prompts/${id}`);
       }
     } catch (err) {
@@ -332,11 +343,11 @@ export default function PromptEditor() {
             <label className="text-sm text-gray-400">Components</label>
           </div>
           {/* Active components parsed from content */}
-          {getComponentIds(form.content).length > 0 && (
+          {componentIds.length > 0 && (
             <div className="mb-3">
               <p className="text-xs text-gray-500 mb-1">Used in content:</p>
               <div className="flex flex-wrap gap-1">
-                {getComponentIds(form.content).map((cid) => {
+                {componentIds.map((cid) => {
                   const comp = allPrompts.find((p) => p.id === cid);
                   return (
                     <span
@@ -359,16 +370,10 @@ export default function PromptEditor() {
           />
           {componentSearch && (
             <div className="max-h-48 overflow-y-auto space-y-1 bg-gray-800 border border-gray-700 rounded-lg p-2">
-              {allPrompts
-                .filter((p) => !(isEdit && p.id === parseInt(id, 10)))
-                .filter((p) => p.name.toLowerCase().includes(componentSearch.toLowerCase()))
-                .length === 0 ? (
+              {filteredSearchPrompts.length === 0 ? (
                 <p className="text-gray-500 text-sm text-center py-2">No prompts found</p>
               ) : (
-                allPrompts
-                  .filter((p) => !(isEdit && p.id === parseInt(id, 10)))
-                  .filter((p) => p.name.toLowerCase().includes(componentSearch.toLowerCase()))
-                  .map((p) => (
+                filteredSearchPrompts.map((p) => (
                     <div
                       key={p.id}
                       className="flex items-center justify-between gap-2 px-2 py-1.5 rounded hover:bg-gray-700"
