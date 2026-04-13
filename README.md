@@ -308,11 +308,46 @@ You are a helpful assistant. The user's name is {{user_name}} and they need help
 ```
 
 ### Component References
-Reference other prompts as reusable components:
+Reference other prompts as reusable components using the `{{component:<id>}}` syntax:
 ```
 {{component:42}}
 
 Now respond to: {{user_message}}
+```
+
+Components are resolved **recursively** at render time: if the referenced prompt itself contains `{{component:…}}` references, those are resolved too (circular references are detected and rejected).
+
+#### Using Components in the Editor
+
+1. Open a prompt in the editor (`/prompts/new` or `/prompts/:id/edit`).
+2. Use the **Components** section in the sidebar to search for an existing prompt by name.
+3. Click a result to insert the `{{component:<id>}}` snippet into the content area. An active-component chip appears showing the referenced prompt name.
+4. The derived component IDs are automatically included in the `components` field when the prompt is saved.
+
+#### Viewing Components in the Detail Page
+
+The prompt detail page (`/prompts/:id`) shows a **Components** sidebar card listing every prompt referenced in the content. Each entry links directly to the component prompt and shows its current version. Variables defined in component prompts are **merged** with the parent prompt's own variables (deduplicated by name) and appear in both the Variables sidebar and the Test Rendering panel.
+
+#### API: `components` field
+
+Include `components` (an array of referenced prompt IDs) in the create or update payload to persist the relationship explicitly:
+
+```json
+{
+  "name": "My composite prompt",
+  "content": "Preamble: {{component:5}}\n\nUser: {{question}}",
+  "components": [5]
+}
+```
+
+The render response includes a `components_resolved` field listing every component ID that was substituted during rendering:
+
+```json
+{
+  "rendered_content": "Preamble: <component 5 content>\n\nUser: ...",
+  "variables_used": ["question"],
+  "components_resolved": [5]
+}
 ```
 
 ### Render Example
@@ -362,6 +397,19 @@ prompt-management-framework/
 │   ├── package.json
 │   ├── Dockerfile
 │   └── nginx.conf
+├── e2e-test/
+│   ├── specs/
+│   │   ├── prompts/               # Prompt CRUD & render API tests
+│   │   ├── components/            # Composable prompts E2E tests
+│   │   ├── agents/                # Agents API tests
+│   │   ├── tags/                  # Tags API tests
+│   │   ├── health/                # Health-check tests
+│   │   ├── edge-cases/            # Error handling & boundary tests
+│   │   ├── data-integrity/        # Data integrity tests
+│   │   ├── performance/           # Performance tests
+│   │   └── mcp/                   # MCP connectivity tests
+│   ├── playwright.config.ts
+│   └── package.json
 ├── helm/
 │   └── prompt-manager/
 │       ├── Chart.yaml

@@ -142,6 +142,19 @@ open-prompt-manager/
 │   │   ├── services/      # Axios API client
 │   │   └── __tests__/     # Jest test suite
 │   └── package.json
+├── e2e-test/              # Playwright API end-to-end tests
+│   ├── specs/
+│   │   ├── prompts/       # Prompt CRUD & render tests
+│   │   ├── components/    # Composable prompts tests
+│   │   ├── agents/        # Agents API tests
+│   │   ├── tags/          # Tags API tests
+│   │   ├── health/        # Health-check tests
+│   │   ├── edge-cases/    # Error handling tests
+│   │   ├── data-integrity/# Data integrity tests
+│   │   ├── performance/   # Performance tests
+│   │   └── mcp/           # MCP connectivity tests
+│   ├── playwright.config.ts
+│   └── package.json
 ├── helm/                  # Helm chart for Kubernetes
 ├── terraform/             # AWS infrastructure (ECS, RDS, ALB, VPC)
 ├── docker-compose.yml
@@ -217,6 +230,28 @@ make up
 curl http://localhost:8000/api/health
 # Expected JSON shape: {"status":"ok","version":"<runtime-version>"}
 ```
+
+### Playwright E2E Tests
+
+The `e2e-test/` directory contains API-level end-to-end tests that exercise the full REST API surface, including composable prompts. These tests require a **running stack** (use `make up` first).
+
+```bash
+cd e2e-test
+npm ci
+# Run all E2E specs
+npm test
+# Run only the composable prompts spec
+npm run test:components
+# Run only the prompt API spec
+npm run test:prompts
+```
+
+Available `npm run test:<suite>` scripts: `test:health`, `test:prompts`, `test:components`, `test:tags`, `test:agents`, `test:edge-cases`, `test:data-integrity`, `test:performance`, `test:mcp`.
+
+- New E2E specs go in `e2e-test/specs/<feature>/`.
+- Add a corresponding `test:<feature>` script to `e2e-test/package.json`.
+- Tests use the `request` fixture only (no browser); they hit `http://localhost` by default.
+- Always clean up created resources in `afterEach` to avoid state leakage between tests.
 
 ---
 

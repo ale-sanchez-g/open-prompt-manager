@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
-  ArrowLeft, Edit, Trash2, Copy, Play, Star, Activity, Clock, GitBranch, ArrowLeftRight, X
+  ArrowLeft, Edit, Trash2, Copy, Play, Star, Activity, Clock, GitBranch, ArrowLeftRight, X, Puzzle
 } from 'lucide-react';
 import { promptsApi } from '../services/api';
 
@@ -62,6 +62,7 @@ export default function PromptDetail() {
   const [copied, setCopied] = useState(false);
   const [diffTarget, setDiffTarget] = useState(null);   // { prompt, diff[] }
   const [diffLoading, setDiffLoading] = useState(false);
+  const [componentPrompts, setComponentPrompts] = useState([]);
 
   const handleCompare = async (otherId) => {
     setDiffLoading(true);
@@ -91,6 +92,42 @@ export default function PromptDetail() {
     promptsApi.getVersions(id).then((r) => setVersions(r.data)).catch(console.error);
   }, [id]);
 
+  useEffect(() => {
+    if (!prompt) return;
+    // Clear stale component data immediately so the UI never shows components
+    // from a previously viewed prompt while the new fetch is in flight.
+    setComponentPrompts([]);
+    const ids = [
+      ...new Set(
+        [...prompt.content.matchAll(/\{\{component:(\d+)\}\}/g)].map((m) => parseInt(m[1], 10))
+      ),
+    ];
+    if (ids.length === 0) return;
+    Promise.all(ids.map((cid) => promptsApi.get(cid)))
+      .then((results) => {
+        const comps = results.map((r) => r.data);
+        setComponentPrompts(comps);
+        // Merge component variables' defaults into variables state without
+        // overwriting values the user may have already typed for the parent prompt.
+        setVariables((prev) => {
+          const next = { ...prev };
+          comps.forEach((comp) => {
+            (comp.variables || []).forEach((v) => {
+              if (!(v.name in next)) {
+                next[v.name] = v.default !== null && v.default !== undefined ? String(v.default) : '';
+              }
+            });
+          });
+          return next;
+        });
+      })
+      .catch((err) => {
+        // On error, ensure stale components are not left in state.
+        setComponentPrompts([]);
+        console.error(err);
+      });
+  }, [prompt?.id, prompt?.content]);
+
   const handleDelete = async () => {
     if (!window.confirm('Delete this prompt?')) return;
     await promptsApi.delete(id);
@@ -115,6 +152,23 @@ export default function PromptDetail() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  // Merge parent variables with variables from all component prompts (deduplicated by name).
+  // All of these are required by the backend renderer when {{component:id}} refs are present.
+  // Must be declared before the early return to satisfy Rules of Hooks.
+  const allVariables = useMemo(() => {
+    const seen = new Set();
+    const result = [];
+    for (const v of (prompt?.variables || [])) {
+      if (!seen.has(v.name)) { seen.add(v.name); result.push(v); }
+    }
+    for (const comp of componentPrompts) {
+      for (const v of (comp.variables || [])) {
+        if (!seen.has(v.name)) { seen.add(v.name); result.push({ ...v, _fromComponent: comp.name }); }
+      }
+    }
+    return result;
+  }, [prompt?.variables, componentPrompts]);
 
   if (!prompt) return <div className="text-gray-400">Loading...</div>;
 
@@ -196,16 +250,20 @@ export default function PromptDetail() {
             <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4 flex items-center gap-2">
               <Play size={14} /> Test Rendering
             </h3>
-            {(prompt.variables || []).length > 0 ? (
+            {allVariables.length > 0 ? (
               <div className="space-y-3 mb-4">
-                {prompt.variables.map((v) => (
+                {allVariables.map((v) => (
                   <div key={v.name}>
-                    <label className="block text-xs text-gray-400 mb-1">
+                    <label htmlFor={`var-${v.name}`} className="block text-xs text-gray-400 mb-1">
                       {v.name}
                       {v.required && <span className="text-red-400 ml-1">*</span>}
                       {v.description && <span className="text-gray-500 ml-2">— {v.description}</span>}
+                      {v._fromComponent && (
+                        <span className="text-purple-400 ml-2">from: {v._fromComponent}</span>
+                      )}
                     </label>
                     <input
+                      id={`var-${v.name}`}
                       className="w-full bg-gray-700 text-white px-3 py-2 rounded-lg text-sm border border-gray-600 focus:outline-none focus:border-blue-500"
                       value={variables[v.name] || ''}
                       onChange={(e) => setVariables({ ...variables, [v.name]: e.target.value })}
@@ -307,17 +365,42 @@ export default function PromptDetail() {
             </div>
           )}
 
+          {/* Components */}
+          {componentPrompts.length > 0 && (
+            <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
+                <Puzzle size={14} className="text-purple-400" /> Components
+              </h3>
+              <ul className="space-y-1">
+                {componentPrompts.map((comp) => (
+                  <li key={comp.id}>
+                    <Link
+                      to={`/prompts/${comp.id}`}
+                      className="flex items-center justify-between gap-2 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                    >
+                      <span className="truncate">{comp.name}</span>
+                      <span className="text-xs text-gray-500 flex-shrink-0">v{comp.version}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* Variables */}
-          {(prompt.variables || []).length > 0 && (
+          {allVariables.length > 0 && (
             <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
               <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Variables</h3>
               <ul className="space-y-2">
-                {prompt.variables.map((v) => (
+                {allVariables.map((v) => (
                   <li key={v.name} className="text-sm">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <code className="text-blue-300">{`{{${v.name}}}`}</code>
                       <span className="text-xs text-gray-500">{v.type}</span>
                       {v.required && <span className="text-xs text-red-400">required</span>}
+                      {v._fromComponent && (
+                        <span className="text-xs text-purple-400">from: {v._fromComponent}</span>
+                      )}
                     </div>
                     {v.description && <p className="text-xs text-gray-500 mt-0.5">{v.description}</p>}
                   </li>

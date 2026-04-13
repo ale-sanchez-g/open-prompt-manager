@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Plus, Trash2, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Puzzle } from 'lucide-react';
 import { promptsApi, tagsApi, agentsApi } from '../services/api';
 
 const VAR_TYPES = ['string', 'number', 'boolean', 'array', 'object'];
@@ -67,6 +67,8 @@ export default function PromptEditor() {
   });
   const [tags, setTags] = useState([]);
   const [agents, setAgents] = useState([]);
+  const [allPrompts, setAllPrompts] = useState([]);
+  const [componentSearch, setComponentSearch] = useState('');
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -85,6 +87,7 @@ export default function PromptEditor() {
   useEffect(() => {
     tagsApi.list().then((r) => setTags(r.data)).catch(console.error);
     agentsApi.list().then((r) => setAgents(r.data)).catch(console.error);
+    promptsApi.list({ limit: 200 }).then((r) => setAllPrompts(r.data)).catch(console.error);
     if (isEdit) {
       promptsApi.get(id)
         .then((r) => {
@@ -135,6 +138,41 @@ export default function PromptEditor() {
     }, 0);
   };
 
+  const handleInsertComponent = (componentId) => {
+    const el = contentRef.current;
+    const snippet = `{{component:${componentId}}}`;
+    if (!el) {
+      setForm((prev) => ({ ...prev, content: prev.content + snippet }));
+      return;
+    }
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const newContent = form.content.slice(0, start) + snippet + form.content.slice(end);
+    setForm({ ...form, content: newContent });
+    setComponentSearch('');
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(start + snippet.length, start + snippet.length);
+    }, 0);
+  };
+
+  const componentIds = useMemo(
+    () => [
+      ...new Set(
+        [...form.content.matchAll(/\{\{component:(\d+)\}\}/g)].map((m) => parseInt(m[1], 10))
+      ),
+    ],
+    [form.content]
+  );
+
+  const filteredSearchPrompts = useMemo(
+    () =>
+      allPrompts
+        .filter((p) => !(isEdit && p.id === parseInt(id, 10)))
+        .filter((p) => p.name.toLowerCase().includes(componentSearch.toLowerCase())),
+    [allPrompts, isEdit, id, componentSearch]
+  );
+
   const toggleId = (field, val) => {
     const arr = form[field];
     setForm({
@@ -152,7 +190,7 @@ export default function PromptEditor() {
     setSaving(true);
     setError('');
     try {
-      const res = await promptsApi.create(form);
+      const res = await promptsApi.create({ ...form, components: componentIds });
       navigate(`/prompts/${res.data.id}`);
     } catch (err) {
       setError(err.response?.data?.detail || 'Save failed');
@@ -174,7 +212,7 @@ export default function PromptEditor() {
         });
         navigate(`/prompts/${res.data.id}`);
       } else {
-        await promptsApi.update(id, form);
+        await promptsApi.update(id, { ...form, components: componentIds });
         navigate(`/prompts/${id}`);
       }
     } catch (err) {
@@ -296,6 +334,66 @@ export default function PromptEditor() {
               />
             ))}
           </div>
+        </div>
+
+        {/* Components */}
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <Puzzle size={14} className="text-purple-400" />
+            <label className="text-sm text-gray-400">Components</label>
+          </div>
+          {/* Active components parsed from content */}
+          {componentIds.length > 0 && (
+            <div className="mb-3">
+              <p className="text-xs text-gray-500 mb-1">Used in content:</p>
+              <div className="flex flex-wrap gap-1">
+                {componentIds.map((cid) => {
+                  const comp = allPrompts.find((p) => p.id === cid);
+                  return (
+                    <span
+                      key={cid}
+                      className="text-xs bg-purple-900/50 border border-purple-700 text-purple-300 px-2 py-0.5 rounded-full"
+                    >
+                      {comp ? comp.name : `#${cid}`}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {/* Search for prompts to add as components */}
+          <input
+            className="w-full bg-gray-800 text-white px-3 py-2 rounded-lg text-sm border border-gray-700 focus:outline-none focus:border-purple-500 mb-1"
+            placeholder="Search prompts to insert as components…"
+            value={componentSearch}
+            onChange={(e) => setComponentSearch(e.target.value)}
+          />
+          {componentSearch && (
+            <div className="max-h-48 overflow-y-auto space-y-1 bg-gray-800 border border-gray-700 rounded-lg p-2">
+              {filteredSearchPrompts.length === 0 ? (
+                <p className="text-gray-500 text-sm text-center py-2">No prompts found</p>
+              ) : (
+                filteredSearchPrompts.map((p) => (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between gap-2 px-2 py-1.5 rounded hover:bg-gray-700"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm text-white truncate">{p.name}</p>
+                        <p className="text-xs text-gray-500">v{p.version}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleInsertComponent(p.id)}
+                        className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded flex-shrink-0"
+                      >
+                        Insert
+                      </button>
+                    </div>
+                  ))
+              )}
+            </div>
+          )}
         </div>
 
         {/* Tags */}
