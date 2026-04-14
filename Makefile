@@ -1,9 +1,11 @@
-.PHONY: up down build logs clean help helm-install helm-upgrade helm-uninstall
+.PHONY: up down build logs clean help helm-install helm-upgrade helm-uninstall ci-fail-first-check ci-lint-backend ci-lint-frontend ci-lint-mcp-node ci-lint-terraform ci-precommit-lint
 
 VERSION ?= $(shell [ -f .version ] && cat .version || echo latest)
 REGISTRY ?= your-registry
 BACKEND_IMAGE = $(REGISTRY)/prompt-manager-backend
 FRONTEND_IMAGE = $(REGISTRY)/prompt-manager-frontend
+PYTHON ?= python3
+PIP ?= $(PYTHON) -m pip
 
 ## help: Show this help message
 help:
@@ -75,3 +77,32 @@ sync-version:
 bump-version:
 	@test -n "$(BUMP)" || (echo "Usage: make bump-version BUMP=patch|minor|major" && exit 1)
 	./scripts/release/bump_version.sh $(BUMP)
+
+## ci-lint-backend: Run fast Python syntax/lint validation for backend and MCP Python package
+ci-lint-backend:
+	$(PIP) install --upgrade pip
+	$(PIP) install ruff==0.6.9
+	ruff check --select E9,F63,F7,F82 backend mcp-package-python
+
+## ci-fail-first-check: Intentionally fail CI when the SPLM fail-first sentinel exists
+ci-fail-first-check:
+	@if [ -f splm/ci.fail-first ]; then \
+		echo "Intentional fail-first sentinel found: splm/ci.fail-first"; \
+		echo "Remove this file when you are ready to verify the passing pipeline."; \
+		exit 1; \
+	fi
+
+## ci-lint-frontend: Run fast frontend lint validation
+ci-lint-frontend:
+	cd frontend && npm ci --legacy-peer-deps && npm run lint:ci
+
+## ci-lint-mcp-node: Run MCP Node package lint validation
+ci-lint-mcp-node:
+	cd mcp-package-node && npm ci && npm run lint:ci
+
+## ci-lint-terraform: Run Terraform formatting validation
+ci-lint-terraform:
+	cd terraform && terraform fmt -check -recursive
+
+## ci-precommit-lint: Run all pre-commit lint/validation checks used by CI
+ci-precommit-lint: ci-lint-backend ci-lint-frontend ci-lint-mcp-node ci-lint-terraform

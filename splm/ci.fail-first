@@ -1,0 +1,3 @@
+# SPLM fail-first sentinel
+# This file is intentionally committed on test branches to force CI failure first.
+# Remove this file to validate the subsequent passing pipeline run.

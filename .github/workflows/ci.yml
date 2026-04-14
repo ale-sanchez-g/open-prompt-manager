@@ -22,16 +22,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: SPLM fail-first sentinel check
+        run: make ci-fail-first-check
+
       - name: Set up Python 3.11
         uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
       - name: Run Python lint validation (backend + MCP Python)
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install ruff==0.6.9
-          ruff check --select E9,F63,F7,F82 backend mcp-package-python
+        run: make ci-lint-backend
 
       - name: Set up Node 20
         uses: actions/setup-node@v6
@@ -39,16 +39,10 @@ jobs:
           node-version: "20"
 
       - name: Frontend lint validation
-        run: |
-          npm ci --legacy-peer-deps
-          npm run lint:ci
-        working-directory: frontend
+        run: make ci-lint-frontend
 
       - name: MCP Node lint validation
-        run: |
-          npm ci
-          npm run lint:ci
-        working-directory: mcp-package-node
+        run: make ci-lint-mcp-node
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v4
@@ -56,8 +50,7 @@ jobs:
           terraform_version: "1.7.5"
 
       - name: Terraform format validation
-        run: terraform fmt -check -recursive
-        working-directory: terraform
+        run: make ci-lint-terraform
 
   # ─────────────────────────────────────────────────────────────────────────────
   # Terraform: validate configuration and run the test suite (no AWS creds needed)

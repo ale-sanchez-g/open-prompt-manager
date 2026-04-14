@@ -24,7 +24,7 @@ Implement and operationalize all SPLM CI gate components across pre-commit, pre-
 ### 2.2 Linting and Validation
 - [~] Add fast lint + format validation for backend, frontend, MCP packages, and Terraform format check.
 - [~] Add tool configs and pin tool versions.
-- [~] Add shared lint script targets.
+- [x] Add shared lint script targets.
 - [ ] Acceptance check: pipelines fail fast on style/syntax issues before build jobs.
 
 ## 3. Pre-Build Gate Uplift (Week 2-4)
@@ -116,6 +116,7 @@ Implement and operationalize all SPLM CI gate components across pre-commit, pre-
 ## 8. Progress Log
 - 2026-04-14: Initial uplift plan documented.
 - 2026-04-14: Added pre-commit lint/validation CI gate (Python ruff syntax rules, frontend oxlint, mcp-node oxlint, terraform fmt check).
+- 2026-04-14: Added shared Makefile lint targets and wired CI pre-commit gate to those targets for reproducible local/CI execution.
 - 2026-04-14: Added terraform fmt -check in CI terraform job and formatted terraform files to satisfy the new gate.
 - 2026-04-14: Hardened dependabot workflow permissions toward least-privilege model.
 - 2026-04-14: Applied branch protection on main via GitHub API with strict required checks, required PR review (1 approval), dismiss stale reviews, conversation resolution, and admin enforcement.
