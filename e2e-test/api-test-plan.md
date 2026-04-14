@@ -551,3 +551,56 @@ Comprehensive API test suite for the Open Prompt Manager, a production-ready fra
   1. Send POST request to /mcp endpoint with valid MCP protocol data
     - expect: Response status code is 200
     - expect: Response indicates MCP protocol is active
+
+### 9. User Journey E2E Tests
+
+**File:** `e2e-test/specs/user-journeys/user-journeys.spec.ts`
+
+These tests mirror the 4 step-by-step walkthroughs shown in the in-app API Documentation page (`/api-docs`) and serve as both regression coverage and living documentation.
+
+---
+
+#### 9.1. Journey 1 — Create and Render a Prompt
+
+Steps covered:
+1. Create a tag (POST /api/tags/) — verify id and color
+2. Create a prompt with typed variables and the tag attached (POST /api/prompts/)
+3. Render the prompt with all variable values supplied (POST /api/prompts/{id}/render) — verify rendered_content, variables_used, components_resolved
+4. Render using a variable default when the optional variable is omitted
+5. Verify 422 is returned when a required variable is missing
+6. Full happy-path sequence: tag → prompt → render
+
+---
+
+#### 9.2. Journey 2 — Version a Prompt
+
+Steps covered:
+1. Create the root prompt at v1.0.0
+2. Create a child version — auto-increments to v1.0.1 (POST /api/prompts/{id}/versions)
+3. Create a version with an explicit version string (e.g. v2.0.0)
+4. Verify `is_latest` flags update correctly in a linear chain
+5. Retrieve full version history (GET /api/prompts/{id}/versions) — verify length and is_latest per node
+
+---
+
+#### 9.3. Journey 3 — Register an Agent and Track Executions
+
+Steps covered:
+1. Register a new agent (POST /api/agents/)
+2. Associate the agent with a prompt via PUT /api/prompts/{id}
+3. Record a successful execution (POST /api/prompts/{id}/executions) — verify prompt stats updated (usage_count, avg_rating, success_rate)
+4. Record multiple executions and verify aggregate stats are correct
+5. Retrieve execution history (GET /api/prompts/{id}/executions)
+6. Verify agent detail endpoint (GET /api/agents/{id}) returns execution_count, success_rate, avg_rating
+
+---
+
+#### 9.4. Journey 4 — Build a Composable Prompt
+
+Steps covered:
+1. Create a reusable component prompt
+2. Create a parent prompt referencing the component via `{{component:<id>}}`
+3. Render the parent — verify component content is inlined and components_resolved is populated
+4. Render with deeply nested (3-level) component chain
+5. Render with multiple sibling component references
+6. Verify circular component references are rejected with 422
