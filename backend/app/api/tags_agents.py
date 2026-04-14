@@ -36,7 +36,7 @@ def list_tags(db: Session = Depends(get_db)):
     response_model=TagResponse,
     status_code=201,
     summary='Create a tag',
-    description='Creates a new tag with a unique name and an optional hex colour for badge display.',
+    description='Creates a new tag with a unique name and an optional hex color for badge display.',
     response_description='The newly created tag with its auto-assigned `id`.',
     responses={409: {'description': 'A tag with this name already exists.'}},
 )

@@ -4,7 +4,7 @@ import { BookOpen, ChevronDown, ChevronRight, Code2, ArrowRight } from 'lucide-r
 // ── Helper components ────────────────────────────────────────────────────────
 
 function MethodBadge({ method }) {
-  const colours = {
+  const colors = {
     GET: 'bg-blue-600',
     POST: 'bg-green-600',
     PUT: 'bg-yellow-600',
@@ -12,14 +12,14 @@ function MethodBadge({ method }) {
     PATCH: 'bg-purple-600',
   };
   return (
-    <span className={`${colours[method] || 'bg-gray-600'} text-white text-xs font-bold px-2 py-0.5 rounded`}>
+    <span className={`${colors[method] || 'bg-gray-600'} text-white text-xs font-bold px-2 py-0.5 rounded`}>
       {method}
     </span>
   );
 }
 
 function StatusBadge({ code }) {
-  const colours = {
+  const colors = {
     200: 'bg-blue-700 text-blue-100',
     201: 'bg-green-700 text-green-100',
     204: 'bg-gray-600 text-gray-100',
@@ -29,7 +29,7 @@ function StatusBadge({ code }) {
     422: 'bg-red-700 text-red-100',
   };
   return (
-    <span className={`${colours[code] || 'bg-gray-600 text-gray-100'} text-xs font-mono px-1.5 py-0.5 rounded`}>
+    <span className={`${colors[code] || 'bg-gray-600 text-gray-100'} text-xs font-mono px-1.5 py-0.5 rounded`}>
       {code}
     </span>
   );
@@ -199,7 +199,7 @@ const VARIABLE_FIELDS = [
 
 const TAG_FIELDS = [
   { name: 'name', type: 'string', required: true, description: 'Unique tag name.', example: '"production"' },
-  { name: 'color', type: 'string', required: false, description: 'Hex colour for badge display. Defaults to "#3B82F6".', example: '"#10B981"' },
+  { name: 'color', type: 'string', required: false, description: 'Hex color for badge display. Defaults to "#3B82F6".', example: '"#10B981"' },
 ];
 
 const AGENT_FIELDS = [
@@ -323,7 +323,7 @@ export default function ApiDocs() {
             <ul className="space-y-2 text-sm text-gray-300">
               <li><span className="text-blue-300 font-semibold">Prompt</span> — A versioned template with typed variables and optional embedded component references.</li>
               <li><span className="text-blue-300 font-semibold">Version</span> — A child prompt created from a parent. <code className="bg-gray-800 text-xs px-1 rounded">is_latest: true</code> marks the current tip of each lineage.</li>
-              <li><span className="text-blue-300 font-semibold">Tag</span> — A colour-coded label for organising and filtering prompts.</li>
+              <li><span className="text-blue-300 font-semibold">Tag</span> — A color-coded label for organising and filtering prompts.</li>
               <li><span className="text-blue-300 font-semibold">Agent</span> — An AI agent associated with prompts; its executions are aggregated into stats.</li>
               <li><span className="text-blue-300 font-semibold">Execution</span> — A record of one LLM call (cost, latency, tokens, rating).</li>
               <li><span className="text-blue-300 font-semibold">Metric</span> — A custom numeric measurement (e.g. <code className="bg-gray-800 text-xs px-1 rounded">latency_p99</code>, <code className="bg-gray-800 text-xs px-1 rounded">hallucination_rate</code>).</li>

@@ -12,7 +12,7 @@ class TagBase(BaseModel):
     )
     color: str = Field(
         '#3B82F6',
-        description='Hex colour string used to render the tag badge in the UI.',
+        description='Hex color string used to render the tag badge in the UI.',
         examples=['#10B981'],
     )
 
