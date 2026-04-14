@@ -27,9 +27,18 @@ jobs:
 
       - name: Install gitleaks
         run: |
+          set -euo pipefail
           GITLEAKS_VERSION=8.30.1
-          curl -sSL -o gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-          tar -xzf gitleaks.tar.gz gitleaks
+          GITLEAKS_ARCHIVE="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          GITLEAKS_CHECKSUMS="gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          GITLEAKS_BASE_URL="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+
+          curl -fsSLo "${GITLEAKS_ARCHIVE}" "${GITLEAKS_BASE_URL}/${GITLEAKS_ARCHIVE}"
+          curl -fsSLo "${GITLEAKS_CHECKSUMS}" "${GITLEAKS_BASE_URL}/${GITLEAKS_CHECKSUMS}"
+          grep "  ${GITLEAKS_ARCHIVE}$" "${GITLEAKS_CHECKSUMS}" > gitleaks.sha256
+          sha256sum -c gitleaks.sha256
+
+          tar -xzf "${GITLEAKS_ARCHIVE}" gitleaks
           sudo mv gitleaks /usr/local/bin/gitleaks
           gitleaks version
 
