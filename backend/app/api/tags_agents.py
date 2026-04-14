@@ -14,15 +14,32 @@ router = APIRouter(tags=['tags-agents'])
 
 # ── Tags ──────────────────────────────────────────────────────────────────────
 
-tags_router = APIRouter(prefix='/api/tags')
+tags_router = APIRouter(prefix='/api/tags', tags=['tags'])
 
 
-@tags_router.get('/', response_model=list[TagResponse])
+agents_router = APIRouter(prefix='/api/agents', tags=['agents'])
+
+
+@tags_router.get(
+    '/',
+    response_model=list[TagResponse],
+    summary='List tags',
+    description='Returns all tags ordered alphabetically by name.',
+    response_description='Array of tag objects.',
+)
 def list_tags(db: Session = Depends(get_db)):
     return db.query(Tag).order_by(Tag.name).all()
 
 
-@tags_router.post('/', response_model=TagResponse, status_code=201)
+@tags_router.post(
+    '/',
+    response_model=TagResponse,
+    status_code=201,
+    summary='Create a tag',
+    description='Creates a new tag with a unique name and an optional hex colour for badge display.',
+    response_description='The newly created tag with its auto-assigned `id`.',
+    responses={409: {'description': 'A tag with this name already exists.'}},
+)
 def create_tag(payload: TagCreate, db: Session = Depends(get_db)):
     existing = db.query(Tag).filter(Tag.name == payload.name).first()
     if existing:
@@ -34,7 +51,16 @@ def create_tag(payload: TagCreate, db: Session = Depends(get_db)):
     return tag
 
 
-@tags_router.delete('/{tag_id}', status_code=204)
+@tags_router.delete(
+    '/{tag_id}',
+    status_code=204,
+    summary='Delete a tag',
+    description='Permanently deletes a tag and removes it from all prompts that reference it.',
+    responses={
+        204: {'description': 'Tag deleted.'},
+        404: {'description': 'Tag not found.'},
+    },
+)
 def delete_tag(tag_id: int, db: Session = Depends(get_db)):
     tag = db.query(Tag).filter(Tag.id == tag_id).first()
     if not tag:
@@ -45,15 +71,30 @@ def delete_tag(tag_id: int, db: Session = Depends(get_db)):
 
 # ── Agents ────────────────────────────────────────────────────────────────────
 
-agents_router = APIRouter(prefix='/api/agents')
 
-
-@agents_router.get('/', response_model=list[AgentResponse])
+@agents_router.get(
+    '/',
+    response_model=list[AgentResponse],
+    summary='List agents',
+    description='Returns all agents ordered alphabetically by name.',
+    response_description='Array of agent objects.',
+)
 def list_agents(db: Session = Depends(get_db)):
     return db.query(Agent).order_by(Agent.name).all()
 
 
-@agents_router.post('/', response_model=AgentResponse, status_code=201)
+@agents_router.post(
+    '/',
+    response_model=AgentResponse,
+    status_code=201,
+    summary='Create an agent',
+    description=(
+        'Registers a new AI agent. The `name` must be unique. '
+        'Use `status` to control whether the agent is active, inactive, or deprecated.'
+    ),
+    response_description='The newly created agent with its auto-assigned `id` and `created_at`.',
+    responses={409: {'description': 'An agent with this name already exists.'}},
+)
 def create_agent(payload: AgentCreate, db: Session = Depends(get_db)):
     existing = db.query(Agent).filter(Agent.name == payload.name).first()
     if existing:
@@ -70,7 +111,18 @@ def create_agent(payload: AgentCreate, db: Session = Depends(get_db)):
     return agent
 
 
-@agents_router.get('/{agent_id}', response_model=AgentDetailResponse)
+@agents_router.get(
+    '/{agent_id}',
+    response_model=AgentDetailResponse,
+    summary='Get agent details',
+    description=(
+        'Returns a single agent with its full details: associated prompts and aggregate execution stats '
+        '(`execution_count`, `success_rate`, `avg_rating`) computed across all prompt executions '
+        'attributed to this agent.'
+    ),
+    response_description='Full agent detail including associated prompts and execution statistics.',
+    responses={404: {'description': 'Agent not found.'}},
+)
 def get_agent(agent_id: int, db: Session = Depends(get_db)):
     agent = (
         db.query(Agent)
@@ -107,7 +159,14 @@ def get_agent(agent_id: int, db: Session = Depends(get_db)):
     )
 
 
-@agents_router.put('/{agent_id}', response_model=AgentResponse)
+@agents_router.put(
+    '/{agent_id}',
+    response_model=AgentResponse,
+    summary='Update an agent',
+    description='Partially updates an agent. Only fields present in the request body are changed.',
+    response_description='The updated agent.',
+    responses={404: {'description': 'Agent not found.'}},
+)
 def update_agent(agent_id: int, payload: AgentUpdate, db: Session = Depends(get_db)):
     agent = db.query(Agent).filter(Agent.id == agent_id).first()
     if not agent:
@@ -125,7 +184,16 @@ def update_agent(agent_id: int, payload: AgentUpdate, db: Session = Depends(get_
     return agent
 
 
-@agents_router.delete('/{agent_id}', status_code=204)
+@agents_router.delete(
+    '/{agent_id}',
+    status_code=204,
+    summary='Delete an agent',
+    description='Permanently deletes an agent and removes it from all associated prompts.',
+    responses={
+        204: {'description': 'Agent deleted.'},
+        404: {'description': 'Agent not found.'},
+    },
+)
 def delete_agent(agent_id: int, db: Session = Depends(get_db)):
     agent = db.query(Agent).filter(Agent.id == agent_id).first()
     if not agent:

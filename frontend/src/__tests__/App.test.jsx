@@ -12,6 +12,7 @@ jest.mock('../pages/PromptDetail', () => () => <div>PromptDetail</div>);
 jest.mock('../pages/TagsManagement', () => () => <div>TagsManagement</div>);
 jest.mock('../pages/AgentsManagement', () => () => <div>AgentsManagement</div>);
 jest.mock('../pages/AgentDetail', () => () => <div>AgentDetail</div>);
+jest.mock('../pages/ApiDocs', () => () => <div>ApiDocs</div>);
 jest.mock('../services/api');
 
 function renderAppLayout(initialPath = '/dashboard') {
@@ -39,13 +40,14 @@ describe('AppLayout sidebar', () => {
     });
   });
 
-  it('renders navigation links for Dashboard, Prompts, Tags and Agents', async () => {
+  it('renders navigation links for Dashboard, Prompts, Tags, Agents and API Docs', async () => {
     renderAppLayout();
     await waitFor(() => {
       expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: /prompts/i })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: /tags/i })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: /agents/i })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /api docs/i })).toBeInTheDocument();
     });
   });
 

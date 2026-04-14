@@ -33,12 +33,71 @@ def create_app() -> FastAPI:
             yield
 
     application = FastAPI(
-        title='Prompt Management Framework',
-        description='A production-ready framework for managing AI prompts across agents and organizations.',
+        title='Open Prompt Manager API',
+        description=(
+            '## Overview\n\n'
+            'The Open Prompt Manager REST API lets you **create**, **version**, **render**, and **track** '
+            'AI prompts across agents and organisations.\n\n'
+            '### Key Concepts\n\n'
+            '- **Prompt** — A versioned template with typed variables and optional component references.\n'
+            '- **Version** — A child prompt that inherits from a parent. Version history forms a tree; '
+            '  `is_latest: true` marks the leaf node.\n'
+            '- **Tag** — A colour-coded label for organising and filtering prompts.\n'
+            '- **Agent** — An AI agent that is associated with prompts and whose executions are tracked.\n'
+            '- **Execution** — A record of one LLM call, including cost, latency, tokens, and a rating.\n'
+            '- **Metric** — A custom numeric measurement (e.g. `latency_p99`, `hallucination_rate`).\n\n'
+            '### Variable Syntax\n\n'
+            'Use `{{variable_name}}` in prompt content for dynamic substitution at render time.\n\n'
+            '### Component Syntax\n\n'
+            'Use `{{component:<id>}}` to embed another prompt by its integer ID. '
+            'Components are resolved recursively; circular references are rejected with HTTP 422.\n\n'
+            '### Pagination\n\n'
+            'List endpoints accept `skip` (offset) and `limit` (max 200) query parameters.\n\n'
+            '### Error Responses\n\n'
+            '| Status | Meaning |\n'
+            '|--------|---------|\n'
+            '| 400 | Bad request — invalid input |\n'
+            '| 404 | Resource not found |\n'
+            '| 409 | Conflict — duplicate name |\n'
+            '| 422 | Validation error — missing required field or circular reference |\n'
+        ),
         version=__version__,
         docs_url='/api/docs',
         redoc_url='/api/redoc',
         openapi_url='/api/openapi.json',
+        contact={
+            'name': 'Open Prompt Manager',
+            'url': 'https://github.com/ale-sanchez-g/open-prompt-manager',
+        },
+        license_info={
+            'name': 'MIT',
+            'url': 'https://opensource.org/licenses/MIT',
+        },
+        openapi_tags=[
+            {
+                'name': 'prompts',
+                'description': (
+                    'Create, read, update, and delete prompts. '
+                    'Manage version history, render templates with variables, '
+                    'record executions, and track custom quality metrics.'
+                ),
+            },
+            {
+                'name': 'tags',
+                'description': 'Manage colour-coded labels used to organise and filter prompts.',
+            },
+            {
+                'name': 'agents',
+                'description': (
+                    'Register and manage AI agents. '
+                    'Associate agents with prompts and review aggregate execution statistics.'
+                ),
+            },
+            {
+                'name': 'health',
+                'description': 'Liveness / readiness check endpoint.',
+            },
+        ],
         lifespan=lifespan,
     )
 
@@ -57,7 +116,13 @@ def create_app() -> FastAPI:
     application.include_router(tags_router)
     application.include_router(agents_router)
 
-    @application.get('/api/health')
+    @application.get(
+        '/api/health',
+        tags=['health'],
+        summary='Health check',
+        description='Returns the current application status and version. Used by the frontend to display the app version in the sidebar.',
+        response_description='`{ "status": "ok", "version": "<semver>" }`',
+    )
     def health_check():
         return {'status': 'ok', 'version': __version__}
 
