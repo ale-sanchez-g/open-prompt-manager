@@ -30,7 +30,8 @@
     "start": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint:ci": "npx --yes oxlint@0.4.0 src"
   },
   "engines": {
     "node": ">=20"

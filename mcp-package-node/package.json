@@ -12,7 +12,8 @@
   ],
   "scripts": {
     "start": "node bin/server.js",
-    "test": "node --test tests/server.test.js"
+    "test": "node --test tests/server.test.js",
+    "lint:ci": "npx --yes oxlint@0.4.0 bin lib tests"
   },
   "keywords": ["mcp", "claude", "prompt-management", "ai"],
   "license": "MIT",
