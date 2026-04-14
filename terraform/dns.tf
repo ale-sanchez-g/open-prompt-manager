@@ -7,10 +7,10 @@
 locals {
   route53_zone_id = (
     var.route53_zone_id != ""
-      ? var.route53_zone_id
-      : var.create_route53_zone && var.domain_name != ""
-        ? aws_route53_zone.main[0].zone_id
-        : ""
+    ? var.route53_zone_id
+    : var.create_route53_zone && var.domain_name != ""
+    ? aws_route53_zone.main[0].zone_id
+    : ""
   )
 }
 
@@ -79,11 +79,11 @@ resource "aws_route53_record" "alb_www" {
 resource "aws_acm_certificate_validation" "main" {
   count           = var.create_certificate && var.enable_https ? 1 : 0
   certificate_arn = aws_acm_certificate.main[0].arn
-  
+
   # NOTE: Remove timeout_minutes to use email validation (default)
   # For Route 53 DNS validation, manually create records first, then uncomment:
   # validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
-  
+
   timeouts {
     create = "5m"
   }
@@ -97,10 +97,10 @@ output "route53_nameservers" {
   description = "Route 53 nameservers for your domain. Update your registrar with these values."
   value = (
     var.route53_zone_id != ""
-      ? try(data.aws_route53_zone.existing[0].name_servers, [])
-      : var.create_route53_zone
-        ? aws_route53_zone.main[0].name_servers
-        : []
+    ? try(data.aws_route53_zone.existing[0].name_servers, [])
+    : var.create_route53_zone
+    ? aws_route53_zone.main[0].name_servers
+    : []
   )
 }
 

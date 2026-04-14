@@ -10,8 +10,7 @@ on:
 # Give the workflow the minimum permissions required to read the code and
 # merge the pull request.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────────
@@ -20,6 +19,8 @@ jobs:
   check-actor:
     name: Check PR actor
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       is-dependabot: ${{ steps.actor-check.outputs.result }}
     steps:

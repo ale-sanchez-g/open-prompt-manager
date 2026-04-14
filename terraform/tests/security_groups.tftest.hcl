@@ -10,11 +10,11 @@ mock_provider "aws" {
 }
 
 variables {
-  project_name   = "opm-test"
-  environment    = "test"
-  aws_region     = "us-east-1"
-  frontend_port  = 80
-  backend_port   = 8000
+  project_name  = "opm-test"
+  environment   = "test"
+  aws_region    = "us-east-1"
+  frontend_port = 80
+  backend_port  = 8000
 }
 
 # ─────────────────────────────────────────────
