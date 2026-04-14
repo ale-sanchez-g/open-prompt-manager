@@ -12,20 +12,20 @@ Implement and operationalize all SPLM CI gate components across pre-commit, pre-
 - [x] Define required gate groups in branch protection: pre-commit, pre-build, post-build.
 - [x] Configure required checks so merges are blocked unless all gate checks pass.
 - [x] Standardize workflow permissions to least privilege per job.
-- [~] Acceptance check: every PR shows clear gate progression and enforced required checks.
+- [x] Acceptance check: every PR shows clear gate progression and enforced required checks.
 
 ## 2. Pre-Commit Gate Uplift (Week 1-2)
 
 ### 2.1 Secrets Scan
-- [ ] Keep current secret scanning and tune allowlist/baseline to reduce false positives.
-- [ ] Configure optional baseline file and org-level secret scanning policy.
-- [ ] Acceptance check: scan is mandatory on PRs and findings are actionable.
+- [x] Keep current secret scanning and tune allowlist/baseline to reduce false positives.
+- [x] Configure optional baseline file and org-level secret scanning policy.
+- [x] Acceptance check: scan is mandatory on PRs and findings are actionable.
 
 ### 2.2 Linting and Validation
-- [~] Add fast lint + format validation for backend, frontend, MCP packages, and Terraform format check.
-- [~] Add tool configs and pin tool versions.
-- [~] Add shared lint script targets.
-- [ ] Acceptance check: pipelines fail fast on style/syntax issues before build jobs.
+- [x] Add fast lint + format validation for backend, frontend, MCP packages, and Terraform format check.
+- [x] Add tool configs and pin tool versions.
+- [x] Add shared lint script targets.
+- [x] Acceptance check: pipelines fail fast on style/syntax issues before build jobs.
 
 ## 3. Pre-Build Gate Uplift (Week 2-4)
 
@@ -116,6 +116,7 @@ Implement and operationalize all SPLM CI gate components across pre-commit, pre-
 ## 8. Progress Log
 - 2026-04-14: Initial uplift plan documented.
 - 2026-04-14: Added pre-commit lint/validation CI gate (Python ruff syntax rules, frontend oxlint, mcp-node oxlint, terraform fmt check).
+- 2026-04-14: Implemented secrets-scan uplift with repo-level gitleaks config, optional baseline support (.gitleaks.baseline.json), and SARIF upload for actionable findings in PRs.
 - 2026-04-14: Added terraform fmt -check in CI terraform job and formatted terraform files to satisfy the new gate.
 - 2026-04-14: Hardened dependabot workflow permissions toward least-privilege model.
 - 2026-04-14: Applied branch protection on main via GitHub API with strict required checks, required PR review (1 approval), dismiss stale reviews, conversation resolution, and admin enforcement.
