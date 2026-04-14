@@ -1,0 +1,24 @@
+title = "Open Prompt Manager gitleaks config"
+
+[extend]
+useDefault = true
+
+# Reduce known false positives from generated assets while keeping source code strict.
+[[allowlists]]
+description = "Generated frontend coverage reports"
+paths = [
+  '''^frontend/coverage/.*$''',
+]
+
+[[allowlists]]
+description = "Binary image assets"
+paths = [
+  '''^img/.*\.(png|jpg|jpeg|gif|webp)$''',
+]
+
+[[allowlists]]
+description = "Playwright generated reports"
+paths = [
+  '''^e2e-test/playwright-report/.*$''',
+  '''^e2e-test/test-results/.*$''',
+]
