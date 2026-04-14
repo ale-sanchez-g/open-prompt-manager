@@ -27,13 +27,17 @@ These controls are configured outside this repo in GitHub organization settings:
 
 If historical findings exist and need temporary suppression while remediating:
 
-1. Generate baseline report locally:
+> ⚠️ **Warning:** Gitleaks JSON output may contain matched secret values. Never commit a baseline file
+> that contains raw secret material. Always generate a redacted baseline using the `--redact` flag below.
+
+1. Generate a **redacted** baseline report locally:
 
 ```bash
-gitleaks git --config .gitleaks.toml --report-format json --report-path .gitleaks.baseline.json
+gitleaks git --config .gitleaks.toml --redact --report-format json --report-path .gitleaks.baseline.json
 ```
 
-2. Commit `.gitleaks.baseline.json` if you intentionally want CI to ignore pre-existing findings.
+2. Review `.gitleaks.baseline.json` before committing — confirm no secret values are present (all
+   matched values should appear as `REDACTED`). Only commit the baseline if it is fully redacted.
 3. Remove baseline once historical leaks are remediated.
 
 ## Governance Guidance

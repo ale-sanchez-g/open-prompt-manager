@@ -65,7 +65,11 @@ jobs:
           set -e
 
       - name: Upload gitleaks SARIF to code scanning
-        if: always() && hashFiles('gitleaks-report.sarif') != ''
+        # Skip on fork PRs: GITHUB_TOKEN is read-only for forks and cannot write security-events
+        if: >-
+          always() &&
+          hashFiles('gitleaks-report.sarif') != '' &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: gitleaks-report.sarif
