@@ -9,10 +9,10 @@ Implement and operationalize all SPLM CI gate components across pre-commit, pre-
 - [x] Completed
 
 ## 1. Stabilize Gate Structure (Week 1)
-- [~] Define required gate groups in branch protection: pre-commit, pre-build, post-build.
-- [~] Configure required checks so merges are blocked unless all gate checks pass.
+- [x] Define required gate groups in branch protection: pre-commit, pre-build, post-build.
+- [x] Configure required checks so merges are blocked unless all gate checks pass.
 - [x] Standardize workflow permissions to least privilege per job.
-- [ ] Acceptance check: every PR shows clear gate progression and enforced required checks.
+- [~] Acceptance check: every PR shows clear gate progression and enforced required checks.
 
 ## 2. Pre-Commit Gate Uplift (Week 1-2)
 
@@ -118,5 +118,5 @@ Implement and operationalize all SPLM CI gate components across pre-commit, pre-
 - 2026-04-14: Added pre-commit lint/validation CI gate (Python ruff syntax rules, frontend oxlint, mcp-node oxlint, terraform fmt check).
 - 2026-04-14: Added terraform fmt -check in CI terraform job and formatted terraform files to satisfy the new gate.
 - 2026-04-14: Hardened dependabot workflow permissions toward least-privilege model.
-- 2026-04-14: Remaining Week 1 branch protection and required-check enforcement must be configured in GitHub repository settings (outside repo files).
+- 2026-04-14: Applied branch protection on main via GitHub API with strict required checks, required PR review (1 approval), dismiss stale reviews, conversation resolution, and admin enforcement.
 
