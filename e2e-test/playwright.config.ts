@@ -10,7 +10,7 @@ export default defineConfig({
     ['junit', { outputFile: 'test-results/junit.xml' }],
   ],
   use: {
-    baseURL: 'http://localhost',
+    baseURL: 'http://localhost:3000',
     extraHTTPHeaders: {
       'Content-Type': 'application/json',
     },
