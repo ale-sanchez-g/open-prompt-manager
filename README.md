@@ -29,6 +29,8 @@ The application version displayed in the sidebar and landing page header is fetc
 | `/prompts/:id/edit` | Prompt Editor | Edit an existing prompt |
 | `/tags` | Tags Management | Create and manage tags |
 | `/agents` | Agents Management | Create and manage AI agents |
+| `/agents/:id` | Agent Detail | View agent details and execution stats |
+| `/api-docs` | API Documentation | Interactive API schema reference, user journeys, and endpoint guide |
 
 ## Features
 
@@ -186,46 +188,73 @@ Notes:
 
 ## API Reference
 
+Full interactive documentation is available at runtime:
+
+| Format | URL |
+|--------|-----|
+| Swagger UI | `http://localhost:8000/api/docs` |
+| ReDoc | `http://localhost:8000/api/redoc` |
+| OpenAPI JSON | `http://localhost:8000/api/openapi.json` |
+| In-app guide | `http://localhost/api-docs` (user journeys, schemas, endpoint reference) |
+
 ### Prompts
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/prompts/` | List prompts (filter by tag, agent, search) |
-| POST | `/api/prompts/` | Create new prompt |
-| GET | `/api/prompts/{id}` | Get prompt details |
-| PUT | `/api/prompts/{id}` | Update prompt |
-| DELETE | `/api/prompts/{id}` | Delete prompt |
-| POST | `/api/prompts/{id}/versions` | Create new version |
-| GET | `/api/prompts/{id}/versions` | Get version history |
-| POST | `/api/prompts/{id}/render` | Render prompt with variables |
-| POST | `/api/prompts/{id}/executions` | Track an execution |
-| GET | `/api/prompts/{id}/executions` | Get execution history |
-| POST | `/api/prompts/{id}/metrics` | Add custom metric |
-| GET | `/api/prompts/{id}/metrics` | Get metrics |
+| GET | `/api/prompts/` | List prompts. Query params: `search`, `tag_id`, `agent_id`, `skip`, `limit` |
+| POST | `/api/prompts/` | Create a new root prompt |
+| GET | `/api/prompts/{id}` | Get full prompt detail including tags, agents, variables and quality metrics |
+| PUT | `/api/prompts/{id}` | Partial update — only supplied fields are changed; `tag_ids`/`agent_ids` replace the full list |
+| DELETE | `/api/prompts/{id}` | Permanently delete a prompt and its executions/metrics |
+| POST | `/api/prompts/{id}/versions` | Create a child version; omitted fields are inherited from the parent |
+| GET | `/api/prompts/{id}/versions` | Get the full version lineage (root + all descendants) |
+| POST | `/api/prompts/{id}/render` | Render the template with supplied variables and resolve component references |
+| POST | `/api/prompts/{id}/executions` | Record an LLM execution; prompt stats are recalculated automatically |
+| GET | `/api/prompts/{id}/executions` | Get execution history (most-recent first) |
+| POST | `/api/prompts/{id}/metrics` | Add a custom numeric metric (e.g. `latency_p99`) |
+| GET | `/api/prompts/{id}/metrics` | Get custom metrics (most-recent first) |
 
 ### Tags
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/tags/` | List all tags |
-| POST | `/api/tags/` | Create tag |
-| DELETE | `/api/tags/{id}` | Delete tag |
+| GET | `/api/tags/` | List all tags (alphabetical) |
+| POST | `/api/tags/` | Create a tag — name must be unique, returns 409 on conflict |
+| DELETE | `/api/tags/{id}` | Delete a tag and remove it from all associated prompts |
 
 ### Agents
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/agents/` | List all agents |
-| GET | `/api/agents/{id}` | Get agent |
-| POST | `/api/agents/` | Register agent |
-| PUT | `/api/agents/{id}` | Update agent |
-| DELETE | `/api/agents/{id}` | Delete agent |
+| GET | `/api/agents/` | List all agents (alphabetical) |
+| GET | `/api/agents/{id}` | Get agent details with associated prompts and execution stats |
+| POST | `/api/agents/` | Register an agent — name must be unique, returns 409 on conflict |
+| PUT | `/api/agents/{id}` | Partial update — only supplied fields are changed |
+| DELETE | `/api/agents/{id}` | Delete an agent and remove it from all associated prompts |
 
 ### Health
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/health` | Health check — returns `{ "status": "ok", "version": "<app_version>" }`. The `version` field is consumed by the frontend to display the current application version. |
+| GET | `/api/health` | Liveness check — returns `{ "status": "ok", "version": "<semver>" }`. The `version` field is consumed by the frontend to display the current application version. |
+
+### Template Syntax
+
+| Syntax | Effect |
+|--------|--------|
+| `{{variable_name}}` | Substituted with the matching value from the render request |
+| `{{component:<id>}}` | Replaced with the fully-rendered content of the referenced prompt (recursive) |
+
+Circular component references are detected and rejected with HTTP 422.
+
+### Common Error Responses
+
+| Status | Meaning |
+|--------|---------|
+| 400 | Bad request — invalid input |
+| 404 | Resource not found |
+| 409 | Conflict — duplicate name (tags, agents) |
+| 422 | Validation error — missing required field or circular component reference |
 
 ## MCP Server
 

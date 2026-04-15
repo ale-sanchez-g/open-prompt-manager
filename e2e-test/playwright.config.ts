@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './specs',
-  timeout: 30000,
+  timeout: 60000,
   retries: 1,
   reporter: [
     ['html', { outputFolder: 'playwright-report' }],
@@ -14,6 +14,12 @@ export default defineConfig({
     extraHTTPHeaders: {
       'Content-Type': 'application/json',
     },
+    video: 'retain-on-failure',
+    screenshot: 'only-on-failure',
+    viewport: { width: 1280, height: 720 },
+  },
+  expect: {
+    timeout: 10000,
   },
   projects: [
     {

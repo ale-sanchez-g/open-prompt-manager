@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, Link } from 'react-router-dom';
-import { LayoutDashboard, FileText, Tag, Bot } from 'lucide-react';
+import { LayoutDashboard, FileText, Tag, Bot, BookOpen } from 'lucide-react';
 
 import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
@@ -10,6 +10,7 @@ import PromptDetail from './pages/PromptDetail';
 import TagsManagement from './pages/TagsManagement';
 import AgentsManagement from './pages/AgentsManagement';
 import AgentDetail from './pages/AgentDetail';
+import ApiDocs from './pages/ApiDocs';
 import { healthApi } from './services/api';
 
 function NavItem({ to, icon: Icon, label }) {
@@ -61,6 +62,7 @@ export function AppLayout() {
         <NavItem to="/prompts" icon={FileText} label="Prompts" />
         <NavItem to="/tags" icon={Tag} label="Tags" />
         <NavItem to="/agents" icon={Bot} label="Agents" />
+        <NavItem to="/api-docs" icon={BookOpen} label="API Docs" />
       </aside>
 
       {/* Main content */}
@@ -74,6 +76,7 @@ export function AppLayout() {
           <Route path="/tags" element={<TagsManagement />} />
           <Route path="/agents" element={<AgentsManagement />} />
           <Route path="/agents/:id" element={<AgentDetail />} />
+          <Route path="/api-docs" element={<ApiDocs />} />
         </Routes>
       </main>
     </div>

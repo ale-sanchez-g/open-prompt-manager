@@ -551,3 +551,48 @@ Comprehensive API test suite for the Open Prompt Manager, a production-ready fra
   1. Send POST request to /mcp endpoint with valid MCP protocol data
     - expect: Response status code is 200
     - expect: Response indicates MCP protocol is active
+
+### 9. User Journey E2E Tests
+
+**File:** `e2e-test/specs/user-journeys/user-journeys.spec.ts`
+
+These tests mirror the 4 step-by-step walkthroughs shown in the in-app API Documentation page (`/api-docs`) and serve as both regression coverage and living documentation.
+
+---
+
+#### 9.1. Journey 1 — Create and Render a Prompt
+
+Steps covered:
+1. Create a tag (POST /api/tags/) — verify id and color
+2. Create a prompt with typed variables and the tag attached (POST /api/prompts/)
+3. Render the prompt with all variable values supplied (POST /api/prompts/{id}/render) — verify rendered_content, variables_used, components_resolved
+4. Full happy-path sequence: tag → prompt → render
+
+---
+
+#### 9.2. Journey 2 — Version a Prompt
+
+Steps covered:
+1. Create the root prompt at v1.0.0
+2. Create a child version — auto-increments to v1.0.1 (POST /api/prompts/{id}/versions)
+3. Verify the new version is marked `is_latest=true` and the root prompt is updated to `is_latest=false`
+4. Retrieve version history (GET /api/prompts/{id}/versions) — verify both versions are returned with the expected `is_latest` values
+
+---
+
+#### 9.3. Journey 3 — Register an Agent and Track Executions
+
+Steps covered:
+1. Register a new agent (POST /api/agents/)
+2. Associate the agent with a prompt via PUT /api/prompts/{id}
+3. Record a successful execution (POST /api/prompts/{id}/executions)
+4. Verify the prompt reflects the recorded execution via the currently asserted rating metric (`avg_rating`)
+
+---
+
+#### 9.4. Journey 4 — Build a Composable Prompt
+
+Steps covered:
+1. Create a reusable component prompt
+2. Create a parent prompt referencing the component via `{{component:<id>}}`
+3. Render the parent — verify component content is inlined and components_resolved is populated
