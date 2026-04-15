@@ -101,8 +101,8 @@ test.describe('Agents API Tests', () => {
     const createdAgent = await createAgent(request);
     createdAgentIds.push(createdAgent.id);
 
-    // Use poll to guard against transient timing between the commit and read
-    // (can occur when tests run in parallel with heavy DB writes from other specs).
+    // Retry once after a 1-second delay to guard against transient timing
+    // between the commit and read when other specs are writing heavily.
     let getResponse = await request.get(`/api/agents/${createdAgent.id}`);
     if (getResponse.status() !== 200) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
