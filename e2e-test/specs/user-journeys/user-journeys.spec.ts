@@ -1,743 +1,621 @@
-// User Journey E2E Tests
-// Covers the 4 step-by-step walkthroughs described in the in-app API Documentation page (/api-docs):
-//   1. Create and Render a Prompt
-//   2. Version a Prompt
-//   3. Register an Agent and Track Executions
-//   4. Build a Composable Prompt
-//
-// Each describe block mirrors the exact sequence of API calls shown in the user journey guide
-// so these tests serve both as regression coverage and as living documentation.
+/**
+ * UI User Journey E2E Tests
+ *
+ * Browser-level Playwright tests for the 4 step-by-step user journey walkthroughs
+ * described on the in-app API Documentation page (/api-docs).  Each describe block
+ * exercises the real React frontend running at http://localhost (full docker-compose
+ * stack required — run `make up` before executing these tests).
+ *
+ * Journeys:
+ *   1. Create and Render a Prompt
+ *   2. Version a Prompt
+ *   3. Register an Agent and Track Executions
+ *   4. Build a Composable Prompt
+ *
+ * Run: cd e2e-test && npm run test:user-journeys
+ */
 
-import { test, expect, APIRequestContext } from '@playwright/test';
+import { test, expect, type Page, type APIRequestContext } from '@playwright/test';
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+/** Max ms to wait for the "Rendered output:" label to appear after clicking Render. */
+const RENDER_TIMEOUT_MS = 10000;
+
+/** Max ms to wait for an element to become visible (e.g. async-loaded pills, cards). */
+const VISIBILITY_TIMEOUT_MS = 5000;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function uniqueName(prefix: string): string {
+/** Generate a collision-free display name for test data. */
+function uid(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 }
 
-async function createTag(request: APIRequestContext, name: string, color = '#10B981'): Promise<any> {
-  const response = await request.post('/api/tags/', { data: { name, color } });
-  expect(response.status()).toBe(201);
-  return response.json();
+/** Extract the numeric prompt ID from a URL like /prompts/42 or /prompts/42/edit. */
+function promptIdFromUrl(url: string): number {
+  const m = url.match(/\/prompts\/(\d+)/);
+  if (!m) throw new Error(`No prompt ID in URL: ${url}`);
+  return parseInt(m[1], 10);
 }
 
-async function createAgent(
-  request: APIRequestContext,
-  payload: { name: string; description?: string; type?: string; status?: string }
-): Promise<any> {
-  const response = await request.post('/api/agents/', { data: payload });
-  expect(response.status()).toBe(201);
-  return response.json();
+/** Fetch a JSON list from the given API path. */
+async function fetchList(request: APIRequestContext, path: string): Promise<any[]> {
+  return (await request.get(path)).json();
 }
 
-async function createPrompt(request: APIRequestContext, payload: Record<string, unknown>): Promise<any> {
-  const response = await request.post('/api/prompts/', { data: payload });
-  expect(response.status()).toBe(201);
-  return response.json();
+/**
+ * Click "Add Variable" and fill in the variable name field.
+ * Encapsulates the two-step interaction that is repeated across Journey 1 & 2 tests.
+ */
+async function addVariable(page: Page, name: string): Promise<void> {
+  await page.getByRole('button', { name: /Add Variable/ }).click();
+  await page.getByPlaceholder('name').first().fill(name);
 }
 
 // ── Journey 1: Create and Render a Prompt ─────────────────────────────────────
+//
+// Users create a tagged prompt with typed variables, then supply runtime values
+// and render the resolved output — all through the browser UI.
 
-test.describe('User Journey 1 — Create and Render a Prompt', () => {
-  const createdPromptIds: number[] = [];
-  const createdTagIds: number[] = [];
-
-  test.afterEach(async ({ request }) => {
-    for (const id of createdPromptIds.reverse()) {
-      await request.delete(`/api/prompts/${id}`);
-    }
-    createdPromptIds.length = 0;
-    for (const id of createdTagIds) {
-      await request.delete(`/api/tags/${id}`);
-    }
-    createdTagIds.length = 0;
+test.describe('UI Journey 1 — Create and Render a Prompt', () => {
+  test('API Docs page shows the Create + Render user journey steps', async ({ page }) => {
+    await page.goto('/api-docs');
+    await expect(page.getByRole('heading', { name: 'API Documentation' })).toBeVisible();
+    // User Journeys section is present
+    await expect(page.getByText('User Journeys')).toBeVisible();
+    // Journey 1 title and all three step titles are visible
+    await expect(page.getByText('1 · Create and render a prompt')).toBeVisible();
+    await expect(page.getByText('Create a tag (optional)')).toBeVisible();
+    await expect(page.getByText('Create a prompt')).toBeVisible();
+    await expect(page.getByText('Render the prompt with variable values')).toBeVisible();
   });
 
-  test('Step 1 — Create a tag', async ({ request }) => {
-    const tag = await createTag(request, uniqueName('journey1-tag'));
-    createdTagIds.push(tag.id);
+  test('Step 1 — Create a tag on the Tags management page', async ({ page, request }) => {
+    const tagName = uid('j1-tag');
 
-    expect(tag).toHaveProperty('id');
-    expect(tag.color).toBe('#10B981');
+    await page.goto('/tags');
+    // The only required text input on this page is the tag Name field
+    await page.locator('input[required]').fill(tagName);
+    await page.getByRole('button', { name: /Create/ }).click();
+
+    // The new tag should appear immediately in the tag list
+    await expect(page.getByText(tagName, { exact: true })).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
+
+    // Cleanup
+    const tags = await fetchList(request, '/api/tags/');
+    const tag = tags.find((t: any) => t.name === tagName);
+    if (tag) await request.delete(`/api/tags/${tag.id}`);
   });
 
-  test('Step 2 — Create a prompt with typed variables', async ({ request }) => {
-    const tag = await createTag(request, uniqueName('journey1-tag'));
-    createdTagIds.push(tag.id);
+  test('Step 2 — Create a prompt with a typed variable via the Prompt Editor', async ({ page, request }) => {
+    const promptName = uid('j1-prompt');
 
-    const prompt = await createPrompt(request, {
-      name: uniqueName('customer-greeting'),
-      description: 'Generates a personalised greeting.',
-      content: 'Hello, {{user_name}}! Welcome to {{platform}}.',
-      version: '1.0.0',
-      variables: [
-        { name: 'user_name', type: 'string', required: true, description: "User's first name." },
-        { name: 'platform', type: 'string', required: false, default: 'our platform', description: 'Platform name.' },
-      ],
-      tag_ids: [tag.id],
-    });
-    createdPromptIds.push(prompt.id);
+    await page.goto('/prompts/new');
+    // Name is the first required input in the two-column grid
+    await page.locator('input[required]').first().fill(promptName);
+    // Content is the only textarea in the form
+    await page.locator('textarea').fill('Hello, {{user_name}}!');
 
-    expect(prompt).toHaveProperty('id');
-    expect(prompt.version).toBe('1.0.0');
-    expect(prompt.is_latest).toBe(true);
-    expect(Array.isArray(prompt.variables)).toBe(true);
-    expect(prompt.variables).toHaveLength(2);
-    expect(prompt.tags).toHaveLength(1);
-    expect(prompt.tags[0].id).toBe(tag.id);
+    // Declare the variable via the Variables section
+    await addVariable(page, 'user_name');
+
+    // Submit
+    await page.getByRole('button', { name: 'Create Prompt' }).click();
+    await page.waitForURL(/\/prompts\/\d+/);
+    const promptId = promptIdFromUrl(page.url());
+
+    // Verify the detail page shows the prompt and initial version
+    await expect(page.getByText(promptName)).toBeVisible();
+    await expect(page.getByText('v1.0.0')).toBeVisible();
+
+    // Cleanup
+    await request.delete(`/api/prompts/${promptId}`);
   });
 
-  test('Step 3 — Render the prompt with all variable values supplied', async ({ request }) => {
-    const prompt = await createPrompt(request, {
-      name: uniqueName('greeting-render'),
-      content: 'Hello, {{user_name}}! Welcome to {{platform}}.',
-      variables: [
-        { name: 'user_name', type: 'string', required: true },
-        { name: 'platform', type: 'string', required: false, default: 'our platform' },
-      ],
+  test('Step 3 — Render a prompt with a variable value on the Prompt Detail page', async ({ page, request }) => {
+    // Create a prompt (with a declared variable) via API so we can focus on the render UI
+    const promptName = uid('j1-render');
+    const createResp = await request.post('/api/prompts/', {
+      data: {
+        name: promptName,
+        content: 'Hello, {{user_name}}!',
+        variables: [{ name: 'user_name', type: 'string', required: false, default: '' }],
+      },
     });
-    createdPromptIds.push(prompt.id);
+    const prompt = await createResp.json();
 
-    const renderResponse = await request.post(`/api/prompts/${prompt.id}/render`, {
-      data: { variables: { user_name: 'Alice', platform: 'PromptHub' } },
-    });
-    expect(renderResponse.status()).toBe(200);
+    await page.goto(`/prompts/${prompt.id}`);
+    await expect(page.getByText(promptName)).toBeVisible();
 
-    const body = await renderResponse.json();
-    expect(body.rendered_content).toBe('Hello, Alice! Welcome to PromptHub.');
-    expect(body.variables_used).toContain('user_name');
-    expect(body.variables_used).toContain('platform');
-    expect(Array.isArray(body.components_resolved)).toBe(true);
-    expect(body.components_resolved).toHaveLength(0);
+    // The variable input uses id="var-<name>" pattern
+    await page.locator('#var-user_name').fill('Alice');
+    await page.getByRole('button', { name: /Render/ }).click();
+
+    // Verify the rendered output section appears with the resolved content
+    await expect(page.getByText('Rendered output:')).toBeVisible({ timeout: RENDER_TIMEOUT_MS });
+    await expect(page.getByText('Hello, Alice!')).toBeVisible();
+
+    // Cleanup
+    await request.delete(`/api/prompts/${prompt.id}`);
   });
 
-  test('Step 3a — Render uses variable default when optional variable omitted', async ({ request }) => {
-    const prompt = await createPrompt(request, {
-      name: uniqueName('greeting-default'),
-      content: 'Hello, {{user_name}}! Welcome to {{platform}}.',
-      variables: [
-        { name: 'user_name', type: 'string', required: true },
-        { name: 'platform', type: 'string', required: false, default: 'our platform' },
-      ],
-    });
-    createdPromptIds.push(prompt.id);
+  test('Full journey — create tag, create prompt, render via the browser UI', async ({ page, request }) => {
+    const tagName = uid('j1-full-tag');
+    const promptName = uid('j1-full-prompt');
+    let promptId: number | null = null;
 
-    const renderResponse = await request.post(`/api/prompts/${prompt.id}/render`, {
-      data: { variables: { user_name: 'Bob' } },
-    });
-    expect(renderResponse.status()).toBe(200);
+    // Step 1: Create tag via the Tags UI
+    await page.goto('/tags');
+    await page.locator('input[required]').fill(tagName);
+    await page.getByRole('button', { name: /Create/ }).click();
+    await expect(page.getByText(tagName, { exact: true })).toBeVisible();
 
-    const body = await renderResponse.json();
-    expect(body.rendered_content).toContain('our platform');
-  });
+    // Step 2: Create a prompt and associate the new tag via the Prompt Editor UI
+    await page.goto('/prompts/new');
+    await page.locator('input[required]').first().fill(promptName);
+    await page.locator('textarea').fill('Hi {{user_name}}, welcome to the platform!');
 
-  test('Step 3b — Render returns 422 when a required variable is missing', async ({ request }) => {
-    const prompt = await createPrompt(request, {
-      name: uniqueName('greeting-required-check'),
-      content: 'Hello, {{user_name}}!',
-      variables: [{ name: 'user_name', type: 'string', required: true }],
-    });
-    createdPromptIds.push(prompt.id);
+    // Declare a variable
+    await addVariable(page, 'user_name');
 
-    const renderResponse = await request.post(`/api/prompts/${prompt.id}/render`, {
-      data: { variables: {} },
-    });
-    expect(renderResponse.status()).toBe(422);
-  });
+    // Wait for the tag pills to load, then click the new tag
+    await expect(page.getByRole('button', { name: tagName })).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
+    await page.getByRole('button', { name: tagName }).click();
 
-  test('Full journey — tag → prompt → render (happy path)', async ({ request }) => {
-    // Step 1: create tag
-    const tag = await createTag(request, uniqueName('journey1-full-tag'));
-    createdTagIds.push(tag.id);
+    await page.getByRole('button', { name: 'Create Prompt' }).click();
+    await page.waitForURL(/\/prompts\/\d+/);
+    promptId = promptIdFromUrl(page.url());
 
-    // Step 2: create prompt
-    const prompt = await createPrompt(request, {
-      name: uniqueName('full-greeting'),
-      description: 'Full journey greeting prompt.',
-      content: 'Hi {{user_name}}, thanks for using {{platform}}!',
-      variables: [
-        { name: 'user_name', type: 'string', required: true },
-        { name: 'platform', type: 'string', required: false, default: 'Open Prompt Manager' },
-      ],
-      tag_ids: [tag.id],
-    });
-    createdPromptIds.push(prompt.id);
+    // Verify the tag is shown on the detail page
+    await expect(page.getByText(tagName)).toBeVisible();
 
-    expect(prompt.is_latest).toBe(true);
-    expect(prompt.usage_count).toBe(0);
+    // Step 3: Fill the variable and click Render
+    await page.locator('#var-user_name').fill('Carol');
+    await page.getByRole('button', { name: /Render/ }).click();
 
-    // Step 3: render
-    const renderResponse = await request.post(`/api/prompts/${prompt.id}/render`, {
-      data: { variables: { user_name: 'Carol', platform: 'PromptHub' } },
-    });
-    expect(renderResponse.status()).toBe(200);
+    await expect(page.getByText('Rendered output:')).toBeVisible({ timeout: RENDER_TIMEOUT_MS });
+    await expect(page.getByText('Hi Carol, welcome to the platform!')).toBeVisible();
 
-    const renderBody = await renderResponse.json();
-    expect(renderBody.rendered_content).toBe('Hi Carol, thanks for using PromptHub!');
-    expect(renderBody.variables_used).toContain('user_name');
-    expect(renderBody.variables_used).toContain('platform');
+    // Cleanup
+    await request.delete(`/api/prompts/${promptId}`);
+    const tags = await fetchList(request, '/api/tags/');
+    const tag = tags.find((t: any) => t.name === tagName);
+    if (tag) await request.delete(`/api/tags/${tag.id}`);
   });
 });
 
 // ── Journey 2: Version a Prompt ───────────────────────────────────────────────
+//
+// The Prompt Editor shows a version-bump modal when saving an edit, letting users
+// create a child version with an auto-incremented semver.  The version history
+// sidebar on the Detail page always shows the full lineage.
 
-test.describe('User Journey 2 — Version a Prompt', () => {
-  const createdPromptIds: number[] = [];
-
-  test.afterEach(async ({ request }) => {
-    for (const id of createdPromptIds.reverse()) {
-      await request.delete(`/api/prompts/${id}`);
-    }
-    createdPromptIds.length = 0;
+test.describe('UI Journey 2 — Version a Prompt', () => {
+  test('API Docs page shows the Versioning user journey steps', async ({ page }) => {
+    await page.goto('/api-docs');
+    await expect(page.getByText('2 · Version a prompt')).toBeVisible();
+    await expect(page.getByText('Create a new version')).toBeVisible();
+    await expect(page.getByText('Inspect the version history')).toBeVisible();
+    await expect(page.getByText('Identify the latest version')).toBeVisible();
   });
 
-  test('Step 1 — Create the root prompt (v1.0.0)', async ({ request }) => {
-    const prompt = await createPrompt(request, {
-      name: uniqueName('versioned-prompt'),
-      content: 'Hello, {{user_name}}! Welcome to {{platform}}.',
-      version: '1.0.0',
+  test('Step 1 — Edit a prompt and bump the version via the version modal', async ({ page, request }) => {
+    // Create the initial prompt via API
+    const promptName = uid('j2-modal');
+    const createResp = await request.post('/api/prompts/', {
+      data: { name: promptName, content: 'Original v1 content.' },
     });
-    createdPromptIds.push(prompt.id);
+    const v1 = await createResp.json();
 
-    expect(prompt.version).toBe('1.0.0');
-    expect(prompt.is_latest).toBe(true);
-    expect(prompt.parent_id).toBeNull();
+    // Navigate to the edit page
+    await page.goto(`/prompts/${v1.id}/edit`);
+    await expect(page.getByRole('heading', { name: /Edit Prompt/ })).toBeVisible();
+
+    // Change the content
+    await page.locator('textarea').fill('Updated content for version bump test.');
+
+    // Save — this triggers the version modal
+    await page.getByRole('button', { name: 'Save Changes' }).click();
+
+    // Confirm the version bump in the modal
+    await expect(page.getByRole('button', { name: /Yes, bump to/ })).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
+    await page.getByRole('button', { name: /Yes, bump to/ }).click();
+
+    // After the bump the page redirects to the new (child) prompt
+    await page.waitForURL(/\/prompts\/\d+/);
+    const v2Id = promptIdFromUrl(page.url());
+    expect(v2Id).not.toBe(v1.id);
+
+    // New version should show v1.0.1
+    await expect(page.getByText('v1.0.1')).toBeVisible();
+
+    // "Latest" badge should be shown in the version history sidebar
+    await expect(page.getByText('Latest')).toBeVisible();
+
+    // Cleanup
+    await request.delete(`/api/prompts/${v2Id}`);
+    await request.delete(`/api/prompts/${v1.id}`);
   });
 
-  test('Step 2 — Create a new version (auto-increments to v1.0.1)', async ({ request }) => {
-    const root = await createPrompt(request, {
-      name: uniqueName('versioned-root'),
-      content: 'Hello, {{user_name}}!',
-      version: '1.0.0',
+  test('Step 2 — Version history sidebar shows all versions with the is_latest badge', async ({ page, request }) => {
+    // Create two versions via API
+    const promptName = uid('j2-history');
+    const v1Resp = await request.post('/api/prompts/', {
+      data: { name: promptName, content: 'v1 content.', version: '1.0.0' },
     });
-    createdPromptIds.push(root.id);
-
-    const versionResponse = await request.post(`/api/prompts/${root.id}/versions`, {
-      data: { content: 'Hi {{user_name}}, glad to have you!', description: 'Friendlier tone.' },
+    const v1 = await v1Resp.json();
+    const v2Resp = await request.post(`/api/prompts/${v1.id}/versions`, {
+      data: { content: 'v1.0.1 content.' },
     });
-    expect(versionResponse.status()).toBe(201);
+    const v2 = await v2Resp.json();
 
-    const v2 = await versionResponse.json();
-    createdPromptIds.push(v2.id);
+    // Navigate to the latest version
+    await page.goto(`/prompts/${v2.id}`);
+    await expect(page.getByText(promptName)).toBeVisible();
 
-    expect(v2.version).toBe('1.0.1');
-    expect(v2.parent_id).toBe(root.id);
-    expect(v2.is_latest).toBe(true);
-    expect(v2.content).toBe('Hi {{user_name}}, glad to have you!');
+    // Both versions appear in the Version History sidebar
+    await expect(page.getByText('v1.0.1')).toBeVisible();
+    await expect(page.getByText('v1.0.0')).toBeVisible();
+    // Latest badge marks v1.0.1
+    await expect(page.getByText('Latest')).toBeVisible();
+
+    // Cleanup
+    await request.delete(`/api/prompts/${v2.id}`);
+    await request.delete(`/api/prompts/${v1.id}`);
   });
 
-  test('Step 2a — Create a version with an explicit version string', async ({ request }) => {
-    const root = await createPrompt(request, {
-      name: uniqueName('versioned-explicit'),
-      content: 'Original content.',
-      version: '1.0.0',
+  test('Step 3 — Keep-version option saves the edit without creating a child', async ({ page, request }) => {
+    const promptName = uid('j2-keep');
+    const createResp = await request.post('/api/prompts/', {
+      data: { name: promptName, content: 'Original content.' },
     });
-    createdPromptIds.push(root.id);
+    const prompt = await createResp.json();
 
-    const versionResponse = await request.post(`/api/prompts/${root.id}/versions`, {
-      data: { version: '2.0.0', description: 'Major rewrite.' },
-    });
-    expect(versionResponse.status()).toBe(201);
+    await page.goto(`/prompts/${prompt.id}/edit`);
+    await page.locator('textarea').fill('In-place edit without version bump.');
+    await page.getByRole('button', { name: 'Save Changes' }).click();
 
-    const v2 = await versionResponse.json();
-    createdPromptIds.push(v2.id);
+    // Choose NOT to bump the version
+    await expect(page.getByRole('button', { name: /No, keep version/ })).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
+    await page.getByRole('button', { name: /No, keep version/ }).click();
 
-    expect(v2.version).toBe('2.0.0');
-    expect(v2.parent_id).toBe(root.id);
+    // After saving in-place the URL stays at the same prompt
+    await page.waitForURL(new RegExp(`/prompts/${prompt.id}$`));
+    await expect(page.getByText('v1.0.0')).toBeVisible();
+
+    // Cleanup
+    await request.delete(`/api/prompts/${prompt.id}`);
   });
 
-  test('Step 3 — is_latest flag updates correctly after versioning', async ({ request }) => {
-    const root = await createPrompt(request, {
-      name: uniqueName('versioned-is-latest'),
-      content: 'Version 1 content.',
-      version: '1.0.0',
-    });
-    createdPromptIds.push(root.id);
+  test('Full journey — create prompt via UI, edit, bump version, verify history', async ({ page, request }) => {
+    const promptName = uid('j2-full');
+    let v1Id: number | null = null;
+    let v2Id: number | null = null;
 
-    // Root is latest initially
-    const rootDetail = await (await request.get(`/api/prompts/${root.id}`)).json();
-    expect(rootDetail.is_latest).toBe(true);
+    // Step 1: Create prompt via the Prompt Editor UI
+    await page.goto('/prompts/new');
+    await page.locator('input[required]').first().fill(promptName);
+    await page.locator('textarea').fill('First version content.');
+    await page.getByRole('button', { name: 'Create Prompt' }).click();
+    await page.waitForURL(/\/prompts\/\d+/);
+    v1Id = promptIdFromUrl(page.url());
 
-    // Create new version
-    const newVersionResponse = await request.post(`/api/prompts/${root.id}/versions`, {
-      data: { content: 'Version 2 content.' },
-    });
-    expect(newVersionResponse.status()).toBe(201);
-    const v2 = await newVersionResponse.json();
-    createdPromptIds.push(v2.id);
+    // Step 2: Click Edit and bump the version
+    await page.getByRole('link', { name: /Edit/ }).click();
+    await page.waitForURL(/\/prompts\/\d+\/edit/);
+    await page.locator('textarea').fill('Second version — improved phrasing.');
+    await page.getByRole('button', { name: 'Save Changes' }).click();
+    await expect(page.getByRole('button', { name: /Yes, bump to/ })).toBeVisible();
+    await page.getByRole('button', { name: /Yes, bump to/ }).click();
+    await page.waitForURL(/\/prompts\/\d+/);
+    v2Id = promptIdFromUrl(page.url());
+    expect(v2Id).not.toBe(v1Id);
 
-    // Root is no longer latest
-    const updatedRoot = await (await request.get(`/api/prompts/${root.id}`)).json();
-    expect(updatedRoot.is_latest).toBe(false);
+    // Step 3: Version history sidebar shows both versions, v1.0.1 is Latest
+    await expect(page.getByText('v1.0.1')).toBeVisible();
+    await expect(page.getByText('v1.0.0')).toBeVisible();
+    await expect(page.getByText('Latest')).toBeVisible();
 
-    // New version is latest
-    expect(v2.is_latest).toBe(true);
-  });
-
-  test('Step 4 — Retrieve full version history', async ({ request }) => {
-    const root = await createPrompt(request, {
-      name: uniqueName('version-history-root'),
-      content: 'Root content.',
-      version: '1.0.0',
-    });
-    createdPromptIds.push(root.id);
-
-    // Create a linear chain: root → v2 → v3
-    const v2Res = await request.post(`/api/prompts/${root.id}/versions`, { data: {} });
-    const v2 = await v2Res.json();
-    createdPromptIds.push(v2.id);
-
-    const v3Res = await request.post(`/api/prompts/${v2.id}/versions`, { data: {} });
-    const v3 = await v3Res.json();
-    createdPromptIds.push(v3.id);
-
-    const versionsResponse = await request.get(`/api/prompts/${root.id}/versions`);
-    expect(versionsResponse.status()).toBe(200);
-
-    const versions = await versionsResponse.json();
-    expect(Array.isArray(versions)).toBe(true);
-    expect(versions).toHaveLength(3); // root + v2 + v3
-
-    const byId = Object.fromEntries(versions.map((v: any) => [v.id, v]));
-    expect(byId[root.id].is_latest).toBe(false);
-    expect(byId[v2.id].is_latest).toBe(false);
-    expect(byId[v3.id].is_latest).toBe(true);
-  });
-
-  test('Full journey — root → v1.0.1 → v2.0.0 → history check', async ({ request }) => {
-    // Create root
-    const root = await createPrompt(request, {
-      name: uniqueName('full-version-journey'),
-      content: 'v1 content.',
-      version: '1.0.0',
-    });
-    createdPromptIds.push(root.id);
-    expect(root.is_latest).toBe(true);
-
-    // Bump to v1.0.1
-    const v101Res = await request.post(`/api/prompts/${root.id}/versions`, {
-      data: { content: 'v1.0.1 content.', description: 'Minor improvement.' },
-    });
-    const v101 = await v101Res.json();
-    createdPromptIds.push(v101.id);
-    expect(v101.version).toBe('1.0.1');
-
-    // Bump to v2.0.0
-    const v200Res = await request.post(`/api/prompts/${v101.id}/versions`, {
-      data: { content: 'v2 major rewrite.', version: '2.0.0' },
-    });
-    const v200 = await v200Res.json();
-    createdPromptIds.push(v200.id);
-    expect(v200.version).toBe('2.0.0');
-    expect(v200.is_latest).toBe(true);
-
-    // History contains all 3
-    const versionsRes = await request.get(`/api/prompts/${root.id}/versions`);
-    const versions = await versionsRes.json();
-    expect(versions).toHaveLength(3);
+    // Cleanup
+    await request.delete(`/api/prompts/${v2Id}`);
+    await request.delete(`/api/prompts/${v1Id}`);
   });
 });
 
 // ── Journey 3: Register an Agent and Track Executions ─────────────────────────
+//
+// The Agents page lets users register AI agents; prompts can be associated with
+// agents so that execution metrics (success rate, avg rating, usage count) are
+// aggregated and shown on the Prompt Detail page.
 
-test.describe('User Journey 3 — Register an Agent and Track Executions', () => {
-  const createdPromptIds: number[] = [];
-  const createdAgentIds: number[] = [];
-
-  test.afterEach(async ({ request }) => {
-    for (const id of createdPromptIds.reverse()) {
-      await request.delete(`/api/prompts/${id}`);
-    }
-    createdPromptIds.length = 0;
-    for (const id of createdAgentIds) {
-      await request.delete(`/api/agents/${id}`);
-    }
-    createdAgentIds.length = 0;
+test.describe('UI Journey 3 — Register an Agent and Track Executions', () => {
+  test('API Docs page shows the Agent Execution Tracking user journey steps', async ({ page }) => {
+    await page.goto('/api-docs');
+    await expect(page.getByText('3 · Register an agent and track executions')).toBeVisible();
+    await expect(page.getByText('Register an agent')).toBeVisible();
+    await expect(page.getByText('Associate the agent with a prompt')).toBeVisible();
+    await expect(page.getByText('Record an execution')).toBeVisible();
+    await expect(page.getByText('Review agent stats')).toBeVisible();
   });
 
-  test('Step 1 — Register an agent', async ({ request }) => {
-    const agent = await createAgent(request, {
-      name: uniqueName('support-bot'),
-      description: 'Handles tier-1 customer support queries.',
-      type: 'chatbot',
-      status: 'active',
-    });
-    createdAgentIds.push(agent.id);
+  test('Step 1 — Register an agent on the Agents management page', async ({ page, request }) => {
+    const agentName = uid('j3-agent');
 
-    expect(agent).toHaveProperty('id');
-    expect(agent.status).toBe('active');
-    expect(agent).toHaveProperty('created_at');
+    await page.goto('/agents');
+    // Name is the only required text input in the Register Agent form
+    await page.locator('input[required]').fill(agentName);
+    await page.getByRole('button', { name: /Register/ }).click();
+
+    // The new agent card should appear in the list
+    await expect(
+      page.locator('[data-testid="agent-card"]').filter({ hasText: agentName })
+    ).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
+
+    // Cleanup
+    const agents = await fetchList(request, '/api/agents/');
+    const agent = agents.find((a: any) => a.name === agentName);
+    if (agent) await request.delete(`/api/agents/${agent.id}`);
   });
 
-  test('Step 2 — Associate the agent with a prompt', async ({ request }) => {
-    const agent = await createAgent(request, { name: uniqueName('assoc-agent') });
-    createdAgentIds.push(agent.id);
+  test('Step 2 — Create a prompt associated with an agent via the Prompt Editor', async ({ page, request }) => {
+    const agentName = uid('j3-assoc-agent');
+    const promptName = uid('j3-assoc-prompt');
 
-    const prompt = await createPrompt(request, {
-      name: uniqueName('agent-prompt'),
-      content: 'Hello, {{user_name}}!',
-      variables: [{ name: 'user_name', type: 'string', required: true }],
-    });
-    createdPromptIds.push(prompt.id);
+    // Create the agent via API (already tested in Step 1)
+    const agentResp = await request.post('/api/agents/', { data: { name: agentName } });
+    const agent = await agentResp.json();
 
-    // Associate agent via PUT
-    const updateResponse = await request.put(`/api/prompts/${prompt.id}`, {
-      data: { agent_ids: [agent.id] },
-    });
-    expect(updateResponse.status()).toBe(200);
+    await page.goto('/prompts/new');
+    await page.locator('input[required]').first().fill(promptName);
+    await page.locator('textarea').fill('Support message for the user.');
 
-    const updatedPrompt = await updateResponse.json();
-    expect(updatedPrompt.agents.some((a: any) => a.id === agent.id)).toBe(true);
+    // Wait for agent pills to load, then click the agent to associate it
+    await expect(page.getByRole('button', { name: agentName })).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
+    await page.getByRole('button', { name: agentName }).click();
+
+    await page.getByRole('button', { name: 'Create Prompt' }).click();
+    await page.waitForURL(/\/prompts\/\d+/);
+    const promptId = promptIdFromUrl(page.url());
+
+    // The agent should appear in the Agents sidebar on the detail page
+    await expect(page.getByText(agentName)).toBeVisible();
+
+    // Cleanup
+    await request.delete(`/api/prompts/${promptId}`);
+    await request.delete(`/api/agents/${agent.id}`);
   });
 
-  test('Step 3 — Record a successful execution and verify prompt stats update', async ({ request }) => {
-    const agent = await createAgent(request, { name: uniqueName('tracking-agent') });
-    createdAgentIds.push(agent.id);
+  test('Step 3 — Execution stats are visible on the Prompt Detail page', async ({ page, request }) => {
+    // Create agent and prompt then record an execution — all via API
+    const agentResp = await request.post('/api/agents/', { data: { name: uid('j3-stats-agent') } });
+    const agent = await agentResp.json();
 
-    const prompt = await createPrompt(request, {
-      name: uniqueName('execution-prompt'),
-      content: 'Hello, {{user_name}}!',
-      agent_ids: [agent.id],
+    const promptResp = await request.post('/api/prompts/', {
+      data: { name: uid('j3-stats-prompt'), content: 'Static content.', agent_ids: [agent.id] },
     });
-    createdPromptIds.push(prompt.id);
-
-    // Initial stats are zero
-    const initialDetail = await (await request.get(`/api/prompts/${prompt.id}`)).json();
-    expect(initialDetail.usage_count).toBe(0);
-    expect(initialDetail.avg_rating).toBe(0);
-
-    // Record a successful execution
-    const execResponse = await request.post(`/api/prompts/${prompt.id}/executions`, {
-      data: {
-        agent_id: agent.id,
-        input_variables: { user_name: 'Alice' },
-        rendered_prompt: 'Hello, Alice!',
-        response: 'Hi there, Alice!',
-        execution_time_ms: 340,
-        token_count: 64,
-        cost: 0.0004,
-        success: 1,
-        rating: 5,
-      },
-    });
-    expect(execResponse.status()).toBe(201);
-
-    const execution = await execResponse.json();
-    expect(execution.prompt_id).toBe(prompt.id);
-    expect(execution.agent_id).toBe(agent.id);
-    expect(execution.rating).toBe(5);
-    expect(execution.success).toBe(1);
-    expect(execution).toHaveProperty('timestamp');
-
-    // Stats should be updated
-    const updatedDetail = await (await request.get(`/api/prompts/${prompt.id}`)).json();
-    expect(updatedDetail.usage_count).toBe(1);
-    expect(updatedDetail.avg_rating).toBe(5);
-    expect(updatedDetail.success_rate).toBe(1);
-  });
-
-  test('Step 3a — Multiple executions update aggregate stats correctly', async ({ request }) => {
-    const prompt = await createPrompt(request, {
-      name: uniqueName('stats-prompt'),
-      content: 'Test content.',
-    });
-    createdPromptIds.push(prompt.id);
-
-    // 3 executions: 2 success (ratings 4, 2), 1 failure (no rating)
-    await request.post(`/api/prompts/${prompt.id}/executions`, { data: { success: 1, rating: 4 } });
-    await request.post(`/api/prompts/${prompt.id}/executions`, { data: { success: 1, rating: 2 } });
-    await request.post(`/api/prompts/${prompt.id}/executions`, { data: { success: 0 } });
-
-    const detail = await (await request.get(`/api/prompts/${prompt.id}`)).json();
-    expect(detail.usage_count).toBe(3);
-    expect(Math.abs(detail.avg_rating - 3.0)).toBeLessThan(0.01); // (4+2)/2 = 3
-    expect(Math.abs(detail.success_rate - 2 / 3)).toBeLessThan(0.01);
-  });
-
-  test('Step 4 — Retrieve execution history', async ({ request }) => {
-    const prompt = await createPrompt(request, {
-      name: uniqueName('exec-history-prompt'),
-      content: 'Static content.',
-    });
-    createdPromptIds.push(prompt.id);
-
-    await request.post(`/api/prompts/${prompt.id}/executions`, { data: { success: 1 } });
-    await request.post(`/api/prompts/${prompt.id}/executions`, { data: { success: 1 } });
-
-    const execsResponse = await request.get(`/api/prompts/${prompt.id}/executions`);
-    expect(execsResponse.status()).toBe(200);
-
-    const execs = await execsResponse.json();
-    expect(Array.isArray(execs)).toBe(true);
-    expect(execs).toHaveLength(2);
-  });
-
-  test('Step 5 — Agent detail endpoint returns aggregate execution stats', async ({ request }) => {
-    const agent = await createAgent(request, { name: uniqueName('stats-agent') });
-    createdAgentIds.push(agent.id);
-
-    const prompt = await createPrompt(request, {
-      name: uniqueName('agent-stats-prompt'),
-      content: 'Content.',
-      agent_ids: [agent.id],
-    });
-    createdPromptIds.push(prompt.id);
+    const prompt = await promptResp.json();
 
     await request.post(`/api/prompts/${prompt.id}/executions`, {
-      data: { agent_id: agent.id, success: 1, rating: 4 },
-    });
-    await request.post(`/api/prompts/${prompt.id}/executions`, {
-      data: { agent_id: agent.id, success: 1, rating: 2 },
+      data: { agent_id: agent.id, success: 1, rating: 5 },
     });
 
-    const agentDetail = await (await request.get(`/api/agents/${agent.id}`)).json();
-    expect(agentDetail).toHaveProperty('execution_count');
-    expect(agentDetail).toHaveProperty('success_rate');
-    expect(agentDetail).toHaveProperty('avg_rating');
-    expect(agentDetail.execution_count).toBe(2);
-    expect(agentDetail.success_rate).toBe(1);
-    expect(Math.abs(agentDetail.avg_rating - 3.0)).toBeLessThan(0.01);
+    // Navigate to the prompt detail page and verify stats
+    await page.goto(`/prompts/${prompt.id}`);
+    await expect(page.getByText(prompt.name)).toBeVisible();
+
+    // After 1 execution with rating=5: avg_rating=5.0 shown in the Avg Rating metric badge
+    await expect(page.getByText('5.0')).toBeVisible();
+
+    // Cleanup
+    await request.delete(`/api/prompts/${prompt.id}`);
+    await request.delete(`/api/agents/${agent.id}`);
   });
 
-  test('Full journey — agent → prompt → 2 executions → stats verified', async ({ request }) => {
-    // Register agent
-    const agent = await createAgent(request, {
-      name: uniqueName('full-journey-agent'),
-      description: 'Support bot for full journey test.',
-      type: 'chatbot',
-      status: 'active',
-    });
-    createdAgentIds.push(agent.id);
+  test('Step 4 — Agents navigation link is visible in the sidebar', async ({ page }) => {
+    await page.goto('/dashboard');
+    await expect(page.getByRole('link', { name: /Agents/ })).toBeVisible();
+    await page.getByRole('link', { name: /Agents/ }).click();
+    await page.waitForURL(/\/agents/);
+    await expect(page.getByRole('heading', { name: 'Agents' })).toBeVisible();
+  });
 
-    // Create prompt associated with agent
-    const prompt = await createPrompt(request, {
-      name: uniqueName('full-journey-prompt'),
-      content: 'Hello, {{user_name}}!',
-      variables: [{ name: 'user_name', type: 'string', required: true }],
-      agent_ids: [agent.id],
-    });
-    createdPromptIds.push(prompt.id);
+  test('Full journey — register agent via UI, associate with prompt, verify stats after execution', async ({ page, request }) => {
+    const agentName = uid('j3-full-agent');
+    const promptName = uid('j3-full-prompt');
+    let promptId: number | null = null;
+    let agentId: number | null = null;
 
-    // Record two executions
-    await request.post(`/api/prompts/${prompt.id}/executions`, {
-      data: {
-        agent_id: agent.id,
-        input_variables: { user_name: 'Alice' },
-        rendered_prompt: 'Hello, Alice!',
-        execution_time_ms: 200,
-        token_count: 32,
-        success: 1,
-        rating: 5,
-      },
-    });
-    await request.post(`/api/prompts/${prompt.id}/executions`, {
-      data: {
-        agent_id: agent.id,
-        input_variables: { user_name: 'Bob' },
-        rendered_prompt: 'Hello, Bob!',
-        execution_time_ms: 350,
-        token_count: 30,
-        success: 0,
-      },
-    });
+    // Step 1: Register agent via the Agents UI
+    await page.goto('/agents');
+    await page.locator('input[required]').fill(agentName);
+    await page.getByRole('button', { name: /Register/ }).click();
+    await expect(
+      page.locator('[data-testid="agent-card"]').filter({ hasText: agentName })
+    ).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
-    // Verify prompt stats
-    const promptDetail = await (await request.get(`/api/prompts/${prompt.id}`)).json();
-    expect(promptDetail.usage_count).toBe(2);
-    expect(Math.abs(promptDetail.success_rate - 0.5)).toBeLessThan(0.01);
-    expect(promptDetail.avg_rating).toBe(5);
+    const agents = await fetchList(request, '/api/agents/');
+    const agent = agents.find((a: any) => a.name === agentName);
+    agentId = agent.id;
 
-    // Verify agent stats
-    const agentDetail = await (await request.get(`/api/agents/${agent.id}`)).json();
-    expect(agentDetail.execution_count).toBe(2);
-    expect(Math.abs(agentDetail.success_rate - 0.5)).toBeLessThan(0.01);
+    // Step 2: Create a prompt and associate the agent via the Prompt Editor UI
+    await page.goto('/prompts/new');
+    await page.locator('input[required]').first().fill(promptName);
+    await page.locator('textarea').fill('Support response content.');
+
+    await expect(page.getByRole('button', { name: agentName })).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
+    await page.getByRole('button', { name: agentName }).click();
+
+    await page.getByRole('button', { name: 'Create Prompt' }).click();
+    await page.waitForURL(/\/prompts\/\d+/);
+    promptId = promptIdFromUrl(page.url());
+
+    // Verify the agent appears in the Agents sidebar on the detail page
+    await expect(page.getByText(agentName)).toBeVisible();
+
+    // Step 3: Record an execution via API and reload to verify updated stats in the UI
+    await request.post(`/api/prompts/${promptId}/executions`, {
+      data: { agent_id: agentId, success: 1, rating: 4 },
+    });
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText(promptName)).toBeVisible();
+    // avg_rating = 4.0 should now appear in the Avg Rating metric badge
+    await expect(page.getByText('4.0')).toBeVisible();
+
+    // Cleanup
+    await request.delete(`/api/prompts/${promptId}`);
+    await request.delete(`/api/agents/${agentId}`);
   });
 });
 
 // ── Journey 4: Build a Composable Prompt ──────────────────────────────────────
+//
+// The Prompt Editor's component-search UI lets users embed {{component:<id>}}
+// references into a parent prompt.  At render time the backend resolves each
+// reference recursively so the output contains the full inline text.
 
-test.describe('User Journey 4 — Build a Composable Prompt', () => {
-  const createdPromptIds: number[] = [];
-
-  test.afterEach(async ({ request }) => {
-    for (const id of createdPromptIds.reverse()) {
-      await request.delete(`/api/prompts/${id}`);
-    }
-    createdPromptIds.length = 0;
+test.describe('UI Journey 4 — Build a Composable Prompt', () => {
+  test('API Docs page shows the Composable Prompt user journey steps', async ({ page }) => {
+    await page.goto('/api-docs');
+    await expect(page.getByText('4 · Build a composable prompt')).toBeVisible();
+    await expect(page.getByText('Create a reusable component prompt')).toBeVisible();
+    await expect(page.getByText('Reference the component in a parent prompt')).toBeVisible();
+    await expect(page.getByText('Render to see the resolved output')).toBeVisible();
   });
 
-  test('Step 1 — Create a reusable component prompt', async ({ request }) => {
-    const component = await createPrompt(request, {
-      name: uniqueName('safety-disclaimer'),
-      content: 'Always consult a professional before acting on this advice.',
-      variables: [],
-    });
-    createdPromptIds.push(component.id);
+  test('Step 1 — Create a component prompt via the Prompt Editor', async ({ page, request }) => {
+    const componentName = uid('j4-component');
 
-    expect(component).toHaveProperty('id');
-    expect(component.content).toBe('Always consult a professional before acting on this advice.');
+    await page.goto('/prompts/new');
+    await page.locator('input[required]').first().fill(componentName);
+    await page.locator('textarea').fill('Always consult a professional before acting on this advice.');
+    await page.getByRole('button', { name: 'Create Prompt' }).click();
+    await page.waitForURL(/\/prompts\/\d+/);
+    const componentId = promptIdFromUrl(page.url());
+
+    await expect(page.getByText(componentName)).toBeVisible();
+
+    // Cleanup
+    await request.delete(`/api/prompts/${componentId}`);
   });
 
-  test('Step 2 — Create a parent prompt that embeds the component via {{component:<id>}}', async ({ request }) => {
-    const component = await createPrompt(request, {
-      name: uniqueName('comp-reusable'),
-      content: 'Always consult a professional before acting on this advice.',
-      variables: [],
-    });
-    createdPromptIds.push(component.id);
+  test('Step 2 — Embed a component via the component-search UI in the Prompt Editor', async ({ page, request }) => {
+    const componentName = uid('j4-comp');
+    const parentName = uid('j4-parent');
 
-    const parent = await createPrompt(request, {
-      name: uniqueName('medical-advice-bot'),
-      content: `Here is information about {{topic}}.\n\n{{component:${component.id}}}`,
-      variables: [{ name: 'topic', type: 'string', required: true }],
+    // Create the component prompt via API
+    const compResp = await request.post('/api/prompts/', {
+      data: { name: componentName, content: 'Reusable disclaimer text.' },
     });
-    createdPromptIds.push(parent.id);
+    const comp = await compResp.json();
 
-    expect(parent).toHaveProperty('id');
-    expect(parent.content).toContain(`{{component:${component.id}}}`);
+    // Navigate to the new-prompt page and insert the component via the search UI
+    await page.goto('/prompts/new');
+    await page.locator('input[required]').first().fill(parentName);
+    await page.locator('textarea').fill('Intro paragraph. ');
+
+    // Type the component name into the search box
+    await page.getByPlaceholder(/Search prompts to insert as components/).fill(componentName);
+
+    // Wait for the search result then click Insert
+    await expect(page.getByText(componentName).last()).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
+    await page.getByRole('button', { name: 'Insert' }).first().click();
+
+    // The textarea should now contain the {{component:<id>}} reference
+    const contentVal = await page.locator('textarea').inputValue();
+    expect(contentVal).toContain(`{{component:${comp.id}}}`);
+
+    // Submit the form
+    await page.getByRole('button', { name: 'Create Prompt' }).click();
+    await page.waitForURL(/\/prompts\/\d+/);
+    const parentId = promptIdFromUrl(page.url());
+
+    // The component prompt should be listed in the Components sidebar
+    await expect(page.getByText(componentName)).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
+
+    // Cleanup
+    await request.delete(`/api/prompts/${parentId}`);
+    await request.delete(`/api/prompts/${comp.id}`);
   });
 
-  test('Step 3 — Render resolves the component reference inline', async ({ request }) => {
-    const component = await createPrompt(request, {
-      name: uniqueName('comp-disclaimer'),
-      content: 'Always consult a professional.',
-      variables: [],
+  test('Step 3 — Render a parent prompt and verify the component content is resolved', async ({ page, request }) => {
+    // Create component and parent via API with the component reference baked in
+    const compResp = await request.post('/api/prompts/', {
+      data: {
+        name: uid('j4-render-comp'),
+        content: 'Component inline content resolved at render time.',
+      },
     });
-    createdPromptIds.push(component.id);
+    const comp = await compResp.json();
 
-    const parent = await createPrompt(request, {
-      name: uniqueName('parent-with-component'),
-      content: `Info about {{topic}}.\n\n{{component:${component.id}}}`,
-      variables: [{ name: 'topic', type: 'string', required: true }],
+    const parentResp = await request.post('/api/prompts/', {
+      data: {
+        name: uid('j4-render-parent'),
+        content: `Information section. {{component:${comp.id}}}`,
+      },
     });
-    createdPromptIds.push(parent.id);
+    const parent = await parentResp.json();
 
-    const renderResponse = await request.post(`/api/prompts/${parent.id}/render`, {
-      data: { variables: { topic: 'blood pressure' } },
-    });
-    expect(renderResponse.status()).toBe(200);
+    // Navigate to the parent detail page and render (no variables required)
+    await page.goto(`/prompts/${parent.id}`);
+    await expect(page.getByText(parent.name)).toBeVisible();
 
-    const body = await renderResponse.json();
-    expect(body.rendered_content).toContain('blood pressure');
-    expect(body.rendered_content).toContain('Always consult a professional.');
-    expect(body.components_resolved).toContain(component.id);
+    // The component name should appear in the Components sidebar
+    await expect(page.getByText(comp.name)).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
+
+    await page.getByRole('button', { name: /Render/ }).click();
+
+    // The rendered output contains the component content expanded inline
+    await expect(page.getByText('Rendered output:')).toBeVisible({ timeout: RENDER_TIMEOUT_MS });
+    await expect(page.getByText('Component inline content resolved at render time.')).toBeVisible();
+
+    // Cleanup
+    await request.delete(`/api/prompts/${parent.id}`);
+    await request.delete(`/api/prompts/${comp.id}`);
   });
 
-  test('Step 3a — Render with deeply nested components (3 levels)', async ({ request }) => {
-    const leaf = await createPrompt(request, {
-      name: uniqueName('leaf'),
-      content: 'Leaf content.',
-      variables: [],
-    });
-    createdPromptIds.push(leaf.id);
+  test('Full journey — create component via UI, embed via search, render resolved output', async ({ page, request }) => {
+    const componentName = uid('j4-full-comp');
+    const parentName = uid('j4-full-parent');
+    let componentId: number | null = null;
+    let parentId: number | null = null;
 
-    const middle = await createPrompt(request, {
-      name: uniqueName('middle'),
-      content: `Middle wraps leaf: {{component:${leaf.id}}}`,
-      variables: [],
-    });
-    createdPromptIds.push(middle.id);
+    // Step 1: Create the component prompt via the Prompt Editor UI
+    await page.goto('/prompts/new');
+    await page.locator('input[required]').first().fill(componentName);
+    await page.locator('textarea').fill('Disclaimer: for informational purposes only.');
+    await page.getByRole('button', { name: 'Create Prompt' }).click();
+    await page.waitForURL(/\/prompts\/\d+/);
+    componentId = promptIdFromUrl(page.url());
 
-    const top = await createPrompt(request, {
-      name: uniqueName('top'),
-      content: `Top wraps middle: {{component:${middle.id}}}`,
-      variables: [],
-    });
-    createdPromptIds.push(top.id);
+    // Step 2: Create the parent prompt and embed the component via the search UI
+    await page.goto('/prompts/new');
+    await page.locator('input[required]').first().fill(parentName);
+    await page.locator('textarea').fill('Information about the topic. ');
 
-    const renderResponse = await request.post(`/api/prompts/${top.id}/render`, {
-      data: { variables: {} },
-    });
-    expect(renderResponse.status()).toBe(200);
+    await page.getByPlaceholder(/Search prompts to insert as components/).fill(componentName);
+    await expect(page.getByText(componentName).last()).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
+    await page.getByRole('button', { name: 'Insert' }).first().click();
 
-    const body = await renderResponse.json();
-    expect(body.rendered_content).toContain('Leaf content.');
-    expect(body.components_resolved).toContain(leaf.id);
-    expect(body.components_resolved).toContain(middle.id);
-  });
+    // Confirm the {{component:<id>}} reference was inserted into the textarea
+    const content = await page.locator('textarea').inputValue();
+    expect(content).toContain(`{{component:${componentId}}}`);
 
-  test('Step 3b — Render with multiple sibling component references in one prompt', async ({ request }) => {
-    const compA = await createPrompt(request, {
-      name: uniqueName('comp-a'),
-      content: 'Component A content.',
-      variables: [],
-    });
-    createdPromptIds.push(compA.id);
+    await page.getByRole('button', { name: 'Create Prompt' }).click();
+    await page.waitForURL(/\/prompts\/\d+/);
+    parentId = promptIdFromUrl(page.url());
 
-    const compB = await createPrompt(request, {
-      name: uniqueName('comp-b'),
-      content: 'Component B content.',
-      variables: [],
-    });
-    createdPromptIds.push(compB.id);
+    // Component is listed in the Components sidebar on the detail page
+    await expect(page.getByText(componentName)).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
-    const parent = await createPrompt(request, {
-      name: uniqueName('parent-multi-comp'),
-      content: `Intro. {{component:${compA.id}}} Middle. {{component:${compB.id}}} End.`,
-      variables: [],
-    });
-    createdPromptIds.push(parent.id);
+    // Step 3: Render and verify the component content is resolved inline
+    await page.getByRole('button', { name: /Render/ }).click();
+    await expect(page.getByText('Rendered output:')).toBeVisible({ timeout: RENDER_TIMEOUT_MS });
+    await expect(page.getByText('Disclaimer: for informational purposes only.')).toBeVisible();
 
-    const renderResponse = await request.post(`/api/prompts/${parent.id}/render`, {
-      data: { variables: {} },
-    });
-    expect(renderResponse.status()).toBe(200);
-
-    const body = await renderResponse.json();
-    expect(body.rendered_content).toContain('Component A content.');
-    expect(body.rendered_content).toContain('Component B content.');
-    expect(body.components_resolved).toContain(compA.id);
-    expect(body.components_resolved).toContain(compB.id);
-  });
-
-  test('Step 4 — Circular component reference is rejected with 422', async ({ request }) => {
-    // Create prompt A then make it reference itself
-    const a = await createPrompt(request, {
-      name: uniqueName('self-ref-a'),
-      content: 'placeholder',
-      variables: [],
-    });
-    createdPromptIds.push(a.id);
-
-    // Update content to reference itself
-    await request.put(`/api/prompts/${a.id}`, {
-      data: { content: `{{component:${a.id}}}` },
-    });
-
-    const renderResponse = await request.post(`/api/prompts/${a.id}/render`, {
-      data: { variables: {} },
-    });
-    expect(renderResponse.status()).toBe(422);
-  });
-
-  test('Full journey — component → parent → render with variable + component resolution', async ({ request }) => {
-    // Step 1: create reusable component
-    const disclaimer = await createPrompt(request, {
-      name: uniqueName('full-disclaimer'),
-      content: 'Disclaimer: This is for informational purposes only.',
-      variables: [],
-    });
-    createdPromptIds.push(disclaimer.id);
-
-    // Step 2: create parent prompt referencing the component
-    const parent = await createPrompt(request, {
-      name: uniqueName('full-parent'),
-      content: `Information about {{topic}}.\n\n{{component:${disclaimer.id}}}`,
-      variables: [{ name: 'topic', type: 'string', required: true }],
-    });
-    createdPromptIds.push(parent.id);
-
-    // Step 3: render
-    const renderResponse = await request.post(`/api/prompts/${parent.id}/render`, {
-      data: { variables: { topic: 'artificial intelligence' } },
-    });
-    expect(renderResponse.status()).toBe(200);
-
-    const body = await renderResponse.json();
-    expect(body.rendered_content).toContain('artificial intelligence');
-    expect(body.rendered_content).toContain('Disclaimer: This is for informational purposes only.');
-    expect(body.variables_used).toContain('topic');
-    expect(body.components_resolved).toContain(disclaimer.id);
+    // Cleanup
+    await request.delete(`/api/prompts/${parentId}`);
+    await request.delete(`/api/prompts/${componentId}`);
   });
 });
