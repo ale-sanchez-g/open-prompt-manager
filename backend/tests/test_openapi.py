@@ -8,7 +8,6 @@ These tests check that:
 - Examples are present on request body schemas.
 - Important response codes (404, 409, 422) are documented where expected.
 """
-import pytest
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
