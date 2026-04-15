@@ -14,7 +14,7 @@ export default defineConfig({
     extraHTTPHeaders: {
       'Content-Type': 'application/json',
     },
-    video: 'on',
+    video: 'retain-on-failure',
     screenshot: 'only-on-failure',
     viewport: { width: 1280, height: 720 },
   },
