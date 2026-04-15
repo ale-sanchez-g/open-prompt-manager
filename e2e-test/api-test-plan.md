@@ -566,9 +566,7 @@ Steps covered:
 1. Create a tag (POST /api/tags/) — verify id and color
 2. Create a prompt with typed variables and the tag attached (POST /api/prompts/)
 3. Render the prompt with all variable values supplied (POST /api/prompts/{id}/render) — verify rendered_content, variables_used, components_resolved
-4. Render using a variable default when the optional variable is omitted
-5. Verify 422 is returned when a required variable is missing
-6. Full happy-path sequence: tag → prompt → render
+4. Full happy-path sequence: tag → prompt → render
 
 ---
 
