@@ -585,10 +585,8 @@ Steps covered:
 Steps covered:
 1. Register a new agent (POST /api/agents/)
 2. Associate the agent with a prompt via PUT /api/prompts/{id}
-3. Record a successful execution (POST /api/prompts/{id}/executions) — verify prompt stats updated (usage_count, avg_rating, success_rate)
-4. Record multiple executions and verify aggregate stats are correct
-5. Retrieve execution history (GET /api/prompts/{id}/executions)
-6. Verify agent detail endpoint (GET /api/agents/{id}) returns execution_count, success_rate, avg_rating
+3. Record a successful execution (POST /api/prompts/{id}/executions)
+4. Verify the prompt reflects the recorded execution via the currently asserted rating metric (`avg_rating`)
 
 ---
 
