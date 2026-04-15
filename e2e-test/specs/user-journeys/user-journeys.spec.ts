@@ -270,7 +270,7 @@ test.describe('UI Journey 4 — Build a Composable Prompt', () => {
     await page.waitForURL(/\/prompts\/\d+\/?$/);
     componentId = promptIdFromUrl(page.url());
     await page.waitForLoadState('networkidle');
-    await expect(page.getByText(componentName)).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
+    await expect(page.getByRole('heading', { name: componentName })).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // Step 2: Create the parent prompt and embed the component via the search UI
     await page.goto('/prompts/new');
@@ -299,7 +299,7 @@ test.describe('UI Journey 4 — Build a Composable Prompt', () => {
     ).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // Component is listed in the Components sidebar on the detail page
-    await expect(page.getByText(componentName)).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
+    await expect(page.getByRole('link', { name: componentName })).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // Step 3: Render and verify the component content is resolved inline
     await page.getByRole('button', { name: /Render/ }).click();
