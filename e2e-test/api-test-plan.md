@@ -575,9 +575,8 @@ Steps covered:
 Steps covered:
 1. Create the root prompt at v1.0.0
 2. Create a child version — auto-increments to v1.0.1 (POST /api/prompts/{id}/versions)
-3. Create a version with an explicit version string (e.g. v2.0.0)
-4. Verify `is_latest` flags update correctly in a linear chain
-5. Retrieve full version history (GET /api/prompts/{id}/versions) — verify length and is_latest per node
+3. Verify the new version is marked `is_latest=true` and the root prompt is updated to `is_latest=false`
+4. Retrieve version history (GET /api/prompts/{id}/versions) — verify both versions are returned with the expected `is_latest` values
 
 ---
 
