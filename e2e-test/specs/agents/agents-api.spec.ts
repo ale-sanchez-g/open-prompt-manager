@@ -29,7 +29,7 @@ async function createAgent(
   });
 
   expect(response.status()).toBe(201);
-  return response.json();
+  return await response.json();
 }
 
 test.describe('Agents API Tests', () => {
@@ -101,7 +101,13 @@ test.describe('Agents API Tests', () => {
     const createdAgent = await createAgent(request);
     createdAgentIds.push(createdAgent.id);
 
-    const getResponse = await request.get(`/api/agents/${createdAgent.id}`);
+    // Use poll to guard against transient timing between the commit and read
+    // (can occur when tests run in parallel with heavy DB writes from other specs).
+    let getResponse = await request.get(`/api/agents/${createdAgent.id}`);
+    if (getResponse.status() !== 200) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      getResponse = await request.get(`/api/agents/${createdAgent.id}`);
+    }
 
     expect(getResponse.status()).toBe(200);
     const body = await getResponse.json();

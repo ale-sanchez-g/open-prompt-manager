@@ -290,6 +290,14 @@ test.describe('UI Journey 4 — Build a Composable Prompt', () => {
     parentId = promptIdFromUrl(page.url());
     await page.waitForLoadState('networkidle');
 
+    // The PromptDetail page fetches component prompts in a second useEffect that
+    // runs after the main prompt loads.  Wait for the "Components" sidebar heading
+    // to appear before asserting the component name — this confirms the second
+    // API call has completed and componentPrompts state has been set.
+    await expect(
+      page.locator('h3').filter({ hasText: 'Components' })
+    ).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
+
     // Component is listed in the Components sidebar on the detail page
     await expect(page.getByText(componentName)).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
