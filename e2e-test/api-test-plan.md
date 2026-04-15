@@ -596,6 +596,3 @@ Steps covered:
 1. Create a reusable component prompt
 2. Create a parent prompt referencing the component via `{{component:<id>}}`
 3. Render the parent — verify component content is inlined and components_resolved is populated
-4. Render with deeply nested (3-level) component chain
-5. Render with multiple sibling component references
-6. Verify circular component references are rejected with 422
