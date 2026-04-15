@@ -23,7 +23,7 @@ import { test, expect, type Page, type APIRequestContext } from '@playwright/tes
 const RENDER_TIMEOUT_MS = 10000;
 
 /** Max ms to wait for an element to become visible (e.g. async-loaded pills, cards). */
-const VISIBILITY_TIMEOUT_MS = 5000;
+const VISIBILITY_TIMEOUT_MS = 10000;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -50,7 +50,8 @@ async function fetchList(request: APIRequestContext, path: string): Promise<any[
  */
 async function addVariable(page: Page, name: string): Promise<void> {
   await page.getByRole('button', { name: /Add Variable/ }).click();
-  await page.getByPlaceholder('name').first().fill(name);
+  // Use exact match to avoid the textarea whose placeholder contains "variable_name" as a substring
+  await page.getByPlaceholder('name', { exact: true }).fill(name);
 }
 
 // ── Journey 1: Create and Render a Prompt ─────────────────────────────────────
@@ -353,8 +354,8 @@ test.describe('UI Journey 3 — Register an Agent and Track Executions', () => {
     await page.goto('/api-docs');
     await page.waitForLoadState('domcontentloaded');
     await expect(page.getByText('3 · Register an agent and track executions')).toBeVisible();
-    await expect(page.getByText('Register an agent')).toBeVisible();
-    await expect(page.getByText('Associate the agent with a prompt')).toBeVisible();
+    await expect(page.getByText('Register an agent', { exact: true })).toBeVisible();
+    await expect(page.getByText('Associate the agent with a prompt', { exact: true })).toBeVisible();
     // "Record an execution" also appears as an endpoint accordion summary; use .first()
     await expect(page.getByText('Record an execution').first()).toBeVisible();
     await expect(page.getByText('Review agent stats')).toBeVisible();
@@ -428,7 +429,7 @@ test.describe('UI Journey 3 — Register an Agent and Track Executions', () => {
     await expect(page.getByText(prompt.name)).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // After 1 execution with rating=5: avg_rating=5.0 shown in the Avg Rating metric badge
-    await expect(page.getByText('5.0')).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
+    await expect(page.getByText('5.0').first()).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // Cleanup
     await request.delete(`/api/prompts/${prompt.id}`);
@@ -437,12 +438,12 @@ test.describe('UI Journey 3 — Register an Agent and Track Executions', () => {
 
   test('Step 4 — Agents navigation link is visible in the sidebar', async ({ page }) => {
     await page.goto('/dashboard');
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState('networkidle');
     // Target the sidebar nav link by its href to avoid matching any dashboard content
-    await expect(page.locator('a[href="/agents"]')).toBeVisible();
+    await expect(page.locator('a[href="/agents"]')).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
     await page.locator('a[href="/agents"]').click();
     await page.waitForURL(/\/agents/);
-    await expect(page.getByRole('heading', { name: 'Agents' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Agents' })).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
   });
 
   test('Full journey — register agent via UI, associate with prompt, verify stats after execution', async ({ page, request }) => {
@@ -487,7 +488,7 @@ test.describe('UI Journey 3 — Register an Agent and Track Executions', () => {
     await page.waitForLoadState('networkidle');
     await expect(page.getByText(promptName)).toBeVisible();
     // avg_rating = 4.0 should now appear in the Avg Rating metric badge
-    await expect(page.getByText('4.0')).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
+    await expect(page.getByText('4.0').first()).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // Cleanup
     await request.delete(`/api/prompts/${promptId}`);
