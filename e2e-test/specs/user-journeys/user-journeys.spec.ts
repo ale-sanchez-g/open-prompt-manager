@@ -61,13 +61,16 @@ async function addVariable(page: Page, name: string): Promise<void> {
 test.describe('UI Journey 1 — Create and Render a Prompt', () => {
   test('API Docs page shows the Create + Render user journey steps', async ({ page }) => {
     await page.goto('/api-docs');
-    await expect(page.getByRole('heading', { name: 'API Documentation' })).toBeVisible();
-    // User Journeys section is present
-    await expect(page.getByText('User Journeys')).toBeVisible();
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('h1').filter({ hasText: 'API Documentation' })).toBeVisible();
+    // "User Journeys" appears in both the sticky nav and as a section heading; target heading
+    await expect(page.getByRole('heading', { name: 'User Journeys' })).toBeVisible();
     // Journey 1 title and all three step titles are visible
     await expect(page.getByText('1 · Create and render a prompt')).toBeVisible();
     await expect(page.getByText('Create a tag (optional)')).toBeVisible();
-    await expect(page.getByText('Create a prompt')).toBeVisible();
+    // "Create a prompt" also appears as an endpoint accordion summary; use .first() to target
+    // the journey step title which appears before the endpoint accordions in the DOM
+    await expect(page.getByText('Create a prompt').first()).toBeVisible();
     await expect(page.getByText('Render the prompt with variable values')).toBeVisible();
   });
 
@@ -102,12 +105,14 @@ test.describe('UI Journey 1 — Create and Render a Prompt', () => {
 
     // Submit
     await page.getByRole('button', { name: 'Create Prompt' }).click();
-    await page.waitForURL(/\/prompts\/\d+/);
+    await page.waitForURL(/\/prompts\/\d+\/?$/);
     const promptId = promptIdFromUrl(page.url());
+    await page.waitForLoadState('networkidle');
 
     // Verify the detail page shows the prompt and initial version
-    await expect(page.getByText(promptName)).toBeVisible();
-    await expect(page.getByText('v1.0.0')).toBeVisible();
+    await expect(page.getByText(promptName)).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
+    // Version appears in both the header and history sidebar; .first() avoids strict-mode
+    await expect(page.getByText('v1.0.0').first()).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // Cleanup
     await request.delete(`/api/prompts/${promptId}`);
@@ -126,7 +131,8 @@ test.describe('UI Journey 1 — Create and Render a Prompt', () => {
     const prompt = await createResp.json();
 
     await page.goto(`/prompts/${prompt.id}`);
-    await expect(page.getByText(promptName)).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText(promptName)).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // The variable input uses id="var-<name>" pattern
     await page.locator('#var-user_name').fill('Alice');
@@ -164,11 +170,12 @@ test.describe('UI Journey 1 — Create and Render a Prompt', () => {
     await page.getByRole('button', { name: tagName }).click();
 
     await page.getByRole('button', { name: 'Create Prompt' }).click();
-    await page.waitForURL(/\/prompts\/\d+/);
+    await page.waitForURL(/\/prompts\/\d+\/?$/);
     promptId = promptIdFromUrl(page.url());
+    await page.waitForLoadState('networkidle');
 
     // Verify the tag is shown on the detail page
-    await expect(page.getByText(tagName)).toBeVisible();
+    await expect(page.getByText(tagName)).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // Step 3: Fill the variable and click Render
     await page.locator('#var-user_name').fill('Carol');
@@ -194,8 +201,10 @@ test.describe('UI Journey 1 — Create and Render a Prompt', () => {
 test.describe('UI Journey 2 — Version a Prompt', () => {
   test('API Docs page shows the Versioning user journey steps', async ({ page }) => {
     await page.goto('/api-docs');
+    await page.waitForLoadState('domcontentloaded');
     await expect(page.getByText('2 · Version a prompt')).toBeVisible();
-    await expect(page.getByText('Create a new version')).toBeVisible();
+    // "Create a new version" also appears as an endpoint accordion summary; use .first()
+    await expect(page.getByText('Create a new version').first()).toBeVisible();
     await expect(page.getByText('Inspect the version history')).toBeVisible();
     await expect(page.getByText('Identify the latest version')).toBeVisible();
   });
@@ -222,16 +231,18 @@ test.describe('UI Journey 2 — Version a Prompt', () => {
     await expect(page.getByRole('button', { name: /Yes, bump to/ })).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
     await page.getByRole('button', { name: /Yes, bump to/ }).click();
 
-    // After the bump the page redirects to the new (child) prompt
-    await page.waitForURL(/\/prompts\/\d+/);
+    // After the bump the page redirects to the new (child) prompt.
+    // Use $ anchor so /prompts/42/edit does NOT match — only /prompts/42 (no trailing /edit) does.
+    await page.waitForURL(/\/prompts\/\d+\/?$/);
     const v2Id = promptIdFromUrl(page.url());
     expect(v2Id).not.toBe(v1.id);
+    await page.waitForLoadState('networkidle');
 
     // New version should show v1.0.1
-    await expect(page.getByText('v1.0.1')).toBeVisible();
+    await expect(page.getByText('v1.0.1').first()).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // "Latest" badge should be shown in the version history sidebar
-    await expect(page.getByText('Latest')).toBeVisible();
+    await expect(page.getByText('Latest')).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // Cleanup
     await request.delete(`/api/prompts/${v2Id}`);
@@ -252,13 +263,14 @@ test.describe('UI Journey 2 — Version a Prompt', () => {
 
     // Navigate to the latest version
     await page.goto(`/prompts/${v2.id}`);
-    await expect(page.getByText(promptName)).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText(promptName)).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
-    // Both versions appear in the Version History sidebar
-    await expect(page.getByText('v1.0.1')).toBeVisible();
-    await expect(page.getByText('v1.0.0')).toBeVisible();
+    // Both versions appear in the Version History sidebar (loaded via a separate API call)
+    await expect(page.getByText('v1.0.1').first()).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
+    await expect(page.getByText('v1.0.0').first()).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
     // Latest badge marks v1.0.1
-    await expect(page.getByText('Latest')).toBeVisible();
+    await expect(page.getByText('Latest')).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // Cleanup
     await request.delete(`/api/prompts/${v2.id}`);
@@ -273,6 +285,8 @@ test.describe('UI Journey 2 — Version a Prompt', () => {
     const prompt = await createResp.json();
 
     await page.goto(`/prompts/${prompt.id}/edit`);
+    // Wait for the form to finish loading before interacting (heading is behind loading guard)
+    await expect(page.getByRole('heading', { name: /Edit Prompt/ })).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
     await page.locator('textarea').fill('In-place edit without version bump.');
     await page.getByRole('button', { name: 'Save Changes' }).click();
 
@@ -281,8 +295,9 @@ test.describe('UI Journey 2 — Version a Prompt', () => {
     await page.getByRole('button', { name: /No, keep version/ }).click();
 
     // After saving in-place the URL stays at the same prompt
-    await page.waitForURL(new RegExp(`/prompts/${prompt.id}$`));
-    await expect(page.getByText('v1.0.0')).toBeVisible();
+    await page.waitForURL(new RegExp(`/prompts/${prompt.id}/?$`));
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText('v1.0.0').first()).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // Cleanup
     await request.delete(`/api/prompts/${prompt.id}`);
@@ -298,24 +313,28 @@ test.describe('UI Journey 2 — Version a Prompt', () => {
     await page.locator('input[required]').first().fill(promptName);
     await page.locator('textarea').fill('First version content.');
     await page.getByRole('button', { name: 'Create Prompt' }).click();
-    await page.waitForURL(/\/prompts\/\d+/);
+    await page.waitForURL(/\/prompts\/\d+\/?$/);
     v1Id = promptIdFromUrl(page.url());
 
     // Step 2: Click Edit and bump the version
     await page.getByRole('link', { name: /Edit/ }).click();
     await page.waitForURL(/\/prompts\/\d+\/edit/);
+    // Wait for the edit form to finish loading before interacting
+    await expect(page.getByRole('heading', { name: /Edit Prompt/ })).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
     await page.locator('textarea').fill('Second version — improved phrasing.');
     await page.getByRole('button', { name: 'Save Changes' }).click();
-    await expect(page.getByRole('button', { name: /Yes, bump to/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Yes, bump to/ })).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
     await page.getByRole('button', { name: /Yes, bump to/ }).click();
-    await page.waitForURL(/\/prompts\/\d+/);
+    // $ anchor prevents matching /prompts/42/edit (current URL) — waits for /prompts/43
+    await page.waitForURL(/\/prompts\/\d+\/?$/);
     v2Id = promptIdFromUrl(page.url());
     expect(v2Id).not.toBe(v1Id);
+    await page.waitForLoadState('networkidle');
 
     // Step 3: Version history sidebar shows both versions, v1.0.1 is Latest
-    await expect(page.getByText('v1.0.1')).toBeVisible();
-    await expect(page.getByText('v1.0.0')).toBeVisible();
-    await expect(page.getByText('Latest')).toBeVisible();
+    await expect(page.getByText('v1.0.1').first()).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
+    await expect(page.getByText('v1.0.0').first()).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
+    await expect(page.getByText('Latest')).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // Cleanup
     await request.delete(`/api/prompts/${v2Id}`);
@@ -332,10 +351,12 @@ test.describe('UI Journey 2 — Version a Prompt', () => {
 test.describe('UI Journey 3 — Register an Agent and Track Executions', () => {
   test('API Docs page shows the Agent Execution Tracking user journey steps', async ({ page }) => {
     await page.goto('/api-docs');
+    await page.waitForLoadState('domcontentloaded');
     await expect(page.getByText('3 · Register an agent and track executions')).toBeVisible();
     await expect(page.getByText('Register an agent')).toBeVisible();
     await expect(page.getByText('Associate the agent with a prompt')).toBeVisible();
-    await expect(page.getByText('Record an execution')).toBeVisible();
+    // "Record an execution" also appears as an endpoint accordion summary; use .first()
+    await expect(page.getByText('Record an execution').first()).toBeVisible();
     await expect(page.getByText('Review agent stats')).toBeVisible();
   });
 
@@ -375,11 +396,12 @@ test.describe('UI Journey 3 — Register an Agent and Track Executions', () => {
     await page.getByRole('button', { name: agentName }).click();
 
     await page.getByRole('button', { name: 'Create Prompt' }).click();
-    await page.waitForURL(/\/prompts\/\d+/);
+    await page.waitForURL(/\/prompts\/\d+\/?$/);
     const promptId = promptIdFromUrl(page.url());
+    await page.waitForLoadState('networkidle');
 
     // The agent should appear in the Agents sidebar on the detail page
-    await expect(page.getByText(agentName)).toBeVisible();
+    await expect(page.getByText(agentName)).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // Cleanup
     await request.delete(`/api/prompts/${promptId}`);
@@ -402,10 +424,11 @@ test.describe('UI Journey 3 — Register an Agent and Track Executions', () => {
 
     // Navigate to the prompt detail page and verify stats
     await page.goto(`/prompts/${prompt.id}`);
-    await expect(page.getByText(prompt.name)).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText(prompt.name)).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // After 1 execution with rating=5: avg_rating=5.0 shown in the Avg Rating metric badge
-    await expect(page.getByText('5.0')).toBeVisible();
+    await expect(page.getByText('5.0')).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // Cleanup
     await request.delete(`/api/prompts/${prompt.id}`);
@@ -414,8 +437,10 @@ test.describe('UI Journey 3 — Register an Agent and Track Executions', () => {
 
   test('Step 4 — Agents navigation link is visible in the sidebar', async ({ page }) => {
     await page.goto('/dashboard');
-    await expect(page.getByRole('link', { name: /Agents/ })).toBeVisible();
-    await page.getByRole('link', { name: /Agents/ }).click();
+    await page.waitForLoadState('domcontentloaded');
+    // Target the sidebar nav link by its href to avoid matching any dashboard content
+    await expect(page.locator('a[href="/agents"]')).toBeVisible();
+    await page.locator('a[href="/agents"]').click();
     await page.waitForURL(/\/agents/);
     await expect(page.getByRole('heading', { name: 'Agents' })).toBeVisible();
   });
@@ -447,11 +472,12 @@ test.describe('UI Journey 3 — Register an Agent and Track Executions', () => {
     await page.getByRole('button', { name: agentName }).click();
 
     await page.getByRole('button', { name: 'Create Prompt' }).click();
-    await page.waitForURL(/\/prompts\/\d+/);
+    await page.waitForURL(/\/prompts\/\d+\/?$/);
     promptId = promptIdFromUrl(page.url());
+    await page.waitForLoadState('networkidle');
 
     // Verify the agent appears in the Agents sidebar on the detail page
-    await expect(page.getByText(agentName)).toBeVisible();
+    await expect(page.getByText(agentName)).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // Step 3: Record an execution via API and reload to verify updated stats in the UI
     await request.post(`/api/prompts/${promptId}/executions`, {
@@ -461,7 +487,7 @@ test.describe('UI Journey 3 — Register an Agent and Track Executions', () => {
     await page.waitForLoadState('networkidle');
     await expect(page.getByText(promptName)).toBeVisible();
     // avg_rating = 4.0 should now appear in the Avg Rating metric badge
-    await expect(page.getByText('4.0')).toBeVisible();
+    await expect(page.getByText('4.0')).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // Cleanup
     await request.delete(`/api/prompts/${promptId}`);
@@ -491,10 +517,11 @@ test.describe('UI Journey 4 — Build a Composable Prompt', () => {
     await page.locator('input[required]').first().fill(componentName);
     await page.locator('textarea').fill('Always consult a professional before acting on this advice.');
     await page.getByRole('button', { name: 'Create Prompt' }).click();
-    await page.waitForURL(/\/prompts\/\d+/);
+    await page.waitForURL(/\/prompts\/\d+\/?$/);
     const componentId = promptIdFromUrl(page.url());
+    await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText(componentName)).toBeVisible();
+    await expect(page.getByText(componentName)).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // Cleanup
     await request.delete(`/api/prompts/${componentId}`);
@@ -528,8 +555,9 @@ test.describe('UI Journey 4 — Build a Composable Prompt', () => {
 
     // Submit the form
     await page.getByRole('button', { name: 'Create Prompt' }).click();
-    await page.waitForURL(/\/prompts\/\d+/);
+    await page.waitForURL(/\/prompts\/\d+\/?$/);
     const parentId = promptIdFromUrl(page.url());
+    await page.waitForLoadState('networkidle');
 
     // The component prompt should be listed in the Components sidebar
     await expect(page.getByText(componentName)).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
@@ -559,9 +587,10 @@ test.describe('UI Journey 4 — Build a Composable Prompt', () => {
 
     // Navigate to the parent detail page and render (no variables required)
     await page.goto(`/prompts/${parent.id}`);
-    await expect(page.getByText(parent.name)).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText(parent.name)).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
-    // The component name should appear in the Components sidebar
+    // The component name should appear in the Components sidebar (loaded via separate API call)
     await expect(page.getByText(comp.name)).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     await page.getByRole('button', { name: /Render/ }).click();
@@ -586,7 +615,7 @@ test.describe('UI Journey 4 — Build a Composable Prompt', () => {
     await page.locator('input[required]').first().fill(componentName);
     await page.locator('textarea').fill('Disclaimer: for informational purposes only.');
     await page.getByRole('button', { name: 'Create Prompt' }).click();
-    await page.waitForURL(/\/prompts\/\d+/);
+    await page.waitForURL(/\/prompts\/\d+\/?$/);
     componentId = promptIdFromUrl(page.url());
 
     // Step 2: Create the parent prompt and embed the component via the search UI
@@ -603,8 +632,9 @@ test.describe('UI Journey 4 — Build a Composable Prompt', () => {
     expect(content).toContain(`{{component:${componentId}}}`);
 
     await page.getByRole('button', { name: 'Create Prompt' }).click();
-    await page.waitForURL(/\/prompts\/\d+/);
+    await page.waitForURL(/\/prompts\/\d+\/?$/);
     parentId = promptIdFromUrl(page.url());
+    await page.waitForLoadState('networkidle');
 
     // Component is listed in the Components sidebar on the detail page
     await expect(page.getByText(componentName)).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
