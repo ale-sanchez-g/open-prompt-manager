@@ -498,6 +498,127 @@ jobs:
           sarif_file: checkov-report.sarif
 
   # ─────────────────────────────────────────────────────────────────────────────
+  # SAST summary: aggregate bandit, semgrep, and checkov findings into one PR
+  # comment for quick security signal review.
+  # ─────────────────────────────────────────────────────────────────────────────
+  sast-summary:
+    name: SAST Scan Summary
+    runs-on: ubuntu-latest
+    needs: [python-sast, frontend-sast, iac-sast]
+    if: always() && github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name == github.repository)
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Download SAST artifacts
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "bandit-report|semgrep-report|checkov-report-json"
+          path: sast-reports
+          merge-multiple: false
+
+      - name: Build and post SAST summary PR comment
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const marker = '<!-- sast-scan-summary -->';
+            const reportsDir = 'sast-reports';
+
+            function safeReadJson(file) {
+              try {
+                if (!fs.existsSync(file)) return null;
+                return JSON.parse(fs.readFileSync(file, 'utf8'));
+              } catch {
+                return null;
+              }
+            }
+
+            // bandit-report/bandit-report.json
+            const banditJson = safeReadJson(path.join(reportsDir, 'bandit-report', 'bandit-report.json'));
+            const banditHigh = Number(banditJson?.metrics?._totals?.SEVERITY_HIGH ?? 0);
+            const banditMedium = Number(banditJson?.metrics?._totals?.SEVERITY_MEDIUM ?? 0);
+            const banditLow = Number(banditJson?.metrics?._totals?.SEVERITY_LOW ?? 0);
+            const banditTotal = Number((banditJson?.results ?? []).length);
+            const banditStatus = banditJson ? (banditHigh > 0 ? 'FAIL' : 'PASS') : 'N/A';
+
+            // semgrep-report/semgrep-report.sarif
+            const semgrepSarif = safeReadJson(path.join(reportsDir, 'semgrep-report', 'semgrep-report.sarif'));
+            const semgrepResults = semgrepSarif?.runs?.[0]?.results ?? [];
+            const semgrepError = semgrepResults.filter(r => String(r?.level || '').toLowerCase() === 'error').length;
+            const semgrepWarning = semgrepResults.filter(r => String(r?.level || '').toLowerCase() === 'warning').length;
+            const semgrepNote = semgrepResults.filter(r => String(r?.level || '').toLowerCase() === 'note').length;
+            const semgrepTotal = semgrepResults.length;
+            const semgrepStatus = semgrepSarif ? (semgrepError > 0 ? 'FAIL' : 'PASS') : 'N/A';
+
+            // checkov-report-json/checkov-report.json
+            const checkovJson = safeReadJson(path.join(reportsDir, 'checkov-report-json', 'checkov-report.json'));
+            let checkovHigh = 0;
+            let checkovMedium = 0;
+            let checkovLow = 0;
+            let checkovCritical = 0;
+            let checkovUnknown = 0;
+            let checkovTotal = 0;
+
+            if (checkovJson) {
+              const checks = checkovJson?.results?.failed_checks ?? [];
+              checkovTotal = checks.length;
+              for (const c of checks) {
+                const sev = String(c?.severity || c?.check_result?.severity || 'UNKNOWN').toUpperCase();
+                if (sev === 'CRITICAL') checkovCritical += 1;
+                else if (sev === 'HIGH') checkovHigh += 1;
+                else if (sev === 'MEDIUM') checkovMedium += 1;
+                else if (sev === 'LOW') checkovLow += 1;
+                else checkovUnknown += 1;
+              }
+            }
+            const checkovStatus = checkovJson ? ((checkovCritical + checkovHigh) > 0 ? 'FAIL' : 'PASS') : 'N/A';
+
+            const totalCritical = checkovCritical;
+            const totalHigh = banditHigh + semgrepError + checkovHigh;
+            const totalMedium = banditMedium + semgrepWarning + checkovMedium;
+            const totalLow = banditLow + semgrepNote + checkovLow;
+            const totalUnknown = checkovUnknown;
+            const grandTotal = banditTotal + semgrepTotal + checkovTotal;
+            const overallStatus = (totalCritical + totalHigh) > 0 ? 'FAIL' : 'PASS';
+
+            const body = [
+              marker,
+              '## SAST Scan Summary',
+              '',
+              `- Overall status: **${overallStatus}**`,
+              `- Critical: **${totalCritical}** | High: **${totalHigh}** | Medium: **${totalMedium}** | Low: **${totalLow}** | Unknown: **${totalUnknown}** | Total: **${grandTotal}**`,
+              '',
+              '| Scanner | Critical | High/Error | Medium/Warning | Low/Note | Unknown | Total | Status |',
+              '|---|---:|---:|---:|---:|---:|---:|---|',
+              `| Bandit (backend) | 0 | ${banditHigh} | ${banditMedium} | ${banditLow} | 0 | ${banditTotal} | ${banditStatus} |`,
+              `| Semgrep (frontend) | 0 | ${semgrepError} | ${semgrepWarning} | ${semgrepNote} | 0 | ${semgrepTotal} | ${semgrepStatus} |`,
+              `| Checkov (terraform) | ${checkovCritical} | ${checkovHigh} | ${checkovMedium} | ${checkovLow} | ${checkovUnknown} | ${checkovTotal} | ${checkovStatus} |`,
+              '',
+              '_Suppressions are governed in `.sast-exceptions.json`. Download `bandit-report`, `semgrep-report`, and `checkov-report-json` artifacts for full details._',
+            ].join('\n');
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            const existing = comments.find(c => c.user.type === 'Bot' && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+  # ─────────────────────────────────────────────────────────────────────────────
   # Frontend: npm audit for known CVEs in frontend dependencies
   # ─────────────────────────────────────────────────────────────────────────────
   npm-audit-frontend:

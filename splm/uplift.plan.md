@@ -44,11 +44,13 @@ Implement and operationalize all SPLM CI gate components across pre-commit, pre-
 - [x] Add ignore policy with expiry dates.
 - [x] Upload machine-readable reports (for traceability).
 - [x] Acceptance check: all package ecosystems are scanned consistently.
+- [x] SCA npm Dependency Scan Summary on PR
 
 ### 3.4 SAST
 - [x] Keep backend SAST and add frontend and IaC static security checks.
 - [x] Define severity thresholds and suppression governance.
 - [x] Acceptance check: SAST covers app + IaC with standardized fail policy.
+- [x] SAST Scan Summary on PR
 
 ### 3.5 Code Quality Scan
 - [ ] Enforce quality gate with coverage minimum.
@@ -124,4 +126,5 @@ Implement and operationalize all SPLM CI gate components across pre-commit, pre-
 - 2026-04-17: Added gitleaks PR annotations and sticky PR summary comment so secret findings are visible directly in PR context.
 - 2026-04-17: Implemented 3.3 SCA uplift — pip-audit expanded to matrix covering backend and mcp-package-python; npm-audit jobs updated to capture JSON reports and upload as 30-day artifacts; exception register (.sca-exceptions.json) created with expiry-date enforcement blocking CI; unified SCA npm summary job added posting sticky PR comment with per-ecosystem counts and pass/fail status.
 - 2026-04-17: Implemented 3.4 SAST uplift — retained backend bandit and standardized fail policy at high+ severity with expiry-governed suppressions; added frontend semgrep SAST with ERROR-threshold enforcement and SARIF upload; added Terraform IaC static checks via checkov with hard-fail on HIGH/CRITICAL and suppression governance via .sast-exceptions.json.
+- 2026-04-17: Added SAST Scan Summary on PR — new sticky PR comment aggregates bandit, semgrep, and checkov artifact findings into a single severity/status table.
 
