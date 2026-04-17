@@ -10,13 +10,85 @@ permissions: {}  # Deny all at workflow level — each job opts in explicitly
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────────
-  # Pre-commit gate: fast linting and validation checks across all components
+  # Pre-build gate: split linting by stack for isolated and faster feedback
   # ─────────────────────────────────────────────────────────────────────────────
-  precommit-lint-validate:
-    name: Pre-Commit Lint and Validation
+  prebuild-lint-matrix:
+    name: Pre-Build Lint (${{ matrix.stack }})
     runs-on: ubuntu-latest
     permissions:
       contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - stack: backend
+            setup: python
+            lint_command: |
+              python -m pip install --upgrade pip
+              python -m pip install ruff==0.6.9
+              ruff check --select E9,F63,F7,F82 backend
+          - stack: frontend
+            setup: node
+            lint_command: |
+              cd frontend
+              npm ci --legacy-peer-deps
+              npm run lint:ci
+          - stack: mcp-package-python
+            setup: python
+            lint_command: |
+              python -m pip install --upgrade pip
+              python -m pip install ruff==0.6.9
+              ruff check --select E9,F63,F7,F82 mcp-package-python
+          - stack: mcp-package-node
+            setup: node
+            lint_command: |
+              cd mcp-package-node
+              npm ci
+              npm run lint:ci
+          - stack: terraform
+            setup: terraform
+            lint_command: |
+              cd terraform
+              terraform fmt -check -recursive
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.11
+        if: matrix.setup == 'python'
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node 20
+        if: matrix.setup == 'node'
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Set up Terraform
+        if: matrix.setup == 'terraform'
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.7.5"
+
+      - name: Run stack lint validation
+        run: ${{ matrix.lint_command }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Version pinning/lock integrity gate:
+  # - Python requirements must be exact pins (==) for deploy/runtime paths.
+  # - npm lockfiles must exist and stay in sync with package manifests.
+  # ─────────────────────────────────────────────────────────────────────────────
+  version-pinning-check:
+    name: Version Pinning Check
+    runs-on: ubuntu-latest
+    needs: prebuild-lint-matrix
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
       - name: Checkout code
@@ -25,39 +97,126 @@ jobs:
       - name: Set up Python 3.11
         uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
-      - name: Run Python lint validation (backend + MCP Python)
+      - name: Validate Python dependency pinning (backend requirements)
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install ruff==0.6.9
-          ruff check --select E9,F63,F7,F82 backend mcp-package-python
+          python3 - <<'PY'
+          from pathlib import Path
+          import sys
+
+          files = [
+              Path('backend/requirements.txt'),
+              Path('backend/requirements-test.txt'),
+          ]
+
+          violations = []
+
+          def allowed_non_pin(spec: str) -> bool:
+              return (
+                  spec.startswith('#')
+                  or spec.startswith('-r ')
+                  or spec.startswith('--requirement ')
+                  or spec.startswith('-c ')
+                  or spec.startswith('--constraint ')
+                  or spec.startswith('-e ')
+                  or ' @ ' in spec
+                  or spec.startswith('git+')
+                  or spec.startswith('http://')
+                  or spec.startswith('https://')
+              )
+
+          for req_file in files:
+              if not req_file.exists():
+                  violations.append((str(req_file), 0, 'missing requirements file'))
+                  continue
+              for line_no, raw in enumerate(req_file.read_text(encoding='utf-8', errors='ignore').splitlines(), start=1):
+                  spec = raw.strip()
+                  if not spec:
+                      continue
+                  if allowed_non_pin(spec):
+                      continue
+                  if '==' not in spec:
+                      violations.append((str(req_file), line_no, spec))
+
+          if violations:
+              for file_path, line_no, content in violations:
+                  if line_no > 0:
+                      print(f"::error file={file_path},line={line_no}::Unpinned Python dependency (expected exact '=='): {content}")
+                  else:
+                      print(f"::error file={file_path}::{content}")
+              print(f'Found {len(violations)} pinning violation(s) in backend requirements files.')
+              sys.exit(1)
+
+          print('Python pinning check passed: backend requirements are exact-pinned or explicitly allowed.')
+          PY
 
       - name: Set up Node 20
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: '20'
 
-      - name: Frontend lint validation
+      - name: Verify lockfiles exist
         run: |
-          npm ci --legacy-peer-deps
-          npm run lint:ci
+          test -f frontend/package-lock.json || (echo '::error file=frontend/package.json::Missing frontend/package-lock.json' && exit 1)
+          test -f mcp-package-node/package-lock.json || (echo '::error file=mcp-package-node/package.json::Missing mcp-package-node/package-lock.json' && exit 1)
+
+      - name: Verify frontend lockfile integrity (npm ci)
         working-directory: frontend
+        run: npm ci --legacy-peer-deps --ignore-scripts
 
-      - name: MCP Node lint validation
-        run: |
-          npm ci
-          npm run lint:ci
+      - name: Verify mcp-node lockfile integrity (npm ci)
         working-directory: mcp-package-node
+        run: npm ci --ignore-scripts
 
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v4
+      - name: Detect lockfile drift against manifests
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet -- frontend/package-lock.json mcp-package-node/package-lock.json; then
+            echo '::error::Lockfile drift detected after npm ci. Ensure manifests and lockfiles are synchronized and committed.'
+            git --no-pager diff -- frontend/package-lock.json mcp-package-node/package-lock.json | sed -n '1,200p'
+            exit 1
+          fi
+
+      - name: Write version pinning summary
+        if: always()
+        run: |
+          cat > version-pinning-summary.md <<'EOF'
+          ## Version Pinning Check Summary
+
+          - Python (backend): exact pin verification on `backend/requirements.txt` and `backend/requirements-test.txt`
+          - Node (frontend + mcp-node): lockfile integrity via `npm ci`
+          - Drift detection: fail if lockfiles mutate after `npm ci` and fail on lock/manifests mismatch
+          EOF
+          cat version-pinning-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment version pinning summary on PR
+        if: >-
+          always() &&
+          github.event_name == 'pull_request' &&
+          (github.event.pull_request.head.repo.full_name == github.repository)
+        uses: actions/github-script@v8
         with:
-          terraform_version: "1.7.5"
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- version-pinning-summary -->';
+            const body = `${marker}\n${fs.readFileSync('version-pinning-summary.md', 'utf8')}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
 
-      - name: Terraform format validation
-        run: terraform fmt -check -recursive
-        working-directory: terraform
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            const existing = comments.find((c) => c.user.type === 'Bot' && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
 
   # ─────────────────────────────────────────────────────────────────────────────
   # Terraform: validate configuration and run the test suite (no AWS creds needed)
@@ -65,7 +224,7 @@ jobs:
   terraform:
     name: Terraform Validate & Test
     runs-on: ubuntu-latest
-    needs: precommit-lint-validate
+    needs: [prebuild-lint-matrix, version-pinning-check]
     permissions:
       contents: read
 
@@ -100,7 +259,7 @@ jobs:
   mcp-python-test:
     name: MCP Python Package Tests
     runs-on: ubuntu-latest
-    needs: precommit-lint-validate
+    needs: [prebuild-lint-matrix, version-pinning-check]
     permissions:
       contents: read
 
@@ -131,7 +290,7 @@ jobs:
   mcp-node-test:
     name: MCP Node.js Package Tests
     runs-on: ubuntu-latest
-    needs: precommit-lint-validate
+    needs: [prebuild-lint-matrix, version-pinning-check]
     permissions:
       contents: read
 
@@ -162,7 +321,7 @@ jobs:
   backend-test:
     name: Backend Tests
     runs-on: ubuntu-latest
-    needs: precommit-lint-validate
+    needs: [prebuild-lint-matrix, version-pinning-check]
     permissions:
       contents: read
 
@@ -200,18 +359,31 @@ jobs:
           path: backend/coverage.xml
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # Backend: dependency vulnerability scan (pip-audit)
+  # SCA: pip-audit vulnerability scan across all Python ecosystems
+  # Covers: backend (requirements.txt) and mcp-package-python (pyproject.toml deps)
+  # Exceptions are managed in .sca-exceptions.json — expired entries block CI.
   # ─────────────────────────────────────────────────────────────────────────────
   pip-audit:
-    name: pip-audit (dependency vulnerability scan)
+    name: pip-audit SCA (${{ matrix.name }})
     runs-on: ubuntu-latest
     needs: backend-test
     permissions:
       contents: read
 
-    defaults:
-      run:
-        working-directory: backend
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            install_cmd: pip install -r backend/requirements.txt
+            req_file: backend/requirements.txt
+            report_path: backend/pip-audit-report.json
+          - name: mcp-package-python
+            install_cmd: >-
+              pip install -e mcp-package-python &&
+              pip freeze --exclude-editable > mcp-package-python/requirements-generated.txt
+            req_file: mcp-package-python/requirements-generated.txt
+            report_path: mcp-package-python/pip-audit-report.json
 
     steps:
       - name: Checkout code
@@ -221,24 +393,66 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.11"
-          cache: pip
-          cache-dependency-path: backend/requirements.txt
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Run pip-audit
+      - name: Validate SCA exception register — no expired entries
         run: |
-          pip install pip-audit
-          pip-audit --requirement requirements.txt --format json --output pip-audit-report.json || true
-          pip-audit --requirement requirements.txt
+          python3 - <<'PY'
+          import json, sys
+          from datetime import date
+
+          with open('.sca-exceptions.json') as f:
+              data = json.load(f)
+          today = date.today().isoformat()
+          expired = [e for e in data.get('pip', []) if e.get('expires', '9999-99-99') < today]
+          if expired:
+              for e in expired:
+                  print(f"::error::Expired SCA exception: {e['id']} (expired {e['expires']}, owner: {e.get('owner', '?')}). Resolve the vulnerability or renew the exception.")
+              sys.exit(1)
+          print(f"Exception register OK — {len(data.get('pip', []))} active pip exception(s).")
+          PY
+
+      - name: Build pip-audit ignore flags from exception register
+        id: ignore_flags
+        run: |
+          python3 - <<'PY'
+          import json, os
+
+          with open('.sca-exceptions.json') as f:
+              data = json.load(f)
+          flags = ' '.join(f"--ignore-vuln {e['id']}" for e in data.get('pip', []))
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+              fh.write(f"flags={flags}\n")
+          print(f"pip-audit ignore flags: {flags or '(none)'}")
+          PY
+
+      - name: Install pip-audit
+        run: pip install pip-audit==2.8.0
+
+      - name: Install package dependencies
+        run: ${{ matrix.install_cmd }}
+
+      - name: Run pip-audit (machine-readable JSON report)
+        run: |
+          pip-audit \
+            --requirement ${{ matrix.req_file }} \
+            ${{ steps.ignore_flags.outputs.flags }} \
+            --format json \
+            --output ${{ matrix.report_path }} \
+            || true
+
+      - name: Run pip-audit (enforce — fail on any vulnerability)
+        run: |
+          pip-audit \
+            --requirement ${{ matrix.req_file }} \
+            ${{ steps.ignore_flags.outputs.flags }}
 
       - name: Upload pip-audit report
         uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: pip-audit-report
-          path: backend/pip-audit-report.json
+          name: pip-audit-report-${{ matrix.name }}
+          path: ${{ matrix.report_path }}
+          retention-days: 30
 
   # ─────────────────────────────────────────────────────────────────────────────
   # Frontend: install, lint (build check), unit tests
@@ -246,7 +460,7 @@ jobs:
   frontend-test:
     name: Frontend Tests
     runs-on: ubuntu-latest
-    needs: precommit-lint-validate
+    needs: [prebuild-lint-matrix, version-pinning-check]
     permissions:
       contents: read
 
@@ -281,12 +495,257 @@ jobs:
           path: frontend/coverage/
 
   # ─────────────────────────────────────────────────────────────────────────────
+  # Code quality scan: enforce coverage thresholds and report complexity metrics
+  # ─────────────────────────────────────────────────────────────────────────────
+  code-quality-scan:
+    name: Code Quality Scan
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend-test]
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout code (for complexity scan)
+        uses: actions/checkout@v6
+
+      - name: Download backend coverage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-coverage
+          path: quality-reports/backend
+
+      - name: Download frontend coverage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-coverage
+          path: quality-reports/frontend
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install complexity tools
+        run: pip install radon==6.0.1
+
+      - name: Run backend complexity scan (radon)
+        run: |
+          mkdir -p quality-reports
+          radon cc backend/app -j > quality-reports/radon-cc.json
+          radon mi backend/app -j > quality-reports/radon-mi.json
+
+      - name: Evaluate quality gates and build summary
+        id: quality_eval
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          from collections import Counter
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          BACKEND_MIN = 80.0
+          FRONTEND_MIN = 80.0
+
+          reports_dir = Path('quality-reports')
+          reports_dir.mkdir(exist_ok=True)
+
+          backend_cov_file = next((p for p in (reports_dir / 'backend').rglob('coverage.xml')), None)
+          frontend_lcov_file = next((p for p in (reports_dir / 'frontend').rglob('lcov.info')), None)
+
+          if backend_cov_file is None:
+              print('::error::backend coverage.xml not found in downloaded artifact.')
+              sys.exit(1)
+          if frontend_lcov_file is None:
+              print('::error::frontend lcov.info not found in downloaded artifact.')
+              sys.exit(1)
+
+          root = ET.parse(backend_cov_file).getroot()
+          backend_cov = float(root.attrib.get('line-rate', '0')) * 100.0
+
+          lf = 0
+          lh = 0
+          with frontend_lcov_file.open(encoding='utf-8', errors='ignore') as f:
+              for line in f:
+                  line = line.strip()
+                  if line.startswith('LF:'):
+                      lf += int(line.split(':', 1)[1])
+                  elif line.startswith('LH:'):
+                      lh += int(line.split(':', 1)[1])
+          frontend_cov = (lh / lf * 100.0) if lf > 0 else 0.0
+
+          # Lightweight duplication heuristic for backend Python code:
+          # exact normalized line matches, excluding blanks/comments.
+          total_code_lines = 0
+          line_counter = Counter()
+          for py_file in Path('backend/app').rglob('*.py'):
+              try:
+                  with py_file.open(encoding='utf-8', errors='ignore') as fh:
+                      for raw in fh:
+                          normalized = raw.strip()
+                          if not normalized or normalized.startswith('#'):
+                              continue
+                          total_code_lines += 1
+                          line_counter[normalized] += 1
+              except OSError:
+                  continue
+
+          duplicated_line_occurrences = sum(count for count in line_counter.values() if count > 1)
+          duplicated_unique_lines = sum(1 for count in line_counter.values() if count > 1)
+          duplication_pct = (duplicated_line_occurrences / total_code_lines * 100.0) if total_code_lines > 0 else 0.0
+
+          cc_file = reports_dir / 'radon-cc.json'
+          mi_file = reports_dir / 'radon-mi.json'
+          cc_data = json.loads(cc_file.read_text(encoding='utf-8')) if cc_file.exists() else {}
+          mi_data = json.loads(mi_file.read_text(encoding='utf-8')) if mi_file.exists() else {}
+
+          all_blocks = []
+          high_risk_blocks = []
+          for file_path, blocks in cc_data.items():
+              for block in blocks:
+                  complexity = float(block.get('complexity', 0) or 0)
+                  rank = str(block.get('rank', 'A'))
+                  all_blocks.append(complexity)
+                  if rank in {'D', 'E', 'F'} or complexity >= 21:
+                      high_risk_blocks.append({
+                          'file': file_path,
+                          'name': block.get('name', '<unknown>'),
+                          'complexity': complexity,
+                          'rank': rank,
+                      })
+
+          avg_complexity = (sum(all_blocks) / len(all_blocks)) if all_blocks else 0.0
+
+          mi_values = []
+          for value in mi_data.values():
+              if isinstance(value, (int, float)):
+                  mi_values.append(float(value))
+                  continue
+              if isinstance(value, dict):
+                  raw_mi = value.get('mi', value.get('maintainability_index'))
+                  if isinstance(raw_mi, (int, float)):
+                      mi_values.append(float(raw_mi))
+          avg_mi = (sum(mi_values) / len(mi_values)) if mi_values else None
+
+          backend_pass = backend_cov >= BACKEND_MIN
+          frontend_pass = frontend_cov >= FRONTEND_MIN
+          overall_pass = backend_pass and frontend_pass
+
+          status_backend = 'PASS' if backend_pass else 'FAIL'
+          status_frontend = 'PASS' if frontend_pass else 'FAIL'
+          overall_status = 'PASS' if overall_pass else 'FAIL'
+
+          summary_lines = [
+              '## Code Quality Scan Summary',
+              '',
+              f'- Overall status: **{overall_status}**',
+              f'- Coverage thresholds: backend >= **{BACKEND_MIN:.0f}%**, frontend >= **{FRONTEND_MIN:.0f}%**',
+              '',
+              '| Gate | Result | Observed | Threshold |',
+              '|---|---|---:|---:|',
+              f'| Backend Coverage | {status_backend} | {backend_cov:.2f}% | {BACKEND_MIN:.0f}% |',
+              f'| Frontend Coverage | {status_frontend} | {frontend_cov:.2f}% | {FRONTEND_MIN:.0f}% |',
+              '',
+              '### Optional Duplication/Complexity Metrics (informational)',
+              '',
+              f'- Backend duplicated line occurrences (exact-line heuristic): **{duplicated_line_occurrences}** / **{total_code_lines}** ({duplication_pct:.2f}%)',
+              f'- Backend unique duplicated line patterns: **{duplicated_unique_lines}**',
+              f'- Backend average cyclomatic complexity: **{avg_complexity:.2f}**',
+              (
+                  f'- Backend average maintainability index: **{avg_mi:.2f}**'
+                  if avg_mi is not None
+                  else '- Backend average maintainability index: **N/A** (unable to parse radon MI output)'
+              ),
+              f'- High-risk complexity blocks (rank D/E/F): **{len(high_risk_blocks)}**',
+          ]
+
+          if high_risk_blocks:
+              summary_lines.extend([
+                  '',
+                  '| File | Symbol | Complexity | Rank |',
+                  '|---|---|---:|---|',
+              ])
+              for block in high_risk_blocks[:10]:
+                  summary_lines.append(
+                      f"| {block['file']} | {block['name']} | {block['complexity']:.0f} | {block['rank']} |"
+                  )
+              if len(high_risk_blocks) > 10:
+                  summary_lines.append(f'- Showing first 10 of {len(high_risk_blocks)} high-risk blocks.')
+
+          summary_text = '\n'.join(summary_lines) + '\n'
+          (reports_dir / 'quality-summary.md').write_text(summary_text, encoding='utf-8')
+          Path(os.environ['GITHUB_STEP_SUMMARY']).write_text(summary_text, encoding='utf-8')
+
+          metrics = {
+              'overall_status': overall_status,
+              'backend_coverage': round(backend_cov, 2),
+              'frontend_coverage': round(frontend_cov, 2),
+              'backend_threshold': BACKEND_MIN,
+              'frontend_threshold': FRONTEND_MIN,
+              'backend_total_code_lines': total_code_lines,
+              'backend_duplicated_line_occurrences': duplicated_line_occurrences,
+              'backend_duplicated_unique_lines': duplicated_unique_lines,
+              'backend_duplication_pct': round(duplication_pct, 2),
+              'avg_complexity': round(avg_complexity, 2),
+              'avg_maintainability_index': (round(avg_mi, 2) if avg_mi is not None else None),
+              'high_risk_blocks': len(high_risk_blocks),
+          }
+          (reports_dir / 'quality-metrics.json').write_text(json.dumps(metrics, indent=2) + '\n', encoding='utf-8')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+              fh.write(f"overall_status={overall_status}\n")
+
+          if not overall_pass:
+              print('::error::Code quality gate failed due to coverage threshold breach.')
+              sys.exit(1)
+          PY
+
+      - name: Upload quality reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: code-quality-report
+          path: quality-reports/
+          retention-days: 30
+
+      - name: Comment code quality summary on PR
+        if: >-
+          always() &&
+          github.event_name == 'pull_request' &&
+          (github.event.pull_request.head.repo.full_name == github.repository) &&
+          hashFiles('quality-reports/quality-summary.md') != ''
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- code-quality-summary -->';
+            const body = `${marker}\n${fs.readFileSync('quality-reports/quality-summary.md', 'utf8')}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            const existing = comments.find((c) => c.user.type === 'Bot' && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+  # ─────────────────────────────────────────────────────────────────────────────
   # Frontend: production build verification
   # ─────────────────────────────────────────────────────────────────────────────
   frontend-build:
     name: Frontend Build
     runs-on: ubuntu-latest
-    needs: frontend-test
+    needs: [frontend-test, code-quality-scan]
     permissions:
       contents: read
 

@@ -20,6 +20,7 @@ DESTROY=false
 ENABLE_HTTPS=false
 CREATE_CERTIFICATE=false
 CREATE_ROUTE53_ZONE=false
+ACM_CERTIFICATE_ARN=""
 ROUTE53_ZONE_ID=""
 PRIMARY_DOMAIN=""
 DOMAIN_NAMES=()
@@ -221,16 +222,15 @@ ensure_ecr_repo_in_state() {
     return 0
   fi
 
-  if aws ecr describe-repositories \
-    --repository-names "${repo_name}" \
-    --region "${AWS_REGION}" >/dev/null 2>&1; then
-    warn "ECR repository '${repo_name}' already exists; importing into Terraform state..."
-    terraform import \
+  warn "Attempting Terraform import for '${repo_name}'..."
+  if terraform import \
       -var="aws_region=${AWS_REGION}" \
       -var="environment=${ENVIRONMENT}" \
       -var="project_name=${PROJECT_NAME}" \
-      "${tf_address}" "${repo_name}" >/dev/null
+      "${tf_address}" "${repo_name}" >/dev/null 2>&1; then
     ok "Imported ${tf_address}"
+  else
+    warn "Import skipped for '${repo_name}' (likely not created yet). Terraform will create it."
   fi
 }
 
@@ -262,6 +262,7 @@ ensure_acm_certificate_is_issued() {
 
   terraform plan -out="${PLAN_FILE}.cert" \
     -target=aws_acm_certificate.main \
+    -target=aws_lb_listener.http \
     -var="aws_region=${AWS_REGION}" \
     -var="environment=${ENVIRONMENT}" \
     -var="project_name=${PROJECT_NAME}" \
@@ -370,6 +371,7 @@ if [[ "$DESTROY" == "true" ]]; then
     -var="project_name=${PROJECT_NAME}" \
     -var="enable_https=${ENABLE_HTTPS}" \
     -var="create_certificate=${CREATE_CERTIFICATE}" \
+    -var="acm_certificate_arn=${ACM_CERTIFICATE_ARN}" \
     -var="domain_name=${PRIMARY_DOMAIN}" \
     -var="domain_names=${DOMAIN_NAMES_ARG}" \
     -var="route53_zone_id=${ROUTE53_ZONE_ID}" \
@@ -388,15 +390,16 @@ prepare_terraform_workspace
 ensure_ecr_repo_in_state "aws_ecr_repository.backend" "${PROJECT_NAME}-backend"
 ensure_ecr_repo_in_state "aws_ecr_repository.frontend" "${PROJECT_NAME}-frontend"
 
-log "Planning ECR repository changes..."
+log "Planning ECR repository changes with Terraform..."
 terraform plan -out="${PLAN_FILE}.ecr" \
   -target=aws_ecr_repository.backend \
   -target=aws_ecr_repository.frontend \
+  -target=aws_lb_listener.http \
   -var="aws_region=${AWS_REGION}" \
   -var="environment=${ENVIRONMENT}" \
   -var="project_name=${PROJECT_NAME}" 2>&1 | tee "${PLAN_FILE}.ecr.log"
 
-log "Applying ECR repository changes..."
+log "Applying ECR repository changes with Terraform..."
 terraform apply -auto-approve "${PLAN_FILE}.ecr"
 ok "ECR repositories ready."
 
@@ -473,6 +476,7 @@ terraform plan -out="${PLAN_FILE}" \
   -var="frontend_image=${FRONTEND_IMAGE_URI}" \
   -var="enable_https=${ENABLE_HTTPS}" \
   -var="create_certificate=${CREATE_CERTIFICATE}" \
+  -var="acm_certificate_arn=${ACM_CERTIFICATE_ARN}" \
   -var="domain_name=${PRIMARY_DOMAIN}" \
   -var="domain_names=${DOMAIN_NAMES_ARG}" \
   -var="route53_zone_id=${ROUTE53_ZONE_ID}" \

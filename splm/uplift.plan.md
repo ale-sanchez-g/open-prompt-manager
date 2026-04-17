@@ -30,40 +30,42 @@ Implement and operationalize all SPLM CI gate components across pre-commit, pre-
 ## 3. Pre-Build Gate Uplift (Week 2-4)
 
 ### 3.1 Linting
-- [ ] Split linting by stack with matrix jobs for isolated/faster feedback.
-- [ ] Acceptance check: lint coverage includes backend, frontend, mcp-package-python, mcp-package-node, and terraform.
+- [x] Split linting by stack with matrix jobs for isolated/faster feedback.
+- [x] Acceptance check: lint coverage includes backend, frontend, mcp-package-python, mcp-package-node, and terraform.
 
 ### 3.2 Secrets Scan
-- [ ] Keep existing secret scanning.
-- [ ] Add PR annotation output for findings.
-- [ ] Acceptance check: findings are visible in PR summary.
+- [x] Keep existing secret scanning.
+- [x] Add PR annotation output for findings.
+- [x] Acceptance check: findings are visible in PR summary.
 
 ### 3.3 Dependency Scan / SCA
-- [ ] Include missing package domains and align severity policy.
-- [ ] Fail on high/critical vulnerabilities (with managed exceptions).
-- [ ] Add ignore policy with expiry dates.
-- [ ] Upload machine-readable reports (for traceability).
-- [ ] Acceptance check: all package ecosystems are scanned consistently.
+- [x] Include missing package domains and align severity policy.
+- [x] Fail on high/critical vulnerabilities (with managed exceptions).
+- [x] Add ignore policy with expiry dates.
+- [x] Upload machine-readable reports (for traceability).
+- [x] Acceptance check: all package ecosystems are scanned consistently.
+- [x] SCA npm Dependency Scan Summary on PR
 
 ### 3.4 SAST
-- [ ] Keep backend SAST and add frontend and IaC static security checks.
-- [ ] Define severity thresholds and suppression governance.
-- [ ] Acceptance check: SAST covers app + IaC with standardized fail policy.
+- [x] Keep backend SAST and add frontend and IaC static security checks.
+- [x] Define severity thresholds and suppression governance.
+- [x] Acceptance check: SAST covers app + IaC with standardized fail policy.
+- [x] SAST Scan Summary on PR
 
 ### 3.5 Code Quality Scan
-- [ ] Enforce quality gate with coverage minimum.
-- [ ] Add optional duplication/complexity checks.
-- [ ] Acceptance check: CI fails when thresholds are breached and reports are attached to PR.
+- [x] Enforce quality gate with coverage minimum.
+- [x] Add optional duplication/complexity checks.
+- [x] Acceptance check: CI fails when thresholds are breached and reports are attached to PR.
 
 ### 3.6 Version Pinning Check
-- [ ] Add dependency pin/lock integrity verification.
-- [ ] Add drift detection for manifests/lockfiles.
-- [ ] Acceptance check: unpinned or drifted dependencies fail CI.
+- [x] Add dependency pin/lock integrity verification.
+- [x] Add drift detection for manifests/lockfiles.
+- [x] Acceptance check: unpinned or drifted dependencies fail CI.
 
 ### 3.7 IaC Scan
-- [ ] Add Terraform static policy/security checks before plan stage.
-- [ ] Configure policy pack and severity gate.
-- [ ] Acceptance check: Terraform changes are blocked on findings above threshold.
+- [x] Add Terraform static policy/security checks before plan stage.
+- [x] Configure policy pack and severity gate.
+- [x] Acceptance check: Terraform changes are blocked on findings above threshold.
 
 ## 4. Post-Build Gate Uplift (Week 4-6)
 
@@ -120,4 +122,12 @@ Implement and operationalize all SPLM CI gate components across pre-commit, pre-
 - 2026-04-14: Added terraform fmt -check in CI terraform job and formatted terraform files to satisfy the new gate.
 - 2026-04-14: Hardened dependabot workflow permissions toward least-privilege model.
 - 2026-04-14: Applied branch protection on main via GitHub API with strict required checks, required PR review (1 approval), dismiss stale reviews, conversation resolution, and admin enforcement.
+- 2026-04-17: Started Pre-Build Gate Uplift by adding stack-split lint matrix job in CI for backend, frontend, mcp-package-python, mcp-package-node, and terraform.
+- 2026-04-17: Added gitleaks PR annotations and sticky PR summary comment so secret findings are visible directly in PR context.
+- 2026-04-17: Implemented 3.3 SCA uplift — pip-audit expanded to matrix covering backend and mcp-package-python; npm-audit jobs updated to capture JSON reports and upload as 30-day artifacts; exception register (.sca-exceptions.json) created with expiry-date enforcement blocking CI; unified SCA npm summary job added posting sticky PR comment with per-ecosystem counts and pass/fail status.
+- 2026-04-17: Implemented 3.4 SAST uplift — retained backend bandit and standardized fail policy at high+ severity with expiry-governed suppressions; added frontend semgrep SAST with ERROR-threshold enforcement and SARIF upload; added Terraform IaC static checks via checkov with hard-fail on HIGH/CRITICAL and suppression governance via .sast-exceptions.json.
+- 2026-04-17: Added SAST Scan Summary on PR — new sticky PR comment aggregates bandit, semgrep, and checkov artifact findings into a single severity/status table.
+- 2026-04-17: Implemented 3.5 Code Quality Scan — added a Code Quality Scan CI job that enforces backend/frontend coverage thresholds (>=80%), publishes a sticky PR summary comment, uploads code-quality artifacts, and includes optional backend complexity metrics via radon.
+- 2026-04-17: Implemented 3.6 Version Pinning Check — added a dedicated CI job that enforces exact pinning in backend requirements files, verifies npm lockfile integrity for frontend/mcp-node via npm ci, and blocks on lockfile drift when lockfiles mutate or manifest/lock sync fails.
+- 2026-04-17: Implemented 3.7 IaC Scan via existing Security workflow IaC SAST (checkov) gate with HIGH/CRITICAL fail policy and suppression governance; Terraform changes are blocked by this pre-build security gate.
 

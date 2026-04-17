@@ -221,12 +221,18 @@ The Terraform scripts reference Docker images stored in Amazon ECR. You must bui
 
 ### 2a – Bootstrap ECR repositories first
 
-Run Terraform with a targeted apply to create only the ECR repositories:
+Run a Terraform targeted apply to bootstrap only the ECR repositories before image builds.
+If Terraform reports moved resource instances, include the additional listener target shown below.
 
 ```bash
 cd terraform/
 terraform init
-terraform apply -target=aws_ecr_repository.backend -target=aws_ecr_repository.frontend
+terraform plan \
+  -target=aws_ecr_repository.backend \
+  -target=aws_ecr_repository.frontend \
+  -target=aws_lb_listener.http \
+  -out=.terraform.plans/ecr-bootstrap.tfplan
+terraform apply .terraform.plans/ecr-bootstrap.tfplan
 ```
 
 ### 2b – Build and push the backend image
