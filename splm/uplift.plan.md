@@ -63,9 +63,9 @@ Implement and operationalize all SPLM CI gate components across pre-commit, pre-
 - [x] Acceptance check: unpinned or drifted dependencies fail CI.
 
 ### 3.7 IaC Scan
-- [ ] Add Terraform static policy/security checks before plan stage.
-- [ ] Configure policy pack and severity gate.
-- [ ] Acceptance check: Terraform changes are blocked on findings above threshold.
+- [x] Add Terraform static policy/security checks before plan stage.
+- [x] Configure policy pack and severity gate.
+- [x] Acceptance check: Terraform changes are blocked on findings above threshold.
 
 ## 4. Post-Build Gate Uplift (Week 4-6)
 
@@ -129,4 +129,5 @@ Implement and operationalize all SPLM CI gate components across pre-commit, pre-
 - 2026-04-17: Added SAST Scan Summary on PR — new sticky PR comment aggregates bandit, semgrep, and checkov artifact findings into a single severity/status table.
 - 2026-04-17: Implemented 3.5 Code Quality Scan — added a Code Quality Scan CI job that enforces backend/frontend coverage thresholds (>=80%), publishes a sticky PR summary comment, uploads code-quality artifacts, and includes optional backend complexity metrics via radon.
 - 2026-04-17: Implemented 3.6 Version Pinning Check — added a dedicated CI job that enforces exact pinning in backend requirements files, verifies npm lockfile integrity for frontend/mcp-node via npm ci, and blocks on lockfile drift when lockfiles mutate or manifest/lock sync fails.
+- 2026-04-17: Implemented 3.7 IaC Scan via existing Security workflow IaC SAST (checkov) gate with HIGH/CRITICAL fail policy and suppression governance; Terraform changes are blocked by this pre-build security gate.
 
