@@ -195,7 +195,7 @@ jobs:
           always() &&
           github.event_name == 'pull_request' &&
           (github.event.pull_request.head.repo.full_name == github.repository)
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -716,7 +716,7 @@ jobs:
           github.event_name == 'pull_request' &&
           (github.event.pull_request.head.repo.full_name == github.repository) &&
           hashFiles('quality-reports/quality-summary.md') != ''
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -973,7 +973,7 @@ jobs:
 
       - name: Comment E2E report link on PR
         if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
