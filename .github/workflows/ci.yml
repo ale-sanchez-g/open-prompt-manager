@@ -365,6 +365,9 @@ jobs:
       pull-requests: write
 
     steps:
+      - name: Checkout code (for complexity scan)
+        uses: actions/checkout@v6
+
       - name: Download backend coverage artifact
         uses: actions/download-artifact@v4
         with:
@@ -376,9 +379,6 @@ jobs:
         with:
           name: frontend-coverage
           path: quality-reports/frontend
-
-      - name: Checkout code (for complexity scan)
-        uses: actions/checkout@v6
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v6
@@ -539,7 +539,8 @@ jobs:
         if: >-
           always() &&
           github.event_name == 'pull_request' &&
-          (github.event.pull_request.head.repo.full_name == github.repository)
+          (github.event.pull_request.head.repo.full_name == github.repository) &&
+          hashFiles('quality-reports/quality-summary.md') != ''
         uses: actions/github-script@v8
         with:
           script: |
