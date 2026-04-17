@@ -78,12 +78,153 @@ jobs:
         run: ${{ matrix.lint_command }}
 
   # ─────────────────────────────────────────────────────────────────────────────
+  # Version pinning/lock integrity gate:
+  # - Python requirements must be exact pins (==) for deploy/runtime paths.
+  # - npm lockfiles must exist and stay in sync with package manifests.
+  # ─────────────────────────────────────────────────────────────────────────────
+  version-pinning-check:
+    name: Version Pinning Check
+    runs-on: ubuntu-latest
+    needs: prebuild-lint-matrix
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Validate Python dependency pinning (backend requirements)
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import sys
+
+          files = [
+              Path('backend/requirements.txt'),
+              Path('backend/requirements-test.txt'),
+          ]
+
+          violations = []
+
+          def allowed_non_pin(spec: str) -> bool:
+              return (
+                  spec.startswith('#')
+                  or spec.startswith('-r ')
+                  or spec.startswith('--requirement ')
+                  or spec.startswith('-c ')
+                  or spec.startswith('--constraint ')
+                  or spec.startswith('-e ')
+                  or ' @ ' in spec
+                  or spec.startswith('git+')
+                  or spec.startswith('http://')
+                  or spec.startswith('https://')
+              )
+
+          for req_file in files:
+              if not req_file.exists():
+                  violations.append((str(req_file), 0, 'missing requirements file'))
+                  continue
+              for line_no, raw in enumerate(req_file.read_text(encoding='utf-8', errors='ignore').splitlines(), start=1):
+                  spec = raw.strip()
+                  if not spec:
+                      continue
+                  if allowed_non_pin(spec):
+                      continue
+                  if '==' not in spec:
+                      violations.append((str(req_file), line_no, spec))
+
+          if violations:
+              for file_path, line_no, content in violations:
+                  if line_no > 0:
+                      print(f"::error file={file_path},line={line_no}::Unpinned Python dependency (expected exact '=='): {content}")
+                  else:
+                      print(f"::error file={file_path}::{content}")
+              print(f'Found {len(violations)} pinning violation(s) in backend requirements files.')
+              sys.exit(1)
+
+          print('Python pinning check passed: backend requirements are exact-pinned or explicitly allowed.')
+          PY
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Verify lockfiles exist
+        run: |
+          test -f frontend/package-lock.json || (echo '::error file=frontend/package.json::Missing frontend/package-lock.json' && exit 1)
+          test -f mcp-package-node/package-lock.json || (echo '::error file=mcp-package-node/package.json::Missing mcp-package-node/package-lock.json' && exit 1)
+
+      - name: Verify frontend lockfile integrity (npm ci)
+        working-directory: frontend
+        run: npm ci --legacy-peer-deps --ignore-scripts
+
+      - name: Verify mcp-node lockfile integrity (npm ci)
+        working-directory: mcp-package-node
+        run: npm ci --ignore-scripts
+
+      - name: Detect lockfile drift against manifests
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet -- frontend/package-lock.json mcp-package-node/package-lock.json; then
+            echo '::error::Lockfile drift detected after npm ci. Ensure manifests and lockfiles are synchronized and committed.'
+            git --no-pager diff -- frontend/package-lock.json mcp-package-node/package-lock.json | sed -n '1,200p'
+            exit 1
+          fi
+
+      - name: Write version pinning summary
+        if: always()
+        run: |
+          cat > version-pinning-summary.md <<'EOF'
+          ## Version Pinning Check Summary
+
+          - Python (backend): exact pin verification on `backend/requirements.txt` and `backend/requirements-test.txt`
+          - Node (frontend + mcp-node): lockfile integrity via `npm ci`
+          - Drift detection: fail if lockfiles mutate after `npm ci` and fail on lock/manifests mismatch
+          EOF
+          cat version-pinning-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment version pinning summary on PR
+        if: >-
+          always() &&
+          github.event_name == 'pull_request' &&
+          (github.event.pull_request.head.repo.full_name == github.repository)
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- version-pinning-summary -->';
+            const body = `${marker}\n${fs.readFileSync('version-pinning-summary.md', 'utf8')}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            const existing = comments.find((c) => c.user.type === 'Bot' && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+  # ─────────────────────────────────────────────────────────────────────────────
   # Terraform: validate configuration and run the test suite (no AWS creds needed)
   # ─────────────────────────────────────────────────────────────────────────────
   terraform:
     name: Terraform Validate & Test
     runs-on: ubuntu-latest
-    needs: prebuild-lint-matrix
+    needs: [prebuild-lint-matrix, version-pinning-check]
     permissions:
       contents: read
 
@@ -118,7 +259,7 @@ jobs:
   mcp-python-test:
     name: MCP Python Package Tests
     runs-on: ubuntu-latest
-    needs: prebuild-lint-matrix
+    needs: [prebuild-lint-matrix, version-pinning-check]
     permissions:
       contents: read
 
@@ -149,7 +290,7 @@ jobs:
   mcp-node-test:
     name: MCP Node.js Package Tests
     runs-on: ubuntu-latest
-    needs: prebuild-lint-matrix
+    needs: [prebuild-lint-matrix, version-pinning-check]
     permissions:
       contents: read
 
@@ -180,7 +321,7 @@ jobs:
   backend-test:
     name: Backend Tests
     runs-on: ubuntu-latest
-    needs: prebuild-lint-matrix
+    needs: [prebuild-lint-matrix, version-pinning-check]
     permissions:
       contents: read
 
@@ -319,7 +460,7 @@ jobs:
   frontend-test:
     name: Frontend Tests
     runs-on: ubuntu-latest
-    needs: prebuild-lint-matrix
+    needs: [prebuild-lint-matrix, version-pinning-check]
     permissions:
       contents: read
 

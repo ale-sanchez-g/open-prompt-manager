@@ -58,9 +58,9 @@ Implement and operationalize all SPLM CI gate components across pre-commit, pre-
 - [x] Acceptance check: CI fails when thresholds are breached and reports are attached to PR.
 
 ### 3.6 Version Pinning Check
-- [ ] Add dependency pin/lock integrity verification.
-- [ ] Add drift detection for manifests/lockfiles.
-- [ ] Acceptance check: unpinned or drifted dependencies fail CI.
+- [x] Add dependency pin/lock integrity verification.
+- [x] Add drift detection for manifests/lockfiles.
+- [x] Acceptance check: unpinned or drifted dependencies fail CI.
 
 ### 3.7 IaC Scan
 - [ ] Add Terraform static policy/security checks before plan stage.
@@ -128,4 +128,5 @@ Implement and operationalize all SPLM CI gate components across pre-commit, pre-
 - 2026-04-17: Implemented 3.4 SAST uplift — retained backend bandit and standardized fail policy at high+ severity with expiry-governed suppressions; added frontend semgrep SAST with ERROR-threshold enforcement and SARIF upload; added Terraform IaC static checks via checkov with hard-fail on HIGH/CRITICAL and suppression governance via .sast-exceptions.json.
 - 2026-04-17: Added SAST Scan Summary on PR — new sticky PR comment aggregates bandit, semgrep, and checkov artifact findings into a single severity/status table.
 - 2026-04-17: Implemented 3.5 Code Quality Scan — added a Code Quality Scan CI job that enforces backend/frontend coverage thresholds (>=80%), publishes a sticky PR summary comment, uploads code-quality artifacts, and includes optional backend complexity metrics via radon.
+- 2026-04-17: Implemented 3.6 Version Pinning Check — added a dedicated CI job that enforces exact pinning in backend requirements files, verifies npm lockfile integrity for frontend/mcp-node via npm ci, and blocks on lockfile drift when lockfiles mutate or manifest/lock sync fails.
 
