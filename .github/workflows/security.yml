@@ -17,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: write
       security-events: write
 
     steps:
@@ -80,6 +81,121 @@ jobs:
         with:
           name: gitleaks-report
           path: gitleaks-report.sarif
+
+      - name: Build gitleaks summary and annotations
+        if: always()
+        id: gitleaks_summary
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          import os
+
+          sarif_file = Path('gitleaks-report.sarif')
+          summary_file = Path('gitleaks-pr-summary.md')
+
+          findings = []
+          severity_counts = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'unknown': 0}
+
+          if sarif_file.exists():
+            data = json.loads(sarif_file.read_text(encoding='utf-8', errors='ignore'))
+            runs = data.get('runs', [])
+            for run in runs:
+              rules = {rule.get('id'): rule for rule in run.get('tool', {}).get('driver', {}).get('rules', [])}
+              for result in run.get('results', []):
+                message = result.get('message', {}).get('text', 'Secret detected')
+                rule_id = result.get('ruleId', 'unknown')
+                location = result.get('locations', [{}])[0].get('physicalLocation', {})
+                artifact = location.get('artifactLocation', {})
+                region = location.get('region', {})
+                file_path = artifact.get('uri', 'unknown')
+                line = int(region.get('startLine', 1) or 1)
+
+                severity = 'unknown'
+                rule = rules.get(rule_id, {})
+                properties = rule.get('properties', {}) if isinstance(rule, dict) else {}
+                level = str(result.get('level', '')).lower()
+                if level == 'error':
+                  severity = 'high'
+                elif level == 'warning':
+                  severity = 'medium'
+                elif level == 'note':
+                  severity = 'low'
+
+                mapped = str(properties.get('severity', '')).lower()
+                if mapped in severity_counts:
+                  severity = mapped
+
+                severity_counts[severity] = severity_counts.get(severity, 0) + 1
+                findings.append({'message': message, 'rule_id': rule_id, 'file': file_path, 'line': line, 'severity': severity})
+
+          total = len(findings)
+          lines = [
+            '## Secrets Scan Summary (gitleaks)',
+            '',
+            f'- Total findings: **{total}**',
+            f"- Critical: **{severity_counts['critical']}** | High: **{severity_counts['high']}** | Medium: **{severity_counts['medium']}** | Low: **{severity_counts['low']}** | Unknown: **{severity_counts['unknown']}**",
+            ''
+          ]
+
+          if total > 0:
+            lines.extend([
+              '| Severity | Rule | File | Line | Message |',
+              '|---|---|---|---:|---|'
+            ])
+            for finding in findings[:20]:
+              safe_message = finding['message'].replace('|', '/').replace('\n', ' ')
+              lines.append(
+                f"| {finding['severity']} | {finding['rule_id']} | {finding['file']} | {finding['line']} | {safe_message} |"
+              )
+            if total > 20:
+              lines.append('')
+              lines.append(f'- Showing first 20 of {total} findings. Download `gitleaks-report` artifact for full details.')
+          else:
+            lines.append('- No findings detected.')
+
+          summary_text = '\n'.join(lines) + '\n'
+          summary_file.write_text(summary_text, encoding='utf-8')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+            fh.write(f'total_findings={total}\n')
+
+          for finding in findings[:20]:
+            msg = finding['message'].replace('\n', ' ').strip()
+            print(f"::warning file={finding['file']},line={finding['line']}::{finding['severity']} secret finding ({finding['rule_id']}): {msg}")
+          PY
+
+      - name: Append gitleaks summary to workflow summary
+        if: always()
+        run: cat gitleaks-pr-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment gitleaks summary on PR
+        if: >-
+          always() &&
+          github.event_name == 'pull_request' &&
+          (github.event.pull_request.head.repo.full_name == github.repository)
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- gitleaks-pr-summary -->';
+            const body = `${marker}\n${fs.readFileSync('gitleaks-pr-summary.md', 'utf8')}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            const existing = comments.find((c) => c.user.type === 'Bot' && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
 
       - name: Fail job on detected leaks
         if: always()

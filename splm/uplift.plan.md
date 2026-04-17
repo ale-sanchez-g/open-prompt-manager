@@ -30,13 +30,13 @@ Implement and operationalize all SPLM CI gate components across pre-commit, pre-
 ## 3. Pre-Build Gate Uplift (Week 2-4)
 
 ### 3.1 Linting
-- [ ] Split linting by stack with matrix jobs for isolated/faster feedback.
-- [ ] Acceptance check: lint coverage includes backend, frontend, mcp-package-python, mcp-package-node, and terraform.
+- [x] Split linting by stack with matrix jobs for isolated/faster feedback.
+- [x] Acceptance check: lint coverage includes backend, frontend, mcp-package-python, mcp-package-node, and terraform.
 
 ### 3.2 Secrets Scan
-- [ ] Keep existing secret scanning.
-- [ ] Add PR annotation output for findings.
-- [ ] Acceptance check: findings are visible in PR summary.
+- [x] Keep existing secret scanning.
+- [x] Add PR annotation output for findings.
+- [x] Acceptance check: findings are visible in PR summary.
 
 ### 3.3 Dependency Scan / SCA
 - [ ] Include missing package domains and align severity policy.
@@ -120,4 +120,6 @@ Implement and operationalize all SPLM CI gate components across pre-commit, pre-
 - 2026-04-14: Added terraform fmt -check in CI terraform job and formatted terraform files to satisfy the new gate.
 - 2026-04-14: Hardened dependabot workflow permissions toward least-privilege model.
 - 2026-04-14: Applied branch protection on main via GitHub API with strict required checks, required PR review (1 approval), dismiss stale reviews, conversation resolution, and admin enforcement.
+- 2026-04-17: Started Pre-Build Gate Uplift by adding stack-split lint matrix job in CI for backend, frontend, mcp-package-python, mcp-package-node, and terraform.
+- 2026-04-17: Added gitleaks PR annotations and sticky PR summary comment so secret findings are visible directly in PR context.
 

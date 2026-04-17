@@ -60,12 +60,81 @@ jobs:
         working-directory: terraform
 
   # ─────────────────────────────────────────────────────────────────────────────
+  # Pre-build gate: split linting by stack for isolated and faster feedback
+  # ─────────────────────────────────────────────────────────────────────────────
+  prebuild-lint-matrix:
+    name: Pre-Build Lint (${{ matrix.stack }})
+    runs-on: ubuntu-latest
+    needs: precommit-lint-validate
+    permissions:
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - stack: backend
+            setup: python
+            lint_command: |
+              python -m pip install --upgrade pip
+              python -m pip install ruff==0.6.9
+              ruff check --select E9,F63,F7,F82 backend
+          - stack: frontend
+            setup: node
+            lint_command: |
+              cd frontend
+              npm ci --legacy-peer-deps
+              npm run lint:ci
+          - stack: mcp-package-python
+            setup: python
+            lint_command: |
+              python -m pip install --upgrade pip
+              python -m pip install ruff==0.6.9
+              ruff check --select E9,F63,F7,F82 mcp-package-python
+          - stack: mcp-package-node
+            setup: node
+            lint_command: |
+              cd mcp-package-node
+              npm ci
+              npm run lint:ci
+          - stack: terraform
+            setup: terraform
+            lint_command: |
+              cd terraform
+              terraform fmt -check -recursive
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.11
+        if: matrix.setup == 'python'
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node 20
+        if: matrix.setup == 'node'
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Set up Terraform
+        if: matrix.setup == 'terraform'
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.7.5"
+
+      - name: Run stack lint validation
+        run: ${{ matrix.lint_command }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
   # Terraform: validate configuration and run the test suite (no AWS creds needed)
   # ─────────────────────────────────────────────────────────────────────────────
   terraform:
     name: Terraform Validate & Test
     runs-on: ubuntu-latest
-    needs: precommit-lint-validate
+    needs: [precommit-lint-validate, prebuild-lint-matrix]
     permissions:
       contents: read
 
@@ -100,7 +169,7 @@ jobs:
   mcp-python-test:
     name: MCP Python Package Tests
     runs-on: ubuntu-latest
-    needs: precommit-lint-validate
+    needs: [precommit-lint-validate, prebuild-lint-matrix]
     permissions:
       contents: read
 
@@ -131,7 +200,7 @@ jobs:
   mcp-node-test:
     name: MCP Node.js Package Tests
     runs-on: ubuntu-latest
-    needs: precommit-lint-validate
+    needs: [precommit-lint-validate, prebuild-lint-matrix]
     permissions:
       contents: read
 
@@ -162,7 +231,7 @@ jobs:
   backend-test:
     name: Backend Tests
     runs-on: ubuntu-latest
-    needs: precommit-lint-validate
+    needs: [precommit-lint-validate, prebuild-lint-matrix]
     permissions:
       contents: read
 
@@ -246,7 +315,7 @@ jobs:
   frontend-test:
     name: Frontend Tests
     runs-on: ubuntu-latest
-    needs: precommit-lint-validate
+    needs: [precommit-lint-validate, prebuild-lint-matrix]
     permissions:
       contents: read
 
