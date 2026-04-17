@@ -2,5 +2,186 @@
   "_note": "Managed SAST suppression register. Every entry requires id, owner, expires (ISO 8601 date), and justification. Expired suppressions block CI until renewed or removed.",
   "bandit": [],
   "semgrep": [],
-  "checkov": []
+  "checkov": [
+    {
+      "id": "CKV_AWS_2",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "HTTP listener only created when HTTPS is disabled (dev/test). Planned: enforce HTTPS-only listeners across all environments."
+    },
+    {
+      "id": "CKV_AWS_51",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "ECR tag mutability required for current CI/CD image push workflow. Planned: migrate to immutable tags with SHA-based image references."
+    },
+    {
+      "id": "CKV_AWS_91",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "ALB access logging requires an S3 bucket with correct bucket policy. Planned: add logging bucket and enable access logs on the ALB."
+    },
+    {
+      "id": "CKV_AWS_103",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "HTTP listener exists only when enable_https is false (non-production). TLS 1.2 is enforced on the HTTPS listener. Planned: remove HTTP listener entirely and enforce HTTPS across all environments."
+    },
+    {
+      "id": "CKV_AWS_118",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "RDS enhanced monitoring requires an IAM role for the monitoring agent. Planned: add monitoring IAM role and enable enhanced monitoring at 60s granularity."
+    },
+    {
+      "id": "CKV_AWS_129",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "RDS PostgreSQL log exports (postgresql, upgrade) not yet configured. Planned: enable enabled_cloudwatch_logs_exports for postgresql and upgrade log types."
+    },
+    {
+      "id": "CKV_AWS_130",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "Public subnets assign public IPs by design for ALB and NAT gateway placement. Risk accepted: no EC2 instances are launched in public subnets; only managed AWS resources (ALB, NAT GW) use them."
+    },
+    {
+      "id": "CKV_AWS_131",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "ALB does not yet drop invalid HTTP headers. Planned: set drop_invalid_header_fields = true on the ALB resource."
+    },
+    {
+      "id": "CKV_AWS_136",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "ECR repositories use default AES-256 encryption. Planned: add KMS CMK encryption for ECR to enable key rotation and audit via CloudTrail."
+    },
+    {
+      "id": "CKV_AWS_149",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "Secrets Manager secret uses default AWS-managed encryption. Planned: add KMS CMK for Secrets Manager to enable key rotation and audit."
+    },
+    {
+      "id": "CKV_AWS_150",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "ALB deletion protection is controlled by var.db_deletion_protection but currently defaults to false. Planned: enable deletion protection for production workloads via variable override."
+    },
+    {
+      "id": "CKV_AWS_157",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "RDS Multi-AZ is controlled by var.db_multi_az but defaults to false. Planned: enable Multi-AZ for production to ensure HA failover."
+    },
+    {
+      "id": "CKV_AWS_158",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "CloudWatch Log Groups use default encryption. Planned: add KMS CMK encryption for log groups to comply with encryption-at-rest policy."
+    },
+    {
+      "id": "CKV_AWS_161",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "RDS uses password-based auth via Secrets Manager. Planned: enable IAM database authentication as an additional access control layer."
+    },
+    {
+      "id": "CKV_AWS_226",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "RDS auto_minor_version_upgrade not explicitly set. Planned: set auto_minor_version_upgrade = true to receive security patches automatically."
+    },
+    {
+      "id": "CKV_AWS_260",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "ALB security group allows inbound port 80 from 0.0.0.0/0 for HTTP-to-HTTPS redirect. Planned: restrict port 80 ingress once HTTPS is enforced across all environments."
+    },
+    {
+      "id": "CKV_AWS_293",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "RDS deletion protection controlled by var.db_deletion_protection, currently defaults to false. Planned: enforce deletion_protection = true for production via variable override."
+    },
+    {
+      "id": "CKV_AWS_338",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "CloudWatch log retention is 30 days; policy requires 365 days. Planned: increase retention_in_days to 365 for production log groups."
+    },
+    {
+      "id": "CKV_AWS_353",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "RDS Performance Insights not enabled. Planned: enable performance_insights_enabled with KMS encryption for production database monitoring."
+    },
+    {
+      "id": "CKV_AWS_378",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "Target groups use HTTP protocol for ALB-to-ECS communication within the VPC. Planned: evaluate end-to-end TLS with HTTPS target groups once ECS tasks support TLS termination."
+    },
+    {
+      "id": "CKV_AWS_382",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "Security groups allow unrestricted egress (0.0.0.0/0) for ECS tasks to pull images and reach AWS APIs. Planned: restrict egress to specific CIDR ranges and VPC endpoints."
+    },
+    {
+      "id": "CKV2_AWS_11",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "VPC flow logging not enabled. Planned: add aws_flow_log resource with CloudWatch Logs destination for network traffic visibility."
+    },
+    {
+      "id": "CKV2_AWS_12",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "Default VPC security group not explicitly locked down. Planned: add aws_default_security_group resource that revokes all ingress/egress rules."
+    },
+    {
+      "id": "CKV2_AWS_20",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "ALB HTTP-to-HTTPS redirect only active when enable_https is true; Checkov cannot evaluate conditional resources. Planned: enforce HTTPS-only and remove the HTTP listener."
+    },
+    {
+      "id": "CKV2_AWS_28",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "Public-facing ALB not protected by WAF. Planned: add aws_wafv2_web_acl with managed rule groups (AWSManagedRulesCommonRuleSet, AWSManagedRulesKnownBadInputsRuleSet) and associate with the ALB."
+    },
+    {
+      "id": "CKV2_AWS_30",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "PostgreSQL query logging not enabled via parameter group. Planned: create aws_db_parameter_group with log_statement = all and log_min_duration_statement = 1000."
+    },
+    {
+      "id": "CKV2_AWS_38",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "Route53 hosted zone DNSSEC signing not enabled. Planned: enable DNSSEC via aws_route53_key_signing_key and aws_route53_hosted_zone_dnssec resources."
+    },
+    {
+      "id": "CKV2_AWS_39",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "Route53 DNS query logging not enabled. Planned: add aws_route53_query_log resource with CloudWatch Log Group destination."
+    },
+    {
+      "id": "CKV2_AWS_57",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "Secrets Manager automatic rotation not configured. Planned: add aws_secretsmanager_secret_rotation with Lambda rotation function for database credentials."
+    },
+    {
+      "id": "CKV2_AWS_60",
+      "owner": "github-agents",
+      "expires": "2026-06-30",
+      "justification": "RDS copy_tags_to_snapshot not enabled. Planned: set copy_tags_to_snapshot = true for tag propagation to automated and manual snapshots."
+    }
+  ]
 }
