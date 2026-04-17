@@ -436,20 +436,21 @@ jobs:
 
           ids = [e.get('id', '').strip() for e in data.get('checkov', []) if e.get('id')]
           skip = ','.join(ids)
+          skip_arg = f"--skip-check {skip}" if skip else ''
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
-              fh.write(f"skip_ids={skip}\n")
+              fh.write(f"skip_arg={skip_arg}\n")
           print(f"checkov skip ids: {skip or '(none)'}")
           PY
 
       - name: Install checkov
-        run: pip install checkov==3.2.216
+        run: pip install checkov==3.2.521
 
       - name: Run checkov (machine-readable reports)
         run: |
           checkov \
             -d terraform \
             --framework terraform \
-            --skip-check "${{ steps.checkov_flags.outputs.skip_ids }}" \
+            ${{ steps.checkov_flags.outputs.skip_arg }} \
             -o json \
             --output-file-path checkov-report.json \
             || true
@@ -457,7 +458,7 @@ jobs:
           checkov \
             -d terraform \
             --framework terraform \
-            --skip-check "${{ steps.checkov_flags.outputs.skip_ids }}" \
+            ${{ steps.checkov_flags.outputs.skip_arg }} \
             -o sarif \
             --output-file-path checkov-report.sarif \
             || true
@@ -467,7 +468,7 @@ jobs:
           checkov \
             -d terraform \
             --framework terraform \
-            --skip-check "${{ steps.checkov_flags.outputs.skip_ids }}" \
+            ${{ steps.checkov_flags.outputs.skip_arg }} \
             --soft-fail-on LOW,MEDIUM \
             --hard-fail-on HIGH,CRITICAL
 
