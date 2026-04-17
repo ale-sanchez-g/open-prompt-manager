@@ -53,9 +53,9 @@ Implement and operationalize all SPLM CI gate components across pre-commit, pre-
 - [x] SAST Scan Summary on PR
 
 ### 3.5 Code Quality Scan
-- [ ] Enforce quality gate with coverage minimum.
-- [ ] Add optional duplication/complexity checks.
-- [ ] Acceptance check: CI fails when thresholds are breached and reports are attached to PR.
+- [x] Enforce quality gate with coverage minimum.
+- [x] Add optional duplication/complexity checks.
+- [x] Acceptance check: CI fails when thresholds are breached and reports are attached to PR.
 
 ### 3.6 Version Pinning Check
 - [ ] Add dependency pin/lock integrity verification.
@@ -127,4 +127,5 @@ Implement and operationalize all SPLM CI gate components across pre-commit, pre-
 - 2026-04-17: Implemented 3.3 SCA uplift — pip-audit expanded to matrix covering backend and mcp-package-python; npm-audit jobs updated to capture JSON reports and upload as 30-day artifacts; exception register (.sca-exceptions.json) created with expiry-date enforcement blocking CI; unified SCA npm summary job added posting sticky PR comment with per-ecosystem counts and pass/fail status.
 - 2026-04-17: Implemented 3.4 SAST uplift — retained backend bandit and standardized fail policy at high+ severity with expiry-governed suppressions; added frontend semgrep SAST with ERROR-threshold enforcement and SARIF upload; added Terraform IaC static checks via checkov with hard-fail on HIGH/CRITICAL and suppression governance via .sast-exceptions.json.
 - 2026-04-17: Added SAST Scan Summary on PR — new sticky PR comment aggregates bandit, semgrep, and checkov artifact findings into a single severity/status table.
+- 2026-04-17: Implemented 3.5 Code Quality Scan — added a Code Quality Scan CI job that enforces backend/frontend coverage thresholds (>=80%), publishes a sticky PR summary comment, uploads code-quality artifacts, and includes optional backend complexity metrics via radon.
 

@@ -354,12 +354,222 @@ jobs:
           path: frontend/coverage/
 
   # ─────────────────────────────────────────────────────────────────────────────
+  # Code quality scan: enforce coverage thresholds and report complexity metrics
+  # ─────────────────────────────────────────────────────────────────────────────
+  code-quality-scan:
+    name: Code Quality Scan
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend-test]
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Download backend coverage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-coverage
+          path: quality-reports/backend
+
+      - name: Download frontend coverage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-coverage
+          path: quality-reports/frontend
+
+      - name: Checkout code (for complexity scan)
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install complexity tools
+        run: pip install radon==6.0.1
+
+      - name: Run backend complexity scan (radon)
+        run: |
+          mkdir -p quality-reports
+          radon cc backend/app -j > quality-reports/radon-cc.json
+          radon mi backend/app -j > quality-reports/radon-mi.json
+
+      - name: Evaluate quality gates and build summary
+        id: quality_eval
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          BACKEND_MIN = 80.0
+          FRONTEND_MIN = 80.0
+
+          reports_dir = Path('quality-reports')
+          reports_dir.mkdir(exist_ok=True)
+
+          backend_cov_file = next((p for p in (reports_dir / 'backend').rglob('coverage.xml')), None)
+          frontend_lcov_file = next((p for p in (reports_dir / 'frontend').rglob('lcov.info')), None)
+
+          if backend_cov_file is None:
+              print('::error::backend coverage.xml not found in downloaded artifact.')
+              sys.exit(1)
+          if frontend_lcov_file is None:
+              print('::error::frontend lcov.info not found in downloaded artifact.')
+              sys.exit(1)
+
+          root = ET.parse(backend_cov_file).getroot()
+          backend_cov = float(root.attrib.get('line-rate', '0')) * 100.0
+
+          lf = 0
+          lh = 0
+          with frontend_lcov_file.open(encoding='utf-8', errors='ignore') as f:
+              for line in f:
+                  line = line.strip()
+                  if line.startswith('LF:'):
+                      lf += int(line.split(':', 1)[1])
+                  elif line.startswith('LH:'):
+                      lh += int(line.split(':', 1)[1])
+          frontend_cov = (lh / lf * 100.0) if lf > 0 else 0.0
+
+          cc_file = reports_dir / 'radon-cc.json'
+          mi_file = reports_dir / 'radon-mi.json'
+          cc_data = json.loads(cc_file.read_text(encoding='utf-8')) if cc_file.exists() else {}
+          mi_data = json.loads(mi_file.read_text(encoding='utf-8')) if mi_file.exists() else {}
+
+          all_blocks = []
+          high_risk_blocks = []
+          for file_path, blocks in cc_data.items():
+              for block in blocks:
+                  complexity = float(block.get('complexity', 0) or 0)
+                  rank = str(block.get('rank', 'A'))
+                  all_blocks.append(complexity)
+                  if rank in {'D', 'E', 'F'} or complexity >= 21:
+                      high_risk_blocks.append({
+                          'file': file_path,
+                          'name': block.get('name', '<unknown>'),
+                          'complexity': complexity,
+                          'rank': rank,
+                      })
+
+          avg_complexity = (sum(all_blocks) / len(all_blocks)) if all_blocks else 0.0
+
+          mi_values = []
+          for value in mi_data.values():
+              try:
+                  mi_values.append(float(value))
+              except Exception:
+                  pass
+          avg_mi = (sum(mi_values) / len(mi_values)) if mi_values else 0.0
+
+          backend_pass = backend_cov >= BACKEND_MIN
+          frontend_pass = frontend_cov >= FRONTEND_MIN
+          overall_pass = backend_pass and frontend_pass
+
+          status_backend = 'PASS' if backend_pass else 'FAIL'
+          status_frontend = 'PASS' if frontend_pass else 'FAIL'
+          overall_status = 'PASS' if overall_pass else 'FAIL'
+
+          summary_lines = [
+              '## Code Quality Scan Summary',
+              '',
+              f'- Overall status: **{overall_status}**',
+              f'- Coverage thresholds: backend >= **{BACKEND_MIN:.0f}%**, frontend >= **{FRONTEND_MIN:.0f}%**',
+              '',
+              '| Gate | Result | Observed | Threshold |',
+              '|---|---|---:|---:|',
+              f'| Backend Coverage | {status_backend} | {backend_cov:.2f}% | {BACKEND_MIN:.0f}% |',
+              f'| Frontend Coverage | {status_frontend} | {frontend_cov:.2f}% | {FRONTEND_MIN:.0f}% |',
+              '',
+              '### Optional Complexity Metrics (informational)',
+              '',
+              f'- Backend average cyclomatic complexity: **{avg_complexity:.2f}**',
+              f'- Backend average maintainability index: **{avg_mi:.2f}**',
+              f'- High-risk complexity blocks (rank D/E/F): **{len(high_risk_blocks)}**',
+          ]
+
+          if high_risk_blocks:
+              summary_lines.extend([
+                  '',
+                  '| File | Symbol | Complexity | Rank |',
+                  '|---|---|---:|---|',
+              ])
+              for block in high_risk_blocks[:10]:
+                  summary_lines.append(
+                      f"| {block['file']} | {block['name']} | {block['complexity']:.0f} | {block['rank']} |"
+                  )
+              if len(high_risk_blocks) > 10:
+                  summary_lines.append(f'- Showing first 10 of {len(high_risk_blocks)} high-risk blocks.')
+
+          summary_text = '\n'.join(summary_lines) + '\n'
+          (reports_dir / 'quality-summary.md').write_text(summary_text, encoding='utf-8')
+          Path(os.environ['GITHUB_STEP_SUMMARY']).write_text(summary_text, encoding='utf-8')
+
+          metrics = {
+              'overall_status': overall_status,
+              'backend_coverage': round(backend_cov, 2),
+              'frontend_coverage': round(frontend_cov, 2),
+              'backend_threshold': BACKEND_MIN,
+              'frontend_threshold': FRONTEND_MIN,
+              'avg_complexity': round(avg_complexity, 2),
+              'avg_maintainability_index': round(avg_mi, 2),
+              'high_risk_blocks': len(high_risk_blocks),
+          }
+          (reports_dir / 'quality-metrics.json').write_text(json.dumps(metrics, indent=2) + '\n', encoding='utf-8')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+              fh.write(f"overall_status={overall_status}\n")
+
+          if not overall_pass:
+              print('::error::Code quality gate failed due to coverage threshold breach.')
+              sys.exit(1)
+          PY
+
+      - name: Upload quality reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: code-quality-report
+          path: quality-reports/
+          retention-days: 30
+
+      - name: Comment code quality summary on PR
+        if: >-
+          always() &&
+          github.event_name == 'pull_request' &&
+          (github.event.pull_request.head.repo.full_name == github.repository)
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- code-quality-summary -->';
+            const body = `${marker}\n${fs.readFileSync('quality-reports/quality-summary.md', 'utf8')}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            const existing = comments.find((c) => c.user.type === 'Bot' && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+  # ─────────────────────────────────────────────────────────────────────────────
   # Frontend: production build verification
   # ─────────────────────────────────────────────────────────────────────────────
   frontend-build:
     name: Frontend Build
     runs-on: ubuntu-latest
-    needs: frontend-test
+    needs: [frontend-test, code-quality-scan]
     permissions:
       contents: read
 
