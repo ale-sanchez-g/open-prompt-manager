@@ -39,11 +39,11 @@ Implement and operationalize all SPLM CI gate components across pre-commit, pre-
 - [x] Acceptance check: findings are visible in PR summary.
 
 ### 3.3 Dependency Scan / SCA
-- [ ] Include missing package domains and align severity policy.
-- [ ] Fail on high/critical vulnerabilities (with managed exceptions).
-- [ ] Add ignore policy with expiry dates.
-- [ ] Upload machine-readable reports (for traceability).
-- [ ] Acceptance check: all package ecosystems are scanned consistently.
+- [x] Include missing package domains and align severity policy.
+- [x] Fail on high/critical vulnerabilities (with managed exceptions).
+- [x] Add ignore policy with expiry dates.
+- [x] Upload machine-readable reports (for traceability).
+- [x] Acceptance check: all package ecosystems are scanned consistently.
 
 ### 3.4 SAST
 - [ ] Keep backend SAST and add frontend and IaC static security checks.
@@ -122,4 +122,5 @@ Implement and operationalize all SPLM CI gate components across pre-commit, pre-
 - 2026-04-14: Applied branch protection on main via GitHub API with strict required checks, required PR review (1 approval), dismiss stale reviews, conversation resolution, and admin enforcement.
 - 2026-04-17: Started Pre-Build Gate Uplift by adding stack-split lint matrix job in CI for backend, frontend, mcp-package-python, mcp-package-node, and terraform.
 - 2026-04-17: Added gitleaks PR annotations and sticky PR summary comment so secret findings are visible directly in PR context.
+- 2026-04-17: Implemented 3.3 SCA uplift — pip-audit expanded to matrix covering backend and mcp-package-python; npm-audit jobs updated to capture JSON reports and upload as 30-day artifacts; exception register (.sca-exceptions.json) created with expiry-date enforcement blocking CI; unified SCA npm summary job added posting sticky PR comment with per-ecosystem counts and pass/fail status.
 

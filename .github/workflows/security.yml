@@ -249,7 +249,7 @@ jobs:
   # Frontend: npm audit for known CVEs in frontend dependencies
   # ─────────────────────────────────────────────────────────────────────────────
   npm-audit-frontend:
-    name: npm audit (frontend)
+    name: npm audit SCA (frontend)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -262,6 +262,30 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Validate SCA exception register — no expired npm/frontend entries
+        working-directory: ${{ github.workspace }}
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          from datetime import date
+
+          with open('.sca-exceptions.json') as f:
+              data = json.load(f)
+          today = date.today().isoformat()
+          entries = data.get('npm', {}).get('frontend', [])
+          expired = [e for e in entries if e.get('expires', '9999-99-99') < today]
+          if expired:
+              for e in expired:
+                  print(f"::error::Expired SCA exception: {e['id']} (expired {e['expires']}, owner: {e.get('owner', '?')}). Resolve the vulnerability or renew the exception.")
+              sys.exit(1)
+          print(f"Exception register OK — {len(entries)} active npm/frontend exception(s).")
+          PY
+
       - name: Set up Node 20
         uses: actions/setup-node@v6
         with:
@@ -272,14 +296,25 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Run npm audit
+      - name: Run npm audit (machine-readable JSON report)
+        run: npm audit --json 2>/dev/null > npm-audit-report.json || true
+
+      - name: Run npm audit (enforce — fail on high/critical)
         run: npm audit --audit-level=high
+
+      - name: Upload npm audit report
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: npm-audit-report-frontend
+          path: frontend/npm-audit-report.json
+          retention-days: 30
 
   # ─────────────────────────────────────────────────────────────────────────────
   # MCP Node package: npm audit for known CVEs in MCP Node dependencies
   # ─────────────────────────────────────────────────────────────────────────────
   npm-audit-mcp-node:
-    name: npm audit (mcp-package-node)
+    name: npm audit SCA (mcp-package-node)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -292,6 +327,30 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Validate SCA exception register — no expired npm/mcp-node entries
+        working-directory: ${{ github.workspace }}
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          from datetime import date
+
+          with open('.sca-exceptions.json') as f:
+              data = json.load(f)
+          today = date.today().isoformat()
+          entries = data.get('npm', {}).get('mcp-package-node', [])
+          expired = [e for e in entries if e.get('expires', '9999-99-99') < today]
+          if expired:
+              for e in expired:
+                  print(f"::error::Expired SCA exception: {e['id']} (expired {e['expires']}, owner: {e.get('owner', '?')}). Resolve the vulnerability or renew the exception.")
+              sys.exit(1)
+          print(f"Exception register OK — {len(entries)} active npm/mcp-package-node exception(s).")
+          PY
+
       - name: Set up Node 20
         uses: actions/setup-node@v6
         with:
@@ -302,5 +361,102 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run npm audit
+      - name: Run npm audit (machine-readable JSON report)
+        run: npm audit --json 2>/dev/null > npm-audit-report.json || true
+
+      - name: Run npm audit (enforce — fail on high/critical)
         run: npm audit --audit-level=high
+
+      - name: Upload npm audit report
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: npm-audit-report-mcp-package-node
+          path: mcp-package-node/npm-audit-report.json
+          retention-days: 30
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # SCA summary: aggregate all npm audit findings into a single PR comment
+  # ─────────────────────────────────────────────────────────────────────────────
+  sca-npm-summary:
+    name: SCA npm Summary
+    runs-on: ubuntu-latest
+    needs: [npm-audit-frontend, npm-audit-mcp-node]
+    if: always() && github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name == github.repository)
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Download npm audit reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: npm-audit-report-*
+          path: sca-reports
+          merge-multiple: false
+
+      - name: Build and post SCA summary PR comment
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const marker = '<!-- sca-npm-summary -->';
+            const reportsDir = 'sca-reports';
+            const ecosystems = [
+              { label: 'frontend', dir: 'npm-audit-report-frontend' },
+              { label: 'mcp-package-node', dir: 'npm-audit-report-mcp-package-node' },
+            ];
+
+            const rows = [];
+            let totalHigh = 0, totalCritical = 0, totalModerate = 0, grandTotal = 0;
+
+            for (const eco of ecosystems) {
+              const reportFile = path.join(reportsDir, eco.dir, 'npm-audit-report.json');
+              if (!fs.existsSync(reportFile)) {
+                rows.push(`| ${eco.label} | N/A | N/A | N/A | N/A | report not generated |`);
+                continue;
+              }
+              let data;
+              try { data = JSON.parse(fs.readFileSync(reportFile, 'utf8')); } catch {
+                rows.push(`| ${eco.label} | N/A | N/A | N/A | N/A | parse error |`);
+                continue;
+              }
+              const meta = data?.metadata?.vulnerabilities ?? {};
+              const critical = meta.critical ?? 0;
+              const high = meta.high ?? 0;
+              const moderate = meta.moderate ?? 0;
+              const total = meta.total ?? 0;
+              const status = (critical + high) > 0 ? 'FAIL' : 'PASS';
+              rows.push(`| ${eco.label} | ${critical} | ${high} | ${moderate} | ${total} | ${status} |`);
+              totalCritical += critical;
+              totalHigh += high;
+              totalModerate += moderate;
+              grandTotal += total;
+            }
+
+            const overallStatus = (totalCritical + totalHigh) > 0 ? 'FAIL' : 'PASS';
+            const body = [
+              marker,
+              '## SCA npm Dependency Scan Summary',
+              '',
+              `- Overall status: **${overallStatus}**`,
+              `- Critical: **${totalCritical}** | High: **${totalHigh}** | Moderate: **${totalModerate}** | Total: **${grandTotal}**`,
+              '',
+              '| Ecosystem | Critical | High | Moderate | Total | Status |',
+              '|---|---:|---:|---:|---:|---|',
+              ...rows,
+              '',
+              '_Exceptions are managed in `.sca-exceptions.json`. Download `npm-audit-report-*` artifacts for full details._',
+            ].join('\n');
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 });
+            const existing = comments.find(c => c.user.type === 'Bot' && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
