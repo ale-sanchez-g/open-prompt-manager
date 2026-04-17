@@ -1,0 +1,9 @@
+{
+  "_note": "Managed SCA exception register. All pip entries require: id (GHSA/CVE/PYSEC), owner (GitHub username), expires (ISO 8601 date), justification. Expired entries BLOCK CI — resolve the vulnerability or renew with a new expiry and updated justification.",
+  "_npm_note": "npm exceptions are managed via .audit-ci.jsonc (https://github.com/IBM/audit-ci). Add advisory IDs to the allowlist array in that file with an inline expiry comment. This register tracks them for governance purposes only.",
+  "pip": [],
+  "npm": {
+    "frontend": [],
+    "mcp-package-node": []
+  }
+}
