@@ -458,11 +458,14 @@ jobs:
 
           mi_values = []
           for value in mi_data.values():
-              try:
+              if isinstance(value, (int, float)):
                   mi_values.append(float(value))
-              except Exception:
-                  pass
-          avg_mi = (sum(mi_values) / len(mi_values)) if mi_values else 0.0
+                  continue
+              if isinstance(value, dict):
+                  raw_mi = value.get('mi', value.get('maintainability_index'))
+                  if isinstance(raw_mi, (int, float)):
+                      mi_values.append(float(raw_mi))
+          avg_mi = (sum(mi_values) / len(mi_values)) if mi_values else None
 
           backend_pass = backend_cov >= BACKEND_MIN
           frontend_pass = frontend_cov >= FRONTEND_MIN
@@ -486,7 +489,11 @@ jobs:
               '### Optional Complexity Metrics (informational)',
               '',
               f'- Backend average cyclomatic complexity: **{avg_complexity:.2f}**',
-              f'- Backend average maintainability index: **{avg_mi:.2f}**',
+              (
+                  f'- Backend average maintainability index: **{avg_mi:.2f}**'
+                  if avg_mi is not None
+                  else '- Backend average maintainability index: **N/A** (unable to parse radon MI output)'
+              ),
               f'- High-risk complexity blocks (rank D/E/F): **{len(high_risk_blocks)}**',
           ]
 
@@ -514,7 +521,7 @@ jobs:
               'backend_threshold': BACKEND_MIN,
               'frontend_threshold': FRONTEND_MIN,
               'avg_complexity': round(avg_complexity, 2),
-              'avg_maintainability_index': round(avg_mi, 2),
+              'avg_maintainability_index': (round(avg_mi, 2) if avg_mi is not None else None),
               'high_risk_blocks': len(high_risk_blocks),
           }
           (reports_dir / 'quality-metrics.json').write_text(json.dumps(metrics, indent=2) + '\n', encoding='utf-8')
