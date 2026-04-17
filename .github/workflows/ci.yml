@@ -903,7 +903,7 @@ jobs:
 
       - name: Publish JUnit report to Checks
         if: always()
-        uses: dorny/test-reporter@v2
+        uses: dorny/test-reporter@v3
         with:
           name: Playwright E2E Results
           path: e2e-test/test-results/junit.xml
