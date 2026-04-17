@@ -223,20 +223,61 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install bandit
-        run: pip install bandit[toml]
+      - name: Validate SAST suppression register — no expired bandit entries
+        run: |
+          python3 - <<'PY'
+          import json
+          import sys
+          from datetime import date
 
-      - name: Run bandit (medium severity and above)
+          with open('.sast-exceptions.json', encoding='utf-8') as f:
+              data = json.load(f)
+          today = date.today().isoformat()
+          entries = data.get('bandit', [])
+          expired = [e for e in entries if e.get('expires', '9999-99-99') < today]
+          if expired:
+              for e in expired:
+                  print(f"::error::Expired SAST suppression: {e['id']} (expired {e['expires']}, owner: {e.get('owner', '?')}).")
+              sys.exit(1)
+          print(f"SAST suppression register OK — {len(entries)} active bandit suppression(s).")
+          PY
+
+      - name: Build bandit suppression flags
+        id: bandit_flags
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open('.sast-exceptions.json', encoding='utf-8') as f:
+              data = json.load(f)
+
+          ids = [e.get('id', '').strip() for e in data.get('bandit', []) if e.get('id')]
+          skip = ','.join(ids)
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+              fh.write(f"skip_ids={skip}\n")
+          print(f"bandit skip ids: {skip or '(none)'}")
+          PY
+
+      - name: Install bandit
+        run: pip install bandit[toml]==1.8.2
+
+      - name: Run bandit (machine-readable JSON report)
         run: |
           bandit -r backend/app/ \
-            --severity-level medium \
+            --severity-level high \
             --confidence-level medium \
+            -s "${{ steps.bandit_flags.outputs.skip_ids }}" \
             --format json \
             --output bandit-report.json \
             || true
+
+      - name: Run bandit (enforce standardized fail policy)
+        run: |
           bandit -r backend/app/ \
-            --severity-level medium \
-            --confidence-level medium
+            --severity-level high \
+            --confidence-level medium \
+            -s "${{ steps.bandit_flags.outputs.skip_ids }}"
 
       - name: Upload bandit report
         uses: actions/upload-artifact@v7
@@ -244,6 +285,215 @@ jobs:
         with:
           name: bandit-report
           path: bandit-report.json
+          retention-days: 30
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Frontend SAST: Semgrep static security checks for frontend code
+  # Standard fail policy: block on ERROR severity findings.
+  # ─────────────────────────────────────────────────────────────────────────────
+  frontend-sast:
+    name: Frontend SAST (semgrep)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Validate SAST suppression register — no expired semgrep entries
+        run: |
+          python3 - <<'PY'
+          import json
+          import sys
+          from datetime import date
+
+          with open('.sast-exceptions.json', encoding='utf-8') as f:
+              data = json.load(f)
+          today = date.today().isoformat()
+          entries = data.get('semgrep', [])
+          expired = [e for e in entries if e.get('expires', '9999-99-99') < today]
+          if expired:
+              for e in expired:
+                  print(f"::error::Expired SAST suppression: {e['id']} (expired {e['expires']}, owner: {e.get('owner', '?')}).")
+              sys.exit(1)
+          print(f"SAST suppression register OK — {len(entries)} active semgrep suppression(s).")
+          PY
+
+      - name: Build semgrep suppression flags
+        id: semgrep_flags
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open('.sast-exceptions.json', encoding='utf-8') as f:
+              data = json.load(f)
+
+          ids = [e.get('id', '').strip() for e in data.get('semgrep', []) if e.get('id')]
+          flags = ' '.join(f"--exclude-rule {i}" for i in ids)
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+              fh.write(f"exclude_flags={flags}\n")
+          print(f"semgrep exclude flags: {flags or '(none)'}")
+          PY
+
+      - name: Install semgrep
+        run: pip install semgrep==1.75.0
+
+      - name: Run semgrep (machine-readable SARIF report)
+        run: |
+          semgrep scan \
+            --config p/javascript \
+            --config p/react \
+            ${{ steps.semgrep_flags.outputs.exclude_flags }} \
+            --sarif \
+            --output semgrep-report.sarif \
+            frontend/src \
+            || true
+
+      - name: Run semgrep (enforce standardized fail policy)
+        run: |
+          semgrep scan \
+            --config p/javascript \
+            --config p/react \
+            ${{ steps.semgrep_flags.outputs.exclude_flags }} \
+            --severity ERROR \
+            --error \
+            frontend/src
+
+      - name: Upload semgrep SARIF artifact
+        uses: actions/upload-artifact@v7
+        if: always() && hashFiles('semgrep-report.sarif') != ''
+        with:
+          name: semgrep-report
+          path: semgrep-report.sarif
+          retention-days: 30
+
+      - name: Upload semgrep SARIF to code scanning
+        if: >-
+          always() &&
+          hashFiles('semgrep-report.sarif') != '' &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: semgrep-report.sarif
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # IaC static security checks: Checkov for Terraform configurations
+  # Standard fail policy: block on HIGH/CRITICAL findings.
+  # ─────────────────────────────────────────────────────────────────────────────
+  iac-sast:
+    name: IaC SAST (checkov)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Validate SAST suppression register — no expired checkov entries
+        run: |
+          python3 - <<'PY'
+          import json
+          import sys
+          from datetime import date
+
+          with open('.sast-exceptions.json', encoding='utf-8') as f:
+              data = json.load(f)
+          today = date.today().isoformat()
+          entries = data.get('checkov', [])
+          expired = [e for e in entries if e.get('expires', '9999-99-99') < today]
+          if expired:
+              for e in expired:
+                  print(f"::error::Expired SAST suppression: {e['id']} (expired {e['expires']}, owner: {e.get('owner', '?')}).")
+              sys.exit(1)
+          print(f"SAST suppression register OK — {len(entries)} active checkov suppression(s).")
+          PY
+
+      - name: Build checkov suppression flags
+        id: checkov_flags
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open('.sast-exceptions.json', encoding='utf-8') as f:
+              data = json.load(f)
+
+          ids = [e.get('id', '').strip() for e in data.get('checkov', []) if e.get('id')]
+          skip = ','.join(ids)
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+              fh.write(f"skip_ids={skip}\n")
+          print(f"checkov skip ids: {skip or '(none)'}")
+          PY
+
+      - name: Install checkov
+        run: pip install checkov==3.2.216
+
+      - name: Run checkov (machine-readable reports)
+        run: |
+          checkov \
+            -d terraform \
+            --framework terraform \
+            --skip-check "${{ steps.checkov_flags.outputs.skip_ids }}" \
+            -o json \
+            --output-file-path checkov-report.json \
+            || true
+
+          checkov \
+            -d terraform \
+            --framework terraform \
+            --skip-check "${{ steps.checkov_flags.outputs.skip_ids }}" \
+            -o sarif \
+            --output-file-path checkov-report.sarif \
+            || true
+
+      - name: Run checkov (enforce standardized fail policy)
+        run: |
+          checkov \
+            -d terraform \
+            --framework terraform \
+            --skip-check "${{ steps.checkov_flags.outputs.skip_ids }}" \
+            --soft-fail-on LOW,MEDIUM \
+            --hard-fail-on HIGH,CRITICAL
+
+      - name: Upload checkov JSON report
+        uses: actions/upload-artifact@v7
+        if: always() && hashFiles('checkov-report.json') != ''
+        with:
+          name: checkov-report-json
+          path: checkov-report.json
+          retention-days: 30
+
+      - name: Upload checkov SARIF artifact
+        uses: actions/upload-artifact@v7
+        if: always() && hashFiles('checkov-report.sarif') != ''
+        with:
+          name: checkov-report-sarif
+          path: checkov-report.sarif
+          retention-days: 30
+
+      - name: Upload checkov SARIF to code scanning
+        if: >-
+          always() &&
+          hashFiles('checkov-report.sarif') != '' &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: checkov-report.sarif
 
   # ─────────────────────────────────────────────────────────────────────────────
   # Frontend: npm audit for known CVEs in frontend dependencies

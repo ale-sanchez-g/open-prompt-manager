@@ -1,0 +1,6 @@
+{
+  "_note": "Managed SAST suppression register. Every entry requires id, owner, expires (ISO 8601 date), and justification. Expired suppressions block CI until renewed or removed.",
+  "bandit": [],
+  "semgrep": [],
+  "checkov": []
+}
