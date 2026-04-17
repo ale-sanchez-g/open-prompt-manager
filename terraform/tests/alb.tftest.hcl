@@ -153,7 +153,7 @@ run "http_listener_port_is_80" {
   command = plan
 
   assert {
-    condition     = aws_lb_listener.http.port == 80
+    condition     = length(aws_lb_listener.http) == 1 && aws_lb_listener.http[0].port == 80
     error_message = "HTTP listener must listen on port 80."
   }
 }
@@ -162,7 +162,7 @@ run "http_listener_protocol_is_http" {
   command = plan
 
   assert {
-    condition     = aws_lb_listener.http.protocol == "HTTP"
+    condition     = length(aws_lb_listener.http) == 1 && aws_lb_listener.http[0].protocol == "HTTP"
     error_message = "HTTP listener protocol must be 'HTTP'."
   }
 }
