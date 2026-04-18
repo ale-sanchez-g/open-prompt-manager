@@ -62,11 +62,11 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Set up Node 20
+      - name: Set up Node 24
         if: matrix.setup == 'node'
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Set up Terraform
         if: matrix.setup == 'terraform'
@@ -151,10 +151,10 @@ jobs:
           print('Python pinning check passed: backend requirements are exact-pinned or explicitly allowed.')
           PY
 
-      - name: Set up Node 20
+      - name: Set up Node 24
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: "24"
 
       - name: Verify lockfiles exist
         run: |
@@ -302,10 +302,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Node 20
+      - name: Set up Node 24
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: mcp-package-node/package-lock.json
 
@@ -472,10 +472,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Node 20
+      - name: Set up Node 24
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -757,10 +757,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Node 20
+      - name: Set up Node 24
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -866,10 +866,10 @@ jobs:
           docker compose logs frontend
           exit 1
 
-      - name: Set up Node 20
+      - name: Set up Node 24
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: e2e-test/package-lock.json
 

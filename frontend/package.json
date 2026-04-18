@@ -34,6 +34,6 @@
     "lint:ci": "npx --yes oxlint@0.4.0 src"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   }
 }
