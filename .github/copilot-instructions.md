@@ -8,9 +8,9 @@ This is a monorepo with five independently testable components:
 
 | Component | Path | Runtime | Purpose |
 |-----------|------|---------|---------|
-| Backend API | `backend/` | Python 3.11, FastAPI, SQLAlchemy 2.0 | REST API + MCP server |
+| Backend API | `backend/` | Python 3.14, FastAPI, SQLAlchemy 2.0 | REST API + MCP server |
 | Frontend | `frontend/` | React 19, Tailwind CSS, React Router v7 | SPA dashboard |
-| MCP Python package | `mcp-package-python/` | Python 3.11, `mcp` SDK | Standalone stdio MCP client for Claude Desktop |
+| MCP Python package | `mcp-package-python/` | Python 3.14, `mcp` SDK | Standalone stdio MCP client for Claude Desktop |
 | MCP Node package | `mcp-package-node/` | Node 24, `@modelcontextprotocol/sdk` | Standalone stdio MCP client for Node environments |
 | Infrastructure | `terraform/`, `helm/` | Terraform, Helm 3 | AWS ECS + Kubernetes deployment |
 

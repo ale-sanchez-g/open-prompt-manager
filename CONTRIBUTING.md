@@ -66,7 +66,7 @@ For non-trivial changes, **open an issue first** to discuss your approach before
 | Tool | Minimum version |
 |------|----------------|
 | Docker & Docker Compose | 24.x |
-| Python | 3.11 |
+| Python | 3.14 |
 | Node.js | 24.x |
 | npm | 9.x |
 
