@@ -8,6 +8,9 @@ on:
 
 permissions: {}  # Deny all at workflow level — each job opts in explicitly
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   # Pre-build gate: split linting by stack for isolated and faster feedback
