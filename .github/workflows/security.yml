@@ -513,7 +513,7 @@ jobs:
     steps:
       - name: Download SAST artifacts
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: "bandit-report|semgrep-report|checkov-report-json"
           path: sast-reports
@@ -762,7 +762,7 @@ jobs:
 
     steps:
       - name: Download npm audit reports
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: npm-audit-report-*
           path: sca-reports
