@@ -11,7 +11,7 @@ This is a monorepo with five independently testable components:
 | Backend API | `backend/` | Python 3.11, FastAPI, SQLAlchemy 2.0 | REST API + MCP server |
 | Frontend | `frontend/` | React 19, Tailwind CSS, React Router v7 | SPA dashboard |
 | MCP Python package | `mcp-package-python/` | Python 3.11, `mcp` SDK | Standalone stdio MCP client for Claude Desktop |
-| MCP Node package | `mcp-package-node/` | Node 20, `@modelcontextprotocol/sdk` | Standalone stdio MCP client for Node environments |
+| MCP Node package | `mcp-package-node/` | Node 24, `@modelcontextprotocol/sdk` | Standalone stdio MCP client for Node environments |
 | Infrastructure | `terraform/`, `helm/` | Terraform, Helm 3 | AWS ECS + Kubernetes deployment |
 
 The backend exposes both a REST API (`/api/*`) and an MCP endpoint (`/mcp`) via Streamable HTTP transport. The MCP mount **must** remain the last `app.mount()` call in `main.py` so it does not shadow `/api/*` routes.

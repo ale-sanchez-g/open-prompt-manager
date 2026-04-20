@@ -67,7 +67,7 @@ For non-trivial changes, **open an issue first** to discuss your approach before
 |------|----------------|
 | Docker & Docker Compose | 24.x |
 | Python | 3.11 |
-| Node.js | 20.x |
+| Node.js | 24.x |
 | npm | 9.x |
 
 ### Option A — Docker Compose (recommended)

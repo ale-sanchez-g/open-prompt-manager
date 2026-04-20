@@ -8,7 +8,7 @@ It communicates over **stdio** (required by Claude Desktop) and calls the backen
 
 ## Requirements
 
-- Node.js 20+
+- Node.js 24+
 - A running Open Prompt Manager backend (default: `http://localhost:8000`)
 
 ---
@@ -25,7 +25,7 @@ Open your Claude Desktop config file:
 ### Recommended — point directly at the node binary (works with nvm)
 
 Claude Desktop does **not** inherit your shell's `PATH` or `nvm` environment, so
-always use the **full absolute path** to a Node 18+ binary.
+always use the **full absolute path** to a Node 24+ binary.
 
 ```json
 {

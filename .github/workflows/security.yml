@@ -8,6 +8,9 @@ on:
 
 permissions: {}  # Deny all at workflow level — each job opts in explicitly
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   # Secrets scan: detect hardcoded credentials and secrets in source code
@@ -513,7 +516,7 @@ jobs:
     steps:
       - name: Download SAST artifacts
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: "bandit-report|semgrep-report|checkov-report-json"
           path: sast-reports
@@ -659,10 +662,10 @@ jobs:
           print(f"Exception register OK — {len(entries)} active npm/frontend exception(s).")
           PY
 
-      - name: Set up Node 20
+      - name: Set up Node 24
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -724,10 +727,10 @@ jobs:
           print(f"Exception register OK — {len(entries)} active npm/mcp-package-node exception(s).")
           PY
 
-      - name: Set up Node 20
+      - name: Set up Node 24
         uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: mcp-package-node/package-lock.json
 
@@ -762,7 +765,7 @@ jobs:
 
     steps:
       - name: Download npm audit reports
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: npm-audit-report-*
           path: sca-reports

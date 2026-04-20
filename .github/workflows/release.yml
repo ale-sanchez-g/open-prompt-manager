@@ -25,6 +25,9 @@ on:
 
 permissions: {}  # Deny all at workflow level — each job opts in explicitly
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 concurrency:
   group: release-${{ inputs.target_ref }}
   cancel-in-progress: false
