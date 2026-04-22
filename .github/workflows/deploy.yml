@@ -69,7 +69,7 @@ jobs:
         run: |
           set -euo pipefail
           terraform init -input=false -reconfigure
-          terraform workspace select "${TF_WORKSPACE}" >/dev/null 2>&1 || terraform workspace new "${TF_WORKSPACE}" >/dev/null
+          terraform workspace select "${TF_WORKSPACE}" || terraform workspace new "${TF_WORKSPACE}"
 
           terraform apply -auto-approve \
             -target=aws_ecr_repository.backend \
@@ -124,7 +124,7 @@ jobs:
         working-directory: terraform
         run: |
           set -euo pipefail
-          terraform workspace select "${TF_WORKSPACE}" >/dev/null
+          terraform workspace select "${TF_WORKSPACE}"
 
           terraform apply -auto-approve \
             -var="aws_region=${AWS_REGION}" \

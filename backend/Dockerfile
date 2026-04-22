@@ -2,13 +2,14 @@ FROM python:3.14.4-alpine3.23
 
 WORKDIR /app
 
-RUN adduser -D -h /home/appuser appuser
-RUN mkdir -p /app/data && chown -R appuser:appuser /app/data
+RUN adduser -D -h /home/appuser appuser \
+    && mkdir -p /app/data
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY --chown=appuser:appuser . .
+RUN chown -R appuser:appuser /app/data
 
 USER appuser
 
