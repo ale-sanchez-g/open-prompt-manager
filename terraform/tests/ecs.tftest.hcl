@@ -172,7 +172,7 @@ run "backend_task_definition_has_required_tags" {
 }
 
 run "backend_task_definition_health_check_uses_ready_endpoint" {
-  command = plan
+  command = apply
 
   assert {
     condition     = contains(jsondecode(aws_ecs_task_definition.backend.container_definitions)[0].healthCheck.command[1], "/api/ready")
