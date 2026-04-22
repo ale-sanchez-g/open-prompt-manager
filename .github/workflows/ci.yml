@@ -393,17 +393,17 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-mutation.txt
 
-      - name: Run mutation tests
-        # Config is read from backend/setup.cfg [mutatest] section:
-        # src=app/services, nlocations=30, rseed=42, exception=5
-        run: mutatest
+      - name: Run mutation tests (mutmut)
+        run: |
+          mutmut run
+          mutmut results > mutation_report.txt
 
       - name: Upload mutation report
         uses: actions/upload-artifact@v7
         if: always()
         with:
           name: backend-mutation-report
-          path: backend/mutation_report.rst
+          path: backend/mutation_report.txt
           retention-days: 30
 
   # ─────────────────────────────────────────────────────────────────────────────
