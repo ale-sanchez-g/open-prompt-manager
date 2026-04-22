@@ -142,6 +142,19 @@ The deploy workflow is staged and safer by default:
 - Stores plan logs under `terraform/.terraform.plans/`
 - Checks ACM certificate status before creating HTTPS listener-dependent resources
 
+### GitHub Actions tag-triggered deploy
+
+`/.github/workflows/deploy.yml` runs automatically on pushes to release tags matching `v*.*.*` (for example `v1.4.2`), uses AWS OIDC (`aws-actions/configure-aws-credentials`) with no static AWS access keys, then:
+
+1. Bootstraps ECR repositories via Terraform
+2. Builds and pushes backend + frontend Docker images tagged with the release tag (and `latest`)
+3. Runs full `terraform apply` with those image URIs
+
+Required repository configuration:
+
+- Secret: `AWS_DEPLOY_ROLE_ARN` (IAM role trusted by GitHub OIDC)
+- Optional variables: `AWS_REGION`, `PROJECT_NAME`, `ENVIRONMENT` (defaults: `ap-southeast-2`, `open-prompt-manager`, `prod`)
+
 ### Domain Registration Script (Route 53 Domains)
 
 Use `domainRego.sh` to check availability and register a domain in AWS.

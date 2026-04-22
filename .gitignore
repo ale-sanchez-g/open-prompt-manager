@@ -22,7 +22,8 @@ frontend/build/
 .env.production.local
 
 # Docker
-.dockerignore
+/.dockerignore
+!backend/.dockerignore
 
 # IDE
 .idea/

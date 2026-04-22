@@ -2,12 +2,16 @@ FROM python:3.14.4-alpine3.23
 
 WORKDIR /app
 
+RUN adduser -D -h /home/appuser appuser \
+    && mkdir -p /app/data
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY --chown=appuser:appuser . .
+RUN chown -R appuser:appuser /app/data
 
-RUN mkdir -p /app/data
+USER appuser
 
 EXPOSE 8000
 
