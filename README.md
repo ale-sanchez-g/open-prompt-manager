@@ -250,6 +250,7 @@ Full interactive documentation is available at runtime:
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/health` | Liveness check — returns `{ "status": "ok", "version": "<semver>" }`. The `version` field is consumed by the frontend to display the current application version. |
+| GET | `/api/ready` | Readiness check — runs `SELECT 1` against the database and returns `503` if the database is unavailable. |
 
 ### Template Syntax
 
