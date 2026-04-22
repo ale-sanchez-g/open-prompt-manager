@@ -171,6 +171,15 @@ run "backend_task_definition_has_required_tags" {
   }
 }
 
+run "backend_task_definition_health_check_uses_ready_endpoint" {
+  command = plan
+
+  assert {
+    condition     = strcontains(file("${path.module}/ecs.tf"), "healthCheck = {") && strcontains(file("${path.module}/ecs.tf"), "CMD-SHELL") && strcontains(file("${path.module}/ecs.tf"), "/api/ready')\\\" || exit 1")
+    error_message = "Backend container health check command must probe '/api/ready'."
+  }
+}
+
 # ─────────────────────────────────────────────
 # Frontend Task Definition
 # ─────────────────────────────────────────────

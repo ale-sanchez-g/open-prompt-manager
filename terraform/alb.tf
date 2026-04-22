@@ -56,7 +56,7 @@ resource "aws_lb_target_group" "backend" {
 
   health_check {
     enabled             = true
-    path                = "/api/health"
+    path                = "/api/ready"
     port                = "traffic-port"
     protocol            = "HTTP"
     healthy_threshold   = 3

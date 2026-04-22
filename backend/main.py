@@ -1,8 +1,10 @@
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
+import app.database.base as db_module
 from app.database.base import create_tables
 from app.api.prompts import router as prompts_router
 from app.api.tags_agents import tags_router, agents_router
@@ -120,11 +122,27 @@ def create_app() -> FastAPI:
         '/api/health',
         tags=['health'],
         summary='Health check',
-        description='Returns the current application status and version. Used by the frontend to display the app version in the sidebar.',
+        description='Fast liveness check that returns the current application status and version. Used by the frontend to display the app version in the sidebar.',
         response_description='`{ "status": "ok", "version": "<semver>" }`',
     )
     def health_check():
         return {'status': 'ok', 'version': __version__}
+
+    @application.get(
+        '/api/ready',
+        tags=['health'],
+        summary='Readiness check',
+        description='Readiness probe that verifies database connectivity by running `SELECT 1`.',
+        responses={503: {'description': 'Service not ready because the database is unavailable.'}},
+        response_description='`{ "status": "ok" }`',
+    )
+    def readiness_check():
+        try:
+            with db_module.SessionLocal() as db:
+                db.execute(text('SELECT 1'))
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail='Database not ready') from exc
+        return {'status': 'ok'}
 
     # Mount MCP server – AI agents connect via Streamable HTTP transport.
     # The SDK's default streamable_http_path is /mcp, so the endpoint is
@@ -137,4 +155,3 @@ def create_app() -> FastAPI:
 
 # Module-level app used by uvicorn in production and by the test suite.
 app = create_app()
-
