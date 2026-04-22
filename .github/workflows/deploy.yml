@@ -99,7 +99,7 @@ jobs:
           docker buildx build --platform linux/amd64 \
             -t "${BACKEND_REPO}:${DEPLOY_TAG}" \
             -t "${BACKEND_REPO}:latest" \
-            /home/runner/work/open-prompt-manager/open-prompt-manager/backend \
+            "${GITHUB_WORKSPACE}/backend" \
             --push
         env:
           BACKEND_REPO: ${{ steps.ecr.outputs.backend_repo }}
@@ -111,7 +111,7 @@ jobs:
           docker buildx build --platform linux/amd64 \
             -t "${FRONTEND_REPO}:${DEPLOY_TAG}" \
             -t "${FRONTEND_REPO}:latest" \
-            /home/runner/work/open-prompt-manager/open-prompt-manager/frontend \
+            "${GITHUB_WORKSPACE}/frontend" \
             --push
         env:
           FRONTEND_REPO: ${{ steps.ecr.outputs.frontend_repo }}
@@ -121,11 +121,6 @@ jobs:
         working-directory: terraform
         run: |
           set -euo pipefail
-          TF_WORKSPACE="${PROJECT_NAME}-${ENVIRONMENT}-${AWS_REGION}"
-
-          terraform init -input=false -reconfigure
-          terraform workspace select "${TF_WORKSPACE}" >/dev/null 2>&1 || terraform workspace new "${TF_WORKSPACE}" >/dev/null
-
           terraform apply -auto-approve \
             -var="aws_region=${AWS_REGION}" \
             -var="project_name=${PROJECT_NAME}" \
