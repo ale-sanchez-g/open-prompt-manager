@@ -103,7 +103,7 @@ jobs:
           NEW_VERSION: ${{ steps.bump.outputs.new_version }}
         run: |
           set -euo pipefail
-          git add .version backend/app/__init__.py frontend/package.json mcp-package-node/package.json mcp-package-python/pyproject.toml helm/prompt-manager/Chart.yaml helm/prompt-manager/values.yaml
+          git add .version backend/app/__init__.py frontend/package.json frontend/package-lock.json mcp-package-node/package.json mcp-package-node/package-lock.json mcp-package-python/pyproject.toml helm/prompt-manager/Chart.yaml helm/prompt-manager/values.yaml
           git commit -m "chore(release): v${NEW_VERSION}"
 
       - name: Push release branch and open PR
