@@ -202,3 +202,11 @@ def test_health_endpoint_documented(client):
     assert '/api/health' in schema['paths'], '/api/health should be in the OpenAPI schema'
     operation = schema['paths']['/api/health']['get']
     assert operation.get('summary'), '/api/health should have a summary'
+
+
+def test_ready_endpoint_documented(client):
+    schema = _get_schema(client)
+    assert '/api/ready' in schema['paths'], '/api/ready should be in the OpenAPI schema'
+    operation = schema['paths']['/api/ready']['get']
+    assert operation.get('summary'), '/api/ready should have a summary'
+    assert '503' in operation.get('responses', {}), '/api/ready should document 503 readiness failures'

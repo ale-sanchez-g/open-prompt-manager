@@ -1,9 +1,10 @@
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
-from app.database.base import create_tables
+import app.database.base as db_module
 from app.api.prompts import router as prompts_router
 from app.api.tags_agents import tags_router, agents_router
 from app.mcp_server import build_mcp_server
@@ -13,7 +14,7 @@ from app import __version__
 os.makedirs('./data', exist_ok=True)
 
 # Create database tables once at startup
-create_tables()
+db_module.create_tables()
 
 
 def create_app() -> FastAPI:
@@ -120,11 +121,31 @@ def create_app() -> FastAPI:
         '/api/health',
         tags=['health'],
         summary='Health check',
-        description='Returns the current application status and version. Used by the frontend to display the app version in the sidebar.',
+        description='Fast liveness check that returns the current application status and version. Used by the frontend to display the app version in the sidebar.',
         response_description='`{ "status": "ok", "version": "<semver>" }`',
     )
     def health_check():
         return {'status': 'ok', 'version': __version__}
+
+    @application.get(
+        '/api/ready',
+        tags=['health'],
+        summary='Readiness check',
+        description='Readiness probe that verifies database connectivity by running `SELECT 1`.',
+        responses={503: {'description': 'Service not ready because the database is unavailable.'}},
+        response_description='`{ "status": "ok" }`',
+    )
+    def readiness_check():
+        db = None
+        try:
+            db = db_module.SessionLocal()
+            db.execute(text('SELECT 1'))
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail='Database not ready') from exc
+        finally:
+            if db is not None:
+                db.close()
+        return {'status': 'ok'}
 
     # Mount MCP server – AI agents connect via Streamable HTTP transport.
     # The SDK's default streamable_http_path is /mcp, so the endpoint is
@@ -137,4 +158,3 @@ def create_app() -> FastAPI:
 
 # Module-level app used by uvicorn in production and by the test suite.
 app = create_app()
-
