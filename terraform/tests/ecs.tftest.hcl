@@ -175,7 +175,7 @@ run "backend_task_definition_health_check_uses_ready_endpoint" {
   command = plan
 
   assert {
-    condition     = can(regex("(?s)healthCheck\\s*=\\s*\\{.*?/api/ready", file("${path.module}/ecs.tf")))
+    condition     = contains(file("${path.module}/ecs.tf"), "healthCheck = {") && contains(file("${path.module}/ecs.tf"), "CMD-SHELL") && contains(file("${path.module}/ecs.tf"), "/api/ready')\\\" || exit 1")
     error_message = "Backend container health check command must probe '/api/ready'."
   }
 }
