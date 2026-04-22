@@ -5,5 +5,5 @@ sqlalchemy==2.0.49
 pydantic==2.13.3
 pydantic-settings==2.13.1
 python-multipart==0.0.26
-psycopg2-binary==2.9.11
+psycopg2-binary==2.9.12
 mcp==1.27.0
