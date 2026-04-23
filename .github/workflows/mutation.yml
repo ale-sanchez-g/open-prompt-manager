@@ -1,4 +1,5 @@
 name: Mutation tests
+
 on:
   workflow_dispatch:
   push:
@@ -7,6 +8,7 @@ on:
       - 'release/*'
     paths:
       - 'frontend/**'
+      - '.github/workflows/mutation.yml'
 
 permissions: {}  # Deny all at workflow level — each job opts in explicitly
 
