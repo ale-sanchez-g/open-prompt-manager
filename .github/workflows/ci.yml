@@ -905,24 +905,34 @@ jobs:
 
       - name: Publish mutation score summary
         run: |
+          set -e
           SCORE=$(grep -o 'Mutation score[^<]*' reports/mutation/mutation.html | head -1 | sed 's/.*: //')
-          echo "## :zap: Frontend Mutation Score: $SCORE" > $GITHUB_STEP_SUMMARY
-          echo "[View full mutation report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          if [ -z "$SCORE" ]; then
+            echo "::error::Could not extract mutation score from Stryker report."
+            exit 1
+          fi
+          echo "## :zap: Frontend Mutation Score: $SCORE" > mutation-summary.md
+          echo "[View full mutation report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> mutation-summary.md
+          cat mutation-summary.md > $GITHUB_STEP_SUMMARY
         shell: bash
 
       - name: Comment mutation score on PR
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && hashFiles('mutation-summary.md') != ''
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const summary = fs.readFileSync(process.env.GITHUB_STEP_SUMMARY, 'utf8');
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: summary
-            }); 
+            const summary = fs.readFileSync('mutation-summary.md', 'utf8').trim();
+            if (summary.length > 0) {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: summary
+              });
+            } else {
+              console.log('No mutation summary to comment. Skipping.');
+            }
 
   frontend-build:
     name: Frontend Build
