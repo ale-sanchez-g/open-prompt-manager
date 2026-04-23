@@ -365,8 +365,6 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   # Mutation testing: validates test suite quality beyond line coverage.
   # Mutates app/ source code and checks that tests catch the introduced faults.
-  # Targets 30 sampled locations with a fixed seed for reproducibility.
-  # Survivors above the threshold (5) fail the job — tighten as coverage improves.
   # ─────────────────────────────────────────────────────────────────────────────
   backend-mutation-test:
     name: Backend Mutation Tests
@@ -397,17 +395,93 @@ jobs:
         run: |
           mutmut run
           mutmut results > mutation_report.txt
-          mutmut html --open false --output mutation_html_report
+
+      - name: Build mutation summary markdown
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          report = Path('mutation_report.txt').read_text(encoding='utf-8')
+          total = len(re.findall(r'^\s*app\.', report, re.MULTILINE))
+          survived = len(re.findall(r': survived', report))
+          killed = total - survived
+          pct = (killed / total * 100) if total else 0.0
+          lines = [
+              '# 🧬 Mutation Testing Summary',
+              '',
+              f'- **Total mutants:** {total}',
+              f'- **Killed:** {killed}',
+              f'- **Survived:** {survived}',
+              f'- **Mutation score:** {pct:.1f}%',
+              '',
+              '---',
+              '',
+              '```text',
+              report.strip(),
+              '```',
+          ]
+          Path('mutation-summary.md').write_text('\n'.join(lines), encoding='utf-8')
+          PY
+
+      - name: Upload mutation summary
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: backend-mutation-summary
+          path: backend/mutation-summary.md
+          retention-days: 30
 
       - name: Upload mutation report
         uses: actions/upload-artifact@v7
         if: always()
         with:
           name: backend-mutation-report
-          path: 
-            backend/mutation_report.txt
-            backend/mutation_html_report/
+          path: backend/mutation_report.txt
           retention-days: 30
+
+      - name: Comment mutation summary on PR
+        if: >-
+          always() &&
+          github.event_name == 'pull_request' &&
+          (github.event.pull_request.head.repo.full_name == github.repository) &&
+          hashFiles('backend/mutation-summary.md') != ''
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- mutation-test-summary -->';
+            const body = `${marker}\n${fs.readFileSync('backend/mutation-summary.md', 'utf8')}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            const existing = comments.find(
+              (comment) =>
+                comment.user?.login === 'github-actions[bot]' &&
+                comment.body?.includes(marker)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body,
+              });
+            }
 
   # ─────────────────────────────────────────────────────────────────────────────
   # SCA: pip-audit vulnerability scan across all Python ecosystems
