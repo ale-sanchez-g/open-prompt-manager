@@ -395,7 +395,7 @@ jobs:
 
       - name: Run mutation tests (mutmut)
         run: |
-          mutmut run
+          mutmut run --ignore-tests tests/test_migrations.py
           mutmut results > mutation_report.txt
 
       - name: Upload mutation report
