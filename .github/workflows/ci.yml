@@ -927,7 +927,7 @@ jobs:
   frontend-build:
     name: Frontend Build
     runs-on: ubuntu-latest
-    needs: [frontend-mutation-test]
+    needs: [frontend-test]
     permissions:
       contents: read
 
