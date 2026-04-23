@@ -397,13 +397,16 @@ jobs:
         run: |
           mutmut run
           mutmut results > mutation_report.txt
+          mutmut html --open false --output mutation_html_report
 
       - name: Upload mutation report
         uses: actions/upload-artifact@v7
         if: always()
         with:
           name: backend-mutation-report
-          path: backend/mutation_report.txt
+          path: 
+            backend/mutation_report.txt
+            backend/mutation_html_report/
           retention-days: 30
 
   # ─────────────────────────────────────────────────────────────────────────────
