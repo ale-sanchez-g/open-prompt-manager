@@ -372,6 +372,7 @@ jobs:
     needs: backend-test
     permissions:
       contents: read
+      pull-requests: write
 
     defaults:
       run:
