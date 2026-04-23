@@ -56,3 +56,7 @@ override.tf.json
 # Playwright Test
 playwright-report/
 test-results/
+
+# Stryker
+.stryker-tmp/
+frontend/reports/mutation/
