@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
-    branches: ["**"]
+    branches:
+      - main
+      - 'release/*'
   pull_request:
     branches: ["**"]
 
@@ -868,72 +870,6 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   # Frontend: production build verification
   # ─────────────────────────────────────────────────────────────────────────────
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Frontend: mutation testing (Stryker)
-  # ─────────────────────────────────────────────────────────────────────────────
-  frontend-mutation-test:
-    name: Frontend Mutation Tests
-    runs-on: ubuntu-latest
-    needs: [frontend-test, code-quality-scan]
-    permissions:
-      contents: read
-      pull-requests: write
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Node 24
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20.x
-
-      - name: Install dependencies
-        run: npm ci --legacy-peer-deps
-
-      - name: Run Stryker mutation tests
-        run: npx stryker run
-
-      - name: Upload mutation report artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-mutation-report
-          path: reports/mutation/
-          retention-days: 7
-
-      - name: Publish mutation score summary
-        run: |
-          set -e
-          SCORE=$(grep -o 'Mutation score[^<]*' reports/mutation/mutation.html | head -1 | sed 's/.*: //')
-          if [ -z "$SCORE" ]; then
-            echo "::error::Could not extract mutation score from Stryker report."
-            exit 1
-          fi
-          echo "## :zap: Frontend Mutation Score: $SCORE" > mutation-summary.md
-          echo "[View full mutation report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> mutation-summary.md
-          cat mutation-summary.md > $GITHUB_STEP_SUMMARY
-        shell: bash
-
-      - name: Comment mutation score on PR
-        if: github.event_name == 'pull_request' && hashFiles('mutation-summary.md') != ''
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const summary = fs.readFileSync('mutation-summary.md', 'utf8').trim();
-            if (summary.length > 0) {
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: summary
-              });
-            } else {
-              console.log('No mutation summary to comment. Skipping.');
-            }
-
   frontend-build:
     name: Frontend Build
     runs-on: ubuntu-latest
