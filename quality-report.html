@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Operational Excellence Report — open-prompt-manager</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #222638;
+      --border: #2e3250;
+      --text: #e2e8f0;
+      --muted: #8892b0;
+      --red: #ff5f5f;
+      --red-bg: rgba(255,95,95,0.1);
+      --red-border: rgba(255,95,95,0.3);
+      --yellow: #f5c518;
+      --yellow-bg: rgba(245,197,24,0.1);
+      --yellow-border: rgba(245,197,24,0.3);
+      --green: #3ecf8e;
+      --green-bg: rgba(62,207,142,0.1);
+      --green-border: rgba(62,207,142,0.3);
+      --blue: #4f8ef7;
+      --blue-bg: rgba(79,142,247,0.1);
+      --blue-border: rgba(79,142,247,0.3);
+      --purple: #a78bfa;
+      --purple-bg: rgba(167,139,250,0.1);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    a { color: var(--blue); text-decoration: none; }
+
+    /* HEADER */
+    .header {
+      background: linear-gradient(135deg, #1a1d27 0%, #0f1117 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 32px 40px 28px;
+    }
+    .header h1 { font-size: 22px; font-weight: 700; color: #fff; }
+    .header h1 span { color: var(--blue); }
+    .header p { color: var(--muted); margin-top: 4px; font-size: 13px; }
+    .meta-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+    .pill {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+      padding: 3px 10px; border-radius: 20px;
+      border: 1px solid var(--border); color: var(--muted); background: var(--surface);
+    }
+    .pill.blue { background: var(--blue-bg); border-color: var(--blue-border); color: var(--blue); }
+
+    /* LAYOUT */
+    .container { max-width: 1200px; margin: 0 auto; padding: 32px 40px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+    /* SECTION HEADER */
+    .section-header { display: flex; align-items: center; gap: 10px; margin: 40px 0 16px; }
+    .section-header h2 {
+      font-size: 15px; font-weight: 700; color: #fff;
+      letter-spacing: 0.02em; text-transform: uppercase; white-space: nowrap;
+    }
+    .section-header .line { flex: 1; height: 1px; background: var(--border); }
+
+    /* CARDS */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+    .card h3 {
+      font-size: 13px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px;
+    }
+
+    /* SCORE CARD */
+    .score-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      padding: 20px; display: flex; flex-direction: column; align-items: center;
+      text-align: center; gap: 8px;
+    }
+    .score-card .label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+    .score-ring {
+      width: 72px; height: 72px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 800; border: 3px solid;
+    }
+    .score-ring.red    { border-color: var(--red);    color: var(--red);    background: var(--red-bg);    }
+    .score-ring.yellow { border-color: var(--yellow); color: var(--yellow); background: var(--yellow-bg); }
+    .score-ring.green  { border-color: var(--green);  color: var(--green);  background: var(--green-bg);  }
+    .score-card .desc { font-size: 12px; color: var(--muted); }
+
+    /* ALERT BANNER */
+    .alert-banner {
+      border-radius: 10px; padding: 16px 20px; border-left: 4px solid;
+      display: flex; gap: 14px; align-items: flex-start;
+    }
+    .alert-banner.red    { background: var(--red-bg);    border-color: var(--red);    }
+    .alert-banner.yellow { background: var(--yellow-bg); border-color: var(--yellow); }
+    .alert-banner.green  { background: var(--green-bg);  border-color: var(--green);  }
+    .alert-banner.blue   { background: var(--blue-bg);   border-color: var(--blue);   }
+    .alert-banner .icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+    .alert-banner .title { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+    .alert-banner.red    .title { color: var(--red);    }
+    .alert-banner.yellow .title { color: var(--yellow); }
+    .alert-banner.green  .title { color: var(--green);  }
+    .alert-banner.blue   .title { color: var(--blue);   }
+    .alert-banner p { font-size: 13px; color: var(--muted); }
+    .alert-banner code { background: rgba(255,255,255,0.08); border-radius: 4px; padding: 1px 5px; font-size: 12px; color: var(--text); }
+
+    /* TABLE */
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th {
+      text-align: left; font-size: 11px; font-weight: 700;
+      letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+      padding: 0 12px 8px; border-bottom: 1px solid var(--border);
+    }
+    td { padding: 10px 12px; border-bottom: 1px solid rgba(46,50,80,0.5); vertical-align: top; color: var(--text); }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    /* BADGES */
+    .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: 0.04em; }
+    .badge.red    { background: var(--red-bg);    color: var(--red);    border: 1px solid var(--red-border);    }
+    .badge.yellow { background: var(--yellow-bg); color: var(--yellow); border: 1px solid var(--yellow-border); }
+    .badge.green  { background: var(--green-bg);  color: var(--green);  border: 1px solid var(--green-border);  }
+    .badge.blue   { background: var(--blue-bg);   color: var(--blue);   border: 1px solid var(--blue-border);   }
+    .badge.grey   { background: var(--surface2);  color: var(--muted);  border: 1px solid var(--border);        }
+
+    /* INFRA MAP */
+    .infra-map { display: flex; align-items: center; justify-content: center; gap: 0; flex-wrap: wrap; }
+    .infra-node {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      padding: 12px 16px; text-align: center; min-width: 120px;
+    }
+    .infra-node .node-icon { font-size: 20px; display: block; margin-bottom: 4px; }
+    .infra-node .node-name { font-size: 12px; font-weight: 700; color: var(--text); }
+    .infra-node .node-detail { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .infra-node.healthy { border-color: var(--green-border); background: var(--green-bg); }
+    .infra-node.warning { border-color: var(--yellow-border); background: var(--yellow-bg); }
+    .infra-node.danger  { border-color: var(--red-border);   background: var(--red-bg);   }
+    .arrow { font-size: 16px; color: var(--border); padding: 0 6px; align-self: center; }
+
+    /* DEPLOY TIMELINE */
+    .timeline { position: relative; padding-left: 24px; }
+    .timeline::before {
+      content: ''; position: absolute; left: 7px; top: 6px; bottom: 6px;
+      width: 2px; background: var(--border);
+    }
+    .timeline-item { position: relative; margin-bottom: 16px; }
+    .timeline-item::before {
+      content: ''; position: absolute; left: -20px; top: 6px;
+      width: 10px; height: 10px; border-radius: 50%;
+      border: 2px solid var(--border); background: var(--surface);
+    }
+    .timeline-item.success::before { border-color: var(--green); background: var(--green); }
+    .timeline-item.warning::before { border-color: var(--yellow); background: var(--yellow); }
+    .timeline-item .ts { font-size: 11px; color: var(--muted); font-family: monospace; }
+    .timeline-item .ev { font-size: 13px; color: var(--text); margin-top: 2px; }
+    .timeline-item .detail { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    /* METRIC BAR */
+    .metric-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .metric-row .m-label { font-size: 12px; color: var(--muted); min-width: 190px; }
+    .metric-bar { flex: 1; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+    .metric-bar-fill { height: 100%; border-radius: 3px; }
+    .metric-bar-fill.green  { background: var(--green);  }
+    .metric-bar-fill.yellow { background: var(--yellow); }
+    .metric-bar-fill.red    { background: var(--red);    }
+    .metric-bar-fill.grey   { background: var(--muted);  }
+    .metric-row .m-val { font-size: 12px; color: var(--text); min-width: 60px; text-align: right; font-family: monospace; }
+
+    /* RECOMMENDATION */
+    .rec-item { display: flex; gap: 14px; padding: 14px 0; border-bottom: 1px solid rgba(46,50,80,0.5); align-items: flex-start; }
+    .rec-item:last-child { border-bottom: none; }
+    .rec-num {
+      width: 26px; height: 26px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 800; flex-shrink: 0;
+    }
+    .rec-num.p1 { background: var(--red-bg);    color: var(--red);    border: 1px solid var(--red-border);    }
+    .rec-num.p2 { background: var(--yellow-bg); color: var(--yellow); border: 1px solid var(--yellow-border); }
+    .rec-num.p3 { background: var(--blue-bg);   color: var(--blue);   border: 1px solid var(--blue-border);   }
+    .rec-content .rec-title { font-size: 13px; font-weight: 700; color: var(--text); }
+    .rec-content .rec-why   { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .rec-meta { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+
+    .stat-num { font-size: 32px; font-weight: 800; color: #fff; line-height: 1; }
+    .stat-label { font-size: 11px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+    code { font-family: 'SFMono-Regular', Consolas, monospace; background: rgba(255,255,255,0.08); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+
+    /* FOOTER */
+    .footer {
+      border-top: 1px solid var(--border); padding: 24px 40px;
+      text-align: center; color: var(--muted); font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <h1>Operational Excellence &amp; Observability &mdash; <span>open-prompt-manager</span></h1>
+  <p>Infrastructure health, telemetry coverage, alert quality &amp; improvement backlog &mdash; sourced from Datadog MCP</p>
+  <div class="meta-pills">
+    <span class="pill blue">Generated: 2026-04-23</span>
+    <span class="pill">Source: Datadog MCP</span>
+    <span class="pill">Region: ap-southeast-2</span>
+    <span class="pill">AWS Account: 060367163877</span>
+    <span class="pill">Window: 30 days</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- OVERALL SCORES -->
+  <div class="section-header"><h2>Overall Scores</h2><div class="line"></div></div>
+  <div class="grid-4">
+    <div class="score-card">
+      <div class="label">Alert Coverage</div>
+      <div class="score-ring red">0/10</div>
+      <div class="desc">Zero monitors configured for this project</div>
+    </div>
+    <div class="score-card">
+      <div class="label">Telemetry Depth</div>
+      <div class="score-ring red">2/10</div>
+      <div class="desc">Infrastructure metrics only &mdash; no logs, no APM, no custom metrics</div>
+    </div>
+    <div class="score-card">
+      <div class="label">Deployment Health</div>
+      <div class="score-ring yellow">5/10</div>
+      <div class="desc">High cadence (4 deploys in 7 days); 1 health-check failure on Apr 22</div>
+    </div>
+    <div class="score-card">
+      <div class="label">RDS / Backup</div>
+      <div class="score-ring green">9/10</div>
+      <div class="desc">Daily snapshots completing successfully &mdash; no backup failures in 30 days</div>
+    </div>
+  </div>
+
+  <!-- CRITICAL FINDINGS -->
+  <div class="section-header"><h2>Critical Findings</h2><div class="line"></div></div>
+  <div style="display:flex; flex-direction:column; gap:12px;">
+
+    <div class="alert-banner red">
+      <div class="icon">&#x1F6A8;</div>
+      <div>
+        <div class="title">ZERO Monitors &mdash; No alerting coverage whatsoever</div>
+        <p>A search for all monitors tagged <code>project:open-prompt-manager</code> returned <strong>0 results</strong>. There are no Datadog monitors, SLO alerts, synthetic tests, or log-based alerts watching this platform. Any production failure &mdash; service crash, 5xx surge, database outage, disk full &mdash; will go completely undetected until a user reports it.</p>
+      </div>
+    </div>
+
+    <div class="alert-banner red">
+      <div class="icon">&#x1F6AB;</div>
+      <div>
+        <div class="title">No Application Logs in Datadog &mdash; Logs pillar is dark</div>
+        <p>Querying Datadog logs for both <code>project:open-prompt-manager</code> and <code>service:open-prompt-manager-backend/frontend</code> returns <strong>0 results over 7 days</strong>. Application logs are not being shipped to Datadog. There is no structured log data for error rates, user journey tracing, exception tracking, or debugging. Only AWS infrastructure events from ECS and RDS are visible.</p>
+      </div>
+    </div>
+
+    <div class="alert-banner red">
+      <div class="icon">&#x1F4E1;</div>
+      <div>
+        <div class="title">No APM / Distributed Traces &mdash; Traces pillar is dark</div>
+        <p>No <code>trace.*</code> metrics are present for this project. There is no distributed tracing from the frontend through the backend to the database. Latency breakdowns, endpoint-level error rates, and DB query performance are all invisible. If the application slows down or errors spike, there is no way to pinpoint the root cause without manually shelling into containers.</p>
+      </div>
+    </div>
+
+    <div class="alert-banner yellow">
+      <div class="icon">&#x26A0;&#xFE0F;</div>
+      <div>
+        <div class="title">Backend Health Check Failed (HTTP 404) During Apr 22 Deployment</div>
+        <p>ECS event: <code>task 71f03efcc1444964b793ba0833cfbde7</code> on <code>open-prompt-manager-backend</code> was marked unhealthy in target group <code>open-prompt-manager-backend-tg</code> with <strong>HTTP 404</strong> at 05:15 UTC during a rolling deploy. The task was drained and the new task set completed cleanly (Desired: 2, Running: 2 at 05:17 UTC). This pattern suggests the health check path may return 404 during startup, creating a brief window where the ALB could route to unhealthy targets.</p>
+      </div>
+    </div>
+
+    <div class="alert-banner blue">
+      <div class="icon">&#x2139;&#xFE0F;</div>
+      <div>
+        <div class="title">Zero Incidents in Datadog Incident Management (30 days, entire account)</div>
+        <p>No incidents have been declared or tracked in Datadog for any project over the last 30 days. There is no TTD, MTTR, or postmortem data. Operational metrics cannot be computed. If issues have occurred, they were handled entirely outside the formal incident process.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- INFRASTRUCTURE TOPOLOGY -->
+  <div class="section-header"><h2>Infrastructure Topology</h2><div class="line"></div></div>
+  <div class="card">
+    <h3>Detected Components &mdash; open-prompt-manager-cluster &middot; ap-southeast-2 &middot; Fargate</h3>
+    <div class="infra-map" style="gap:8px; margin-top:16px;">
+      <div class="infra-node healthy">
+        <span class="node-icon">&#x1F310;</span>
+        <div class="node-name">ALB</div>
+        <div class="node-detail">open-prompt-manager-backend-tg</div>
+        <div class="node-detail" style="margin-top:6px;"><span class="badge green">Active</span></div>
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="infra-node healthy">
+        <span class="node-icon">&#x1F4E6;</span>
+        <div class="node-name">Frontend</div>
+        <div class="node-detail">ECS Fargate &middot; 2/2 tasks</div>
+        <div class="node-detail" style="margin-top:6px;"><span class="badge green">Healthy</span></div>
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="infra-node warning">
+        <span class="node-icon">&#x2699;&#xFE0F;</span>
+        <div class="node-name">Backend</div>
+        <div class="node-detail">ECS Fargate &middot; port 8000 &middot; 2/2</div>
+        <div class="node-detail" style="margin-top:6px;"><span class="badge yellow">HChk 404 Apr 22</span></div>
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="infra-node healthy">
+        <span class="node-icon">&#x1F5C4;&#xFE0F;</span>
+        <div class="node-name">RDS PostgreSQL</div>
+        <div class="node-detail">16.10 &middot; db.t4g.micro &middot; <code>promptmanager</code></div>
+        <div class="node-detail" style="margin-top:6px;"><span class="badge green">Backups OK</span></div>
+      </div>
+    </div>
+    <div class="infra-map" style="margin-top:16px; gap:8px; justify-content:flex-start; padding-left:20px;">
+      <div class="infra-node" style="min-width:100px;">
+        <span class="node-icon">&#x1F501;</span>
+        <div class="node-name">NAT Gateway</div>
+        <div class="node-detail">Egress routing</div>
+      </div>
+      <div style="width:8px;"></div>
+      <div class="infra-node" style="min-width:100px;">
+        <span class="node-icon">&#x1F4E6;</span>
+        <div class="node-name">ECR</div>
+        <div class="node-detail">Container registry</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TELEMETRY COVERAGE -->
+  <div class="section-header"><h2>Telemetry Coverage</h2><div class="line"></div></div>
+  <div class="grid-2">
+    <div class="card">
+      <h3>Three-Pillar Assessment</h3>
+      <div style="margin-top:8px;">
+        <div class="metric-row">
+          <div class="m-label">Metrics &mdash; AWS CloudWatch</div>
+          <div class="metric-bar"><div class="metric-bar-fill yellow" style="width:55%"></div></div>
+          <div class="m-val" style="color:var(--yellow)">Partial</div>
+        </div>
+        <div class="metric-row">
+          <div class="m-label">Logs &mdash; Application</div>
+          <div class="metric-bar"><div class="metric-bar-fill red" style="width:4%"></div></div>
+          <div class="m-val" style="color:var(--red)">None</div>
+        </div>
+        <div class="metric-row">
+          <div class="m-label">Traces &mdash; APM</div>
+          <div class="metric-bar"><div class="metric-bar-fill red" style="width:4%"></div></div>
+          <div class="m-val" style="color:var(--red)">None</div>
+        </div>
+        <div class="metric-row">
+          <div class="m-label">Synthetic Tests</div>
+          <div class="metric-bar"><div class="metric-bar-fill red" style="width:4%"></div></div>
+          <div class="m-val" style="color:var(--red)">None</div>
+        </div>
+        <div class="metric-row">
+          <div class="m-label">Custom Business Metrics</div>
+          <div class="metric-bar"><div class="metric-bar-fill red" style="width:4%"></div></div>
+          <div class="m-val" style="color:var(--red)">None</div>
+        </div>
+        <div class="metric-row">
+          <div class="m-label">RDS Backup Events</div>
+          <div class="metric-bar"><div class="metric-bar-fill green" style="width:100%"></div></div>
+          <div class="m-val" style="color:var(--green)">Full</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Available Metrics Inventory</h3>
+      <table style="margin-top:4px;">
+        <thead>
+          <tr><th>Group</th><th>Key Signals Available</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ALB</td>
+            <td>5xx/4xx rates, latency p50/p95/p99, healthy/unhealthy host count</td>
+            <td><span class="badge green">Active</span></td>
+          </tr>
+          <tr>
+            <td>ECS Service</td>
+            <td>CPU%, Memory%, Running/Desired task count</td>
+            <td><span class="badge green">Active</span></td>
+          </tr>
+          <tr>
+            <td>RDS PostgreSQL</td>
+            <td>CPU, connections, free storage, freeable memory, read/write IOPS &amp; latency</td>
+            <td><span class="badge green">Active</span></td>
+          </tr>
+          <tr>
+            <td>NAT Gateway</td>
+            <td>Bytes in/out, connection counts, packet drops</td>
+            <td><span class="badge green">Active</span></td>
+          </tr>
+          <tr>
+            <td>App Errors</td>
+            <td>Exception types, error rates, stack traces</td>
+            <td><span class="badge red">Missing</span></td>
+          </tr>
+          <tr>
+            <td>Request Tracing</td>
+            <td>Per-endpoint latency, DB query time, user journey tracking</td>
+            <td><span class="badge red">Missing</span></td>
+          </tr>
+          <tr>
+            <td>Business KPIs</td>
+            <td>Prompt CRUD ops, user sessions, API call success rates</td>
+            <td><span class="badge red">Missing</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- CRITICAL JOURNEY COVERAGE -->
+  <div class="card" style="margin-top:20px;">
+    <h3>Critical User Journeys vs Observability Coverage</h3>
+    <table style="margin-top:8px;">
+      <thead>
+        <tr><th>User Journey</th><th>Metrics</th><th>Logs</th><th>Traces</th><th>Synthetic</th><th>Risk</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>User creates / saves a prompt</td>
+          <td><span class="badge yellow">ALB only</span></td>
+          <td><span class="badge red">None</span></td>
+          <td><span class="badge red">None</span></td>
+          <td><span class="badge red">None</span></td>
+          <td><span class="badge red">Critical</span></td>
+        </tr>
+        <tr>
+          <td>User lists / searches prompts</td>
+          <td><span class="badge yellow">ALB only</span></td>
+          <td><span class="badge red">None</span></td>
+          <td><span class="badge red">None</span></td>
+          <td><span class="badge red">None</span></td>
+          <td><span class="badge red">Critical</span></td>
+        </tr>
+        <tr>
+          <td>User authenticates / logs in</td>
+          <td><span class="badge yellow">ALB 4xx</span></td>
+          <td><span class="badge red">None</span></td>
+          <td><span class="badge red">None</span></td>
+          <td><span class="badge red">None</span></td>
+          <td><span class="badge red">Critical</span></td>
+        </tr>
+        <tr>
+          <td>Backend writes to PostgreSQL</td>
+          <td><span class="badge yellow">RDS metrics</span></td>
+          <td><span class="badge red">None</span></td>
+          <td><span class="badge red">None</span></td>
+          <td><span class="badge red">None</span></td>
+          <td><span class="badge red">Critical</span></td>
+        </tr>
+        <tr>
+          <td>Service uptime / external reachability</td>
+          <td><span class="badge yellow">ALB host count</span></td>
+          <td><span class="badge red">None</span></td>
+          <td><span class="badge red">None</span></td>
+          <td><span class="badge red">None</span></td>
+          <td><span class="badge red">Critical</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="margin-top:12px; font-size:12px; color:var(--muted);">Every critical user journey has zero structured observability beyond raw AWS infrastructure counters. Failures are only discoverable via user complaints.</p>
+  </div>
+
+  <!-- ALERT QUALITY -->
+  <div class="section-header"><h2>Alert Quality &amp; Monitor Inventory</h2><div class="line"></div></div>
+  <div class="grid-3">
+    <div class="card" style="text-align:center;">
+      <h3>Monitors Configured</h3>
+      <div class="stat-num" style="color:var(--red); margin-top:12px;">0</div>
+      <div class="stat-label">out of min recommended 10</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <h3>Synthetic Tests</h3>
+      <div class="stat-num" style="color:var(--red); margin-top:12px;">0</div>
+      <div class="stat-label">no uptime checks configured</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <h3>SLOs Defined</h3>
+      <div class="stat-num" style="color:var(--red); margin-top:12px;">0</div>
+      <div class="stat-label">no availability or latency SLOs</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:20px;">
+    <h3>Minimum Monitor Coverage Needed</h3>
+    <table style="margin-top:8px;">
+      <thead>
+        <tr><th>Monitor</th><th>Signal</th><th>Priority</th><th>Current State</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Synthetic HTTP check &mdash; public health endpoint</td>
+          <td>External reachability &mdash; catches ALB + service failures end-to-end</td>
+          <td><span class="badge red">P1</span></td>
+          <td><span class="badge red">MISSING</span></td>
+        </tr>
+        <tr>
+          <td>ALB 5xx error rate &gt; 1% for 5 min</td>
+          <td>Backend returning server errors to users right now</td>
+          <td><span class="badge red">P1</span></td>
+          <td><span class="badge red">MISSING</span></td>
+        </tr>
+        <tr>
+          <td>ECS running tasks &lt; desired &mdash; backend</td>
+          <td>Backend degraded &mdash; tasks crashed or OOM-killed</td>
+          <td><span class="badge red">P1</span></td>
+          <td><span class="badge red">MISSING</span></td>
+        </tr>
+        <tr>
+          <td>ECS running tasks &lt; desired &mdash; frontend</td>
+          <td>Frontend degraded or unreachable</td>
+          <td><span class="badge red">P1</span></td>
+          <td><span class="badge red">MISSING</span></td>
+        </tr>
+        <tr>
+          <td>RDS free storage &lt; 2 GB</td>
+          <td>Database disk full &rarr; writes fail &rarr; silent data loss</td>
+          <td><span class="badge red">P1</span></td>
+          <td><span class="badge red">MISSING</span></td>
+        </tr>
+        <tr>
+          <td>ALB p99 latency &gt; 2 s</td>
+          <td>Tail latency degradation visible to users</td>
+          <td><span class="badge yellow">P2</span></td>
+          <td><span class="badge red">MISSING</span></td>
+        </tr>
+        <tr>
+          <td>ALB 4xx rate &gt; 5% for 5 min</td>
+          <td>High client error rate &mdash; possible auth or routing breakage</td>
+          <td><span class="badge yellow">P2</span></td>
+          <td><span class="badge red">MISSING</span></td>
+        </tr>
+        <tr>
+          <td>ECS CPU &gt; 80% sustained (backend)</td>
+          <td>Service under CPU pressure &mdash; approaching throttle</td>
+          <td><span class="badge yellow">P2</span></td>
+          <td><span class="badge red">MISSING</span></td>
+        </tr>
+        <tr>
+          <td>RDS CPU &gt; 85% for 10 min</td>
+          <td>Database overloaded &mdash; slow queries impacting users</td>
+          <td><span class="badge yellow">P2</span></td>
+          <td><span class="badge red">MISSING</span></td>
+        </tr>
+        <tr>
+          <td>Application error log spike</td>
+          <td>Exception or panic rate surge in application code</td>
+          <td><span class="badge yellow">P2</span></td>
+          <td><span class="badge grey">Blocked: enable logs first</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- DEPLOYMENT HISTORY -->
+  <div class="section-header"><h2>Deployment Activity (Last 30 Days)</h2><div class="line"></div></div>
+  <div class="grid-2">
+    <div class="card">
+      <h3>Deployment Timeline</h3>
+      <div class="timeline" style="margin-top:12px;">
+        <div class="timeline-item warning">
+          <div class="ts">2026-04-22 &middot; 05:17 UTC</div>
+          <div class="ev">Backend + Frontend deployed &nbsp;<span class="badge yellow">Health Check Failure</span></div>
+          <div class="detail">Backend task returned HTTP 404 on ALB health check at 05:15 before being drained. New task set stabilised at Desired:2, Running:2 by 05:17.</div>
+        </div>
+        <div class="timeline-item success">
+          <div class="ts">2026-04-20 &middot; 23:07 UTC</div>
+          <div class="ev">Backend + Frontend deployed &nbsp;<span class="badge green">Clean</span></div>
+          <div class="detail">Both services reached Desired:2, Running:2 with no health check events.</div>
+        </div>
+        <div class="timeline-item success">
+          <div class="ts">2026-04-18 &middot; 01:47 UTC</div>
+          <div class="ev">Backend + Frontend deployed &nbsp;<span class="badge green">Clean</span></div>
+          <div class="detail">Both services deployed cleanly.</div>
+        </div>
+        <div class="timeline-item success">
+          <div class="ts">2026-04-17 &middot; 07:20 UTC</div>
+          <div class="ev">Backend + Frontend deployed &nbsp;<span class="badge green">Clean</span></div>
+          <div class="detail">Both services deployed cleanly.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Deployment Metrics</h3>
+      <table style="margin-top:8px;">
+        <tbody>
+          <tr><td style="color:var(--muted);">Deployments in 7 days</td><td><strong>4</strong> (8 ECS service events total)</td></tr>
+          <tr><td style="color:var(--muted);">Average deploy interval</td><td>~1.75 days</td></tr>
+          <tr><td style="color:var(--muted);">Deploy strategy</td><td>Rolling update (task drain + replacement)</td></tr>
+          <tr><td style="color:var(--muted);">Health check failures</td><td><span style="color:var(--yellow);">1 of 4 deploys</span> (Apr 22 backend, HTTP 404)</td></tr>
+          <tr><td style="color:var(--muted);">Confirmed rollbacks</td><td>0</td></tr>
+          <tr><td style="color:var(--muted);">Approx change failure rate</td><td><span style="color:var(--yellow);">25%</span> (1 degraded health check / 4 deploys)</td></tr>
+          <tr><td style="color:var(--muted);">Total events (30d)</td><td>220 (RDS backup &amp; ECS deploy events)</td></tr>
+        </tbody>
+      </table>
+      <div style="margin-top:16px;">
+        <div class="alert-banner yellow" style="font-size:12px; padding:12px 14px;">
+          <div class="icon" style="font-size:14px;">&#x26A0;&#xFE0F;</div>
+          <div>
+            <div class="title" style="font-size:12px;">Health Check Path Mismatch</div>
+            <p style="font-size:11px;">The Apr 22 backend returned HTTP 404 on the ALB health check path during startup. Verify the health check path in the ECS target group matches an existing FastAPI route. Add <code>healthCheckGracePeriodSeconds</code> to the ECS service definition if the app needs warm-up time before responding to health checks.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RDS HEALTH -->
+  <div class="section-header"><h2>RDS Database Health</h2><div class="line"></div></div>
+  <div class="card">
+    <h3>open-prompt-manager-prod &middot; PostgreSQL 16.10 &middot; db.t4g.micro &middot; ap-southeast-2b</h3>
+    <div class="grid-3" style="margin-top:16px; gap:16px;">
+      <div>
+        <table>
+          <thead><tr><th>Attribute</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td style="color:var(--muted);">Instance class</td><td>db.t4g.micro</td></tr>
+            <tr><td style="color:var(--muted);">Engine</td><td>PostgreSQL 16.10</td></tr>
+            <tr><td style="color:var(--muted);">Database name</td><td><code>promptmanager</code></td></tr>
+            <tr><td style="color:var(--muted);">Availability Zone</td><td>ap-southeast-2b</td></tr>
+            <tr><td style="color:var(--muted);">Multi-AZ</td><td><span class="badge red">No</span></td></tr>
+            <tr><td style="color:var(--muted);">Managed by</td><td>Terraform v1.9.8</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <table>
+          <thead><tr><th>Backup Signal</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td style="color:var(--muted);">Daily auto-snapshot</td><td><span class="badge green">Completing</span></td></tr>
+            <tr><td style="color:var(--muted);">Backup failures (30d)</td><td><span class="badge green">0</span></td></tr>
+            <tr><td style="color:var(--muted);">Snapshot schedule</td><td>~03:06 UTC daily</td></tr>
+            <tr><td style="color:var(--muted);">Latest snapshot</td><td><code>2026-04-23-03-06</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <div class="alert-banner yellow" style="font-size:12px; padding:12px;">
+          <div class="icon" style="font-size:14px;">&#x26A0;&#xFE0F;</div>
+          <div>
+            <div class="title" style="font-size:12px;">Single-AZ Risk</div>
+            <p style="font-size:11px;">RDS is deployed in a single AZ (ap-southeast-2b only). An AZ-level AWS failure causes database downtime with no automatic failover. No monitor exists for storage, CPU, or connection saturation on this instance.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INCIDENT MANAGEMENT -->
+  <div class="section-header"><h2>Incident Management</h2><div class="line"></div></div>
+  <div class="grid-3">
+    <div class="card" style="text-align:center;">
+      <h3>Incidents (30 days)</h3>
+      <div class="stat-num" style="color:var(--muted); margin-top:12px;">0</div>
+      <div class="stat-label">declared in Datadog</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <h3>Mean TTD</h3>
+      <div class="stat-num" style="color:var(--muted); margin-top:12px;">N/A</div>
+      <div class="stat-label">no incidents to measure</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <h3>Mean MTTR</h3>
+      <div class="stat-num" style="color:var(--muted); margin-top:12px;">N/A</div>
+      <div class="stat-label">no incidents to measure</div>
+    </div>
+  </div>
+  <div class="alert-banner blue" style="margin-top:16px;">
+    <div class="icon">&#x2139;&#xFE0F;</div>
+    <div>
+      <div class="title">No formal incident process in place</div>
+      <p>Without monitors, there are no automated triggers for incident creation. Without incidents, there is no TTD, MTTR, or postmortem data &mdash; making it impossible to track reliability trends, meet SLOs, or demonstrate operational maturity to stakeholders. Establishing this must accompany the monitoring rollout.</p>
+    </div>
+  </div>
+
+  <!-- RECOMMENDATIONS -->
+  <div class="section-header"><h2>Prioritised Improvement Backlog</h2><div class="line"></div></div>
+
+  <div class="card">
+    <h3 style="color:var(--red);">Immediate &mdash; Do This Week</h3>
+    <div style="margin-top:8px;">
+
+      <div class="rec-item">
+        <div class="rec-num p1">1</div>
+        <div class="rec-content">
+          <div class="rec-title">Create a Synthetic HTTP monitor on the public health endpoint</div>
+          <div class="rec-why">Zero visibility into external reachability. One Datadog API synthetic pinging the ALB URL every 60 s from ap-southeast-2 and us-east-1 gives immediate uptime detection. This is the single highest-ROI action &mdash; a 15-minute setup that covers the most critical failure mode.</div>
+          <div class="rec-meta">
+            <span class="badge red">P1</span>
+            <span class="badge grey">Effort: 15 min</span>
+            <span class="badge blue">Datadog Synthetics API test</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rec-item">
+        <div class="rec-num p1">2</div>
+        <div class="rec-content">
+          <div class="rec-title">Add ALB 5xx error rate monitor (&gt; 1% over 5 min)</div>
+          <div class="rec-why">The metric <code>aws.applicationelb.httpcode_target_5xx</code> is already flowing in Datadog. One monitor on the error rate catches crashes, unhandled exceptions, and backend failures that users are experiencing in real time &mdash; with zero instrumentation work needed.</div>
+          <div class="rec-meta">
+            <span class="badge red">P1</span>
+            <span class="badge grey">Effort: 10 min</span>
+            <span class="badge blue">aws.applicationelb.httpcode_target_5xx</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rec-item">
+        <div class="rec-num p1">3</div>
+        <div class="rec-content">
+          <div class="rec-title">Add ECS task count monitor for backend and frontend (running &lt; desired)</div>
+          <div class="rec-why"><code>aws.ecs.service.running</code> and <code>aws.ecs.service.desired</code> are already active. A monitor firing when running &lt; desired catches OOM kills, task crashes, and failed deployments immediately &mdash; before a user notices.</div>
+          <div class="rec-meta">
+            <span class="badge red">P1</span>
+            <span class="badge grey">Effort: 15 min</span>
+            <span class="badge blue">aws.ecs.service.running</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rec-item">
+        <div class="rec-num p1">4</div>
+        <div class="rec-content">
+          <div class="rec-title">Add RDS free storage space monitor (&lt; 2 GB threshold)</div>
+          <div class="rec-why">Running on <code>db.t4g.micro</code> with limited storage. <code>aws.rds.free_storage_space</code> is already collected. A full disk causes PostgreSQL to go read-only and silently drop all writes &mdash; this monitor prevents a hard-to-debug data loss event.</div>
+          <div class="rec-meta">
+            <span class="badge red">P1</span>
+            <span class="badge grey">Effort: 10 min</span>
+            <span class="badge blue">aws.rds.free_storage_space</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rec-item">
+        <div class="rec-num p1">5</div>
+        <div class="rec-content">
+          <div class="rec-title">Fix backend health check 404 on startup</div>
+          <div class="rec-why">The Apr 22 deploy had the backend fail the ALB health check with HTTP 404 at 05:15. Confirm the target group health check path matches an actual FastAPI route (e.g., <code>/health</code> or <code>/api/health</code>). Add <code>healthCheckGracePeriodSeconds</code> to the ECS service if the app takes time to boot before accepting requests.</div>
+          <div class="rec-meta">
+            <span class="badge red">P1</span>
+            <span class="badge grey">Effort: 1&ndash;2 hrs</span>
+            <span class="badge blue">ECS task definition &amp; target group</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px;">
+    <h3 style="color:var(--yellow);">Short-Term &mdash; This Month</h3>
+    <div style="margin-top:8px;">
+
+      <div class="rec-item">
+        <div class="rec-num p2">6</div>
+        <div class="rec-content">
+          <div class="rec-title">Enable Datadog APM on the backend container (ddtrace for Python / FastAPI)</div>
+          <div class="rec-why">Adding <code>ddtrace-run</code> as the ECS task entry point and setting <code>DD_SERVICE</code>, <code>DD_ENV</code>, <code>DD_AGENT_HOST</code> env vars gives full distributed tracing, per-endpoint latency histograms, error rates, and DB query performance &mdash; with zero application code changes. This unlocks the entire traces pillar.</div>
+          <div class="rec-meta">
+            <span class="badge yellow">P2</span>
+            <span class="badge grey">Effort: 2&ndash;4 hrs</span>
+            <span class="badge blue">Python ddtrace &middot; FastAPI</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rec-item">
+        <div class="rec-num p2">7</div>
+        <div class="rec-content">
+          <div class="rec-title">Ship application logs to Datadog (Datadog Agent ECS sidecar or Firehose)</div>
+          <div class="rec-why">Zero application-level logs are reaching Datadog. Option A: add the Datadog Agent as an ECS sidecar with log collection enabled. Option B: stream the CloudWatch log groups (<code>/ecs/open-prompt-manager-backend</code>) to Datadog via Firehose. With logs, all log-based monitors, exception tracking, and structured search become available.</div>
+          <div class="rec-meta">
+            <span class="badge yellow">P2</span>
+            <span class="badge grey">Effort: 4&ndash;8 hrs</span>
+            <span class="badge blue">ECS sidecar or Firehose integration</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rec-item">
+        <div class="rec-num p2">8</div>
+        <div class="rec-content">
+          <div class="rec-title">Define availability and latency SLOs with burn-rate alerts</div>
+          <div class="rec-why">Once the synthetic and ALB monitors are in place, wrap them in a 30-day SLO (e.g., 99.5% availability). Burn-rate alerts fire proportionally to how fast the error budget is depleting &mdash; far more actionable than raw thresholds and the foundation for reliability reporting.</div>
+          <div class="rec-meta">
+            <span class="badge yellow">P2</span>
+            <span class="badge grey">Effort: 2 hrs</span>
+            <span class="badge blue">Pre-req: items 1 + 2</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rec-item">
+        <div class="rec-num p2">9</div>
+        <div class="rec-content">
+          <div class="rec-title">Add ALB p99 latency (&gt; 2 s) and 4xx rate monitors</div>
+          <div class="rec-why"><code>aws.applicationelb.target_response_time.p99</code> and <code>aws.applicationelb.httpcode_target_4xx</code> are already flowing. Latency degradation and auth failures are invisible without these monitors &mdash; and they are 10-minute setups given the metrics exist.</div>
+          <div class="rec-meta">
+            <span class="badge yellow">P2</span>
+            <span class="badge grey">Effort: 20 min</span>
+            <span class="badge blue">Metrics already available in Datadog</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rec-item">
+        <div class="rec-num p2">10</div>
+        <div class="rec-content">
+          <div class="rec-title">Evaluate RDS Multi-AZ for production resilience</div>
+          <div class="rec-why">The RDS instance runs in a single AZ (ap-southeast-2b). An AZ failure causes full database downtime with no automatic failover. On <code>db.t4g.micro</code> enabling Multi-AZ roughly doubles the RDS cost but gives automatic standby promotion. Evaluate against uptime requirements.</div>
+          <div class="rec-meta">
+            <span class="badge yellow">P2</span>
+            <span class="badge grey">Effort: 1 hr + cost review</span>
+            <span class="badge blue">RDS: open-prompt-manager-prod</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px;">
+    <h3 style="color:var(--blue);">Medium-Term &mdash; Next Quarter</h3>
+    <div style="margin-top:8px;">
+
+      <div class="rec-item">
+        <div class="rec-num p3">11</div>
+        <div class="rec-content">
+          <div class="rec-title">Instrument custom business metrics (prompt CRUD rates, user activity, API error breakdown by endpoint)</div>
+          <div class="rec-why">AWS infrastructure metrics tell you the platform is slow, not what users are experiencing or which features are failing. Custom metrics like <code>opm.prompt.created</code>, <code>opm.api.error{endpoint}</code>, and <code>opm.session.active</code> enable user-centric reliability measurement and catch feature-level regressions that ALB metrics miss.</div>
+          <div class="rec-meta">
+            <span class="badge blue">P3</span>
+            <span class="badge grey">Effort: 1&ndash;2 days</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rec-item">
+        <div class="rec-num p3">12</div>
+        <div class="rec-content">
+          <div class="rec-title">Adopt Datadog Incident Management with P1 auto-creation</div>
+          <div class="rec-why">Currently 0 incidents declared over 30 days despite a deployment with health check failures. Wiring P1 monitors to auto-create Datadog incidents gives automatic TTD, MTTR, and postmortem tracking &mdash; essential for demonstrating operational maturity and improving over time.</div>
+          <div class="rec-meta">
+            <span class="badge blue">P3</span>
+            <span class="badge grey">Effort: 2 hrs</span>
+            <span class="badge blue">Pre-req: monitors from items 1&ndash;4</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rec-item">
+        <div class="rec-num p3">13</div>
+        <div class="rec-content">
+          <div class="rec-title">Add RDS CPU and connection count monitors</div>
+          <div class="rec-why"><code>db.t4g.micro</code> has limited CPU burst credits and a low max connection count. Metrics <code>aws.rds.cpuutilization</code> and <code>aws.rds.database_connections</code> are already collected. Connection exhaustion silently drops all new user requests without this monitor in place.</div>
+          <div class="rec-meta">
+            <span class="badge blue">P3</span>
+            <span class="badge grey">Effort: 20 min</span>
+            <span class="badge blue">Metrics already active</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SUMMARY SCORECARD -->
+  <div class="section-header"><h2>Summary Scorecard</h2><div class="line"></div></div>
+  <div class="card">
+    <table>
+      <thead>
+        <tr><th>Dimension</th><th>Score</th><th>Key Finding</th><th>Top Action</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Alert Coverage</strong></td>
+          <td><span class="badge red">0 / 10</span></td>
+          <td>Zero monitors &mdash; no alerting for any failure mode</td>
+          <td>Create Synthetic + ALB 5xx monitor immediately (items 1&ndash;2)</td>
+        </tr>
+        <tr>
+          <td><strong>Metrics Telemetry</strong></td>
+          <td><span class="badge yellow">4 / 10</span></td>
+          <td>Good AWS infra coverage; no application or business metrics</td>
+          <td>Add APM via ddtrace to unlock request-level metrics (item 6)</td>
+        </tr>
+        <tr>
+          <td><strong>Logs Telemetry</strong></td>
+          <td><span class="badge red">0 / 10</span></td>
+          <td>Zero application logs reaching Datadog</td>
+          <td>Add Datadog Agent ECS sidecar to task definitions (item 7)</td>
+        </tr>
+        <tr>
+          <td><strong>Traces Telemetry</strong></td>
+          <td><span class="badge red">0 / 10</span></td>
+          <td>No APM instrumentation on backend or frontend</td>
+          <td>Instrument with ddtrace-run (zero code changes) (item 6)</td>
+        </tr>
+        <tr>
+          <td><strong>Deployment Health</strong></td>
+          <td><span class="badge yellow">5 / 10</span></td>
+          <td>High cadence; 1 of 4 deploys had health check failure (25% CFR)</td>
+          <td>Fix health check path &amp; add startup grace period (item 5)</td>
+        </tr>
+        <tr>
+          <td><strong>Database Health</strong></td>
+          <td><span class="badge green">7 / 10</span></td>
+          <td>Backups healthy; single-AZ; no monitors for storage/CPU</td>
+          <td>Add RDS free storage P1 monitor (item 4)</td>
+        </tr>
+        <tr>
+          <td><strong>Incident Management</strong></td>
+          <td><span class="badge red">0 / 10</span></td>
+          <td>No incidents declared; no TTD/MTTR data exists</td>
+          <td>Enable auto-incident creation from P1 monitors (item 12)</td>
+        </tr>
+        <tr>
+          <td><strong>On-Call Sustainability</strong></td>
+          <td><span class="badge grey">N/A</span></td>
+          <td>No paging configured &mdash; all failures go undetected</td>
+          <td>Define notification routing when monitors are created</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<div class="footer">
+  Generated 2026-04-23 &middot; Source: Datadog MCP (account 060367163877, ap-southeast-2) &middot; Project: open-prompt-manager &middot; Window: 30 days
+  <br/>Produced by the Operational Excellence &amp; Observability skill &middot; Claude Code
+</div>
+
+</body>
+</html>
