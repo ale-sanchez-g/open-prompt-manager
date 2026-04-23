@@ -868,10 +868,66 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   # Frontend: production build verification
   # ─────────────────────────────────────────────────────────────────────────────
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Frontend: mutation testing (Stryker)
+  # ─────────────────────────────────────────────────────────────────────────────
+  frontend-mutation-test:
+    name: Frontend Mutation Tests
+    runs-on: ubuntu-latest
+    needs: [frontend-test, code-quality-scan]
+    permissions:
+      contents: read
+      pull-requests: write
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Run Stryker mutation tests
+        run: npx stryker run
+
+      - name: Upload mutation report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-mutation-report
+          path: reports/mutation/
+          retention-days: 7
+
+      - name: Publish mutation score summary
+        run: |
+          SCORE=$(grep -o 'Mutation score[^<]*' reports/mutation/mutation.html | head -1 | sed 's/.*: //')
+          echo "## :zap: Frontend Mutation Score: $SCORE" > $GITHUB_STEP_SUMMARY
+          echo "[View full mutation report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+        shell: bash
+
+      - name: Comment mutation score on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync(process.env.GITHUB_STEP_SUMMARY, 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            }); 
+
   frontend-build:
     name: Frontend Build
     runs-on: ubuntu-latest
-    needs: [frontend-test, code-quality-scan]
+    needs: [frontend-mutation-test]
     permissions:
       contents: read
 
