@@ -1,0 +1,750 @@
+{
+    "title": "Open Prompt Manager — Cloud Cost & FinOps",
+    "description": "AWS cost visibility for OPM — daily/monthly spend, per-service breakdown, ECS Fargate efficiency, NAT Gateway cost watch, and budget monitor status. Account 060367163877 · ap-southeast-2.",
+    "tags": ["team:opm"],
+    "layout_type": "ordered",
+    "reflow_type": "auto",
+    "notify_list": [],
+
+    "template_variables": [
+        {
+            "name": "account",
+            "prefix": "aws_account",
+            "available_values": ["060367163877"],
+            "default": "060367163877"
+        }
+    ],
+
+    "widgets": [
+
+        {
+            "definition": {
+                "title": "Cost at a Glance",
+                "background_color": "custom_blue",
+                "type": "group",
+                "layout_type": "ordered",
+                "widgets": [
+                    {
+                        "definition": {
+                            "type": "note",
+                            "content": "## AWS Account `060367163877` · ap-southeast-2\nBilling metrics update **hourly** via CloudWatch integration. Values show **month-to-date** estimated charges. Daily spend = delta between hourly readings.\n\n⚠️ **No OPM-specific cost tag yet** — ECS, EC2, and ECR line items cover the whole account. Use the ECS Fargate efficiency section to proxy OPM's share.",
+                            "background_color": "yellow",
+                            "font_size": "12",
+                            "text_align": "left",
+                            "show_tick": false,
+                            "has_padding": true
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "Total estimated charges — month to date (USD)",
+                            "title_size": "16",
+                            "title_align": "left",
+                            "time": { "live_span": "1mo" },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "formulas": [{ "formula": "q" }],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "max:aws.billing.estimated_charges{aws_account:060367163877}"
+                                        }
+                                    ],
+                                    "conditional_formats": [
+                                        { "hide_value": false, "comparator": "<",  "palette": "white_on_green",  "value": 400 },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_yellow", "value": 400 },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_red",    "value": 600 }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": false,
+                            "custom_unit": "USD",
+                            "precision": 2
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "ECS estimated charges — MTD (USD)",
+                            "title_size": "16",
+                            "title_align": "left",
+                            "time": { "live_span": "1mo" },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "formulas": [{ "formula": "q" }],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "max:aws.billing.estimated_charges{aws_account:060367163877,servicename:AmazonECS}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": false,
+                            "custom_unit": "USD",
+                            "precision": 2
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "EC2 + NAT Gateway estimated charges — MTD (USD)",
+                            "title_size": "16",
+                            "title_align": "left",
+                            "time": { "live_span": "1mo" },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "formulas": [{ "formula": "q" }],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "max:aws.billing.estimated_charges{aws_account:060367163877,servicename:AmazonEC2}"
+                                        }
+                                    ],
+                                    "conditional_formats": [
+                                        { "hide_value": false, "comparator": "<",  "palette": "white_on_green",  "value": 50  },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_yellow", "value": 50  },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_red",    "value": 100 }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": false,
+                            "custom_unit": "USD",
+                            "precision": 2
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "Bedrock estimated charges — MTD (USD)",
+                            "title_size": "16",
+                            "title_align": "left",
+                            "time": { "live_span": "1mo" },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "formulas": [{ "formula": "q" }],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "max:aws.billing.estimated_charges{aws_account:060367163877,servicename:AmazonBedrock}"
+                                        }
+                                    ],
+                                    "conditional_formats": [
+                                        { "hide_value": false, "comparator": "<",  "palette": "white_on_green",  "value": 5  },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_yellow", "value": 5  },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_red",    "value": 20 }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": false,
+                            "custom_unit": "USD",
+                            "precision": 2
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "Total estimated daily charges — 30 d",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": { "live_span": "1mo" },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:aws.billing.estimated_charges{aws_account:060367163877}"
+                                        }
+                                    ],
+                                    "display_type": "bars",
+                                    "style": { "palette": "blue" }
+                                }
+                            ],
+                            "markers": [
+                                { "value": "y = 15", "display_type": "warning dashed", "label": "warn $15/day" },
+                                { "value": "y = 20", "display_type": "error dashed",   "label": "alert $20/day" }
+                            ],
+                            "yaxis": {}
+                        }
+                    }
+                ]
+            }
+        },
+
+        {
+            "definition": {
+                "title": "Spend Breakdown by AWS Service",
+                "background_color": "gray",
+                "type": "group",
+                "layout_type": "ordered",
+                "widgets": [
+                    {
+                        "definition": {
+                            "title": "Top 10 services by estimated cost — 30 d",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": { "live_span": "1mo" },
+                            "type": "toplist",
+                            "requests": [
+                                {
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:aws.billing.estimated_charges{aws_account:060367163877} by {servicename}",
+                                            "aggregator": "sum"
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q",
+                                            "limit": { "count": 10, "order": "desc" }
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "Charges by AWS service over time (USD) — 30 d",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": { "live_span": "1mo" },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:aws.billing.estimated_charges{aws_account:060367163877} by {servicename}"
+                                        }
+                                    ],
+                                    "display_type": "line"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "ECS charges — 30 d",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "time": { "live_span": "1mo" },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:aws.billing.estimated_charges{aws_account:060367163877,servicename:AmazonECS}"
+                                        }
+                                    ],
+                                    "style": { "palette": "purple" },
+                                    "display_type": "bars"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "EC2 + NAT Gateway charges — 30 d",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "time": { "live_span": "1mo" },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:aws.billing.estimated_charges{aws_account:060367163877,servicename:AmazonEC2}"
+                                        }
+                                    ],
+                                    "style": { "palette": "warm" },
+                                    "display_type": "bars"
+                                }
+                            ],
+                            "markers": [
+                                { "value": "y = 10", "display_type": "error dashed", "label": "NAT anomaly alert $10/hr" }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "Bedrock inference charges — 30 d",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "time": { "live_span": "1mo" },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:aws.billing.estimated_charges{aws_account:060367163877,servicename:AmazonBedrock}"
+                                        }
+                                    ],
+                                    "style": { "palette": "cool" },
+                                    "display_type": "bars"
+                                }
+                            ],
+                            "markers": [
+                                { "value": "y = 5", "display_type": "error dashed", "label": "Bedrock alert $5/hr" }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "AWS Config + CloudTrail charges — 30 d",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "time": { "live_span": "1mo" },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "config",
+                                            "query": "sum:aws.billing.estimated_charges{aws_account:060367163877,servicename:AWSConfig}"
+                                        },
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "trail",
+                                            "query": "sum:aws.billing.estimated_charges{aws_account:060367163877,servicename:AWSCloudTrail}"
+                                        }
+                                    ],
+                                    "formulas": [
+                                        { "formula": "config", "alias": "AWS Config" },
+                                        { "formula": "trail",  "alias": "CloudTrail"  }
+                                    ],
+                                    "display_type": "bars"
+                                }
+                            ],
+                            "markers": [
+                                { "value": "y = 2", "display_type": "warning dashed", "label": "Config alert $2/hr" },
+                                { "value": "y = 3", "display_type": "warning dashed", "label": "CloudTrail alert $3/hr" }
+                            ],
+                            "yaxis": {}
+                        }
+                    }
+                ]
+            }
+        },
+
+        {
+            "definition": {
+                "title": "ECS Fargate — Cost Efficiency",
+                "background_color": "custom_purple",
+                "type": "group",
+                "layout_type": "ordered",
+                "widgets": [
+                    {
+                        "definition": {
+                            "type": "note",
+                            "content": "### Fargate Cost Proxy\nOPM runs **2 Fargate tasks** (backend + frontend). Fargate bills per vCPU-hour and GB-hour. Low CPU/memory utilisation = over-provisioned task definitions = wasted spend.\n\n**Rule of thumb:** if avg utilisation < 30% sustained, right-size the task definition.",
+                            "background_color": "white",
+                            "font_size": "12",
+                            "text_align": "left",
+                            "show_tick": false,
+                            "has_padding": true
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "ECS CPU utilization by service — 7 d",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": { "live_span": "1w" },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:aws.ecs.service.cpuutilization{project:open-prompt-manager} by {servicename}"
+                                        }
+                                    ],
+                                    "display_type": "line"
+                                }
+                            ],
+                            "markers": [
+                                { "value": "y = 30", "display_type": "ok dashed",      "label": "right-size floor 30%" },
+                                { "value": "y = 80", "display_type": "warning dashed", "label": "scale-out warn 80%"   },
+                                { "value": "y = 90", "display_type": "error dashed",   "label": "alert 90%"            }
+                            ],
+                            "yaxis": { "min": "0", "max": "100" }
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "ECS memory utilization by service — 7 d",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": { "live_span": "1w" },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:aws.ecs.service.memory_utilization{project:open-prompt-manager} by {servicename}"
+                                        }
+                                    ],
+                                    "display_type": "line"
+                                }
+                            ],
+                            "markers": [
+                                { "value": "y = 30", "display_type": "ok dashed",      "label": "right-size floor 30%" },
+                                { "value": "y = 80", "display_type": "warning dashed", "label": "scale-out warn 80%"   },
+                                { "value": "y = 90", "display_type": "error dashed",   "label": "alert 90%"            }
+                            ],
+                            "yaxis": { "min": "0", "max": "100" }
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "Backend CPU % avg (7 d)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": { "live_span": "1w" },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        { "hide_value": false, "comparator": "<",  "palette": "white_on_yellow", "value": 30 },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_green",  "value": 30 },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_red",    "value": 80 }
+                                    ],
+                                    "formulas": [{ "formula": "q" }],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:aws.ecs.service.cpuutilization{service:open-prompt-manager-backend}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "custom_unit": "%",
+                            "precision": 1
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "Frontend CPU % avg (7 d)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": { "live_span": "1w" },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        { "hide_value": false, "comparator": "<",  "palette": "white_on_yellow", "value": 30 },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_green",  "value": 30 },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_red",    "value": 80 }
+                                    ],
+                                    "formulas": [{ "formula": "q" }],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:aws.ecs.service.cpuutilization{service:open-prompt-manager-frontend}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "custom_unit": "%",
+                            "precision": 1
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "Backend memory % avg (7 d)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": { "live_span": "1w" },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        { "hide_value": false, "comparator": "<",  "palette": "white_on_yellow", "value": 30 },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_green",  "value": 30 },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_red",    "value": 80 }
+                                    ],
+                                    "formulas": [{ "formula": "q" }],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:aws.ecs.service.memory_utilization{service:open-prompt-manager-backend}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "custom_unit": "%",
+                            "precision": 1
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "Frontend memory % avg (7 d)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": { "live_span": "1w" },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        { "hide_value": false, "comparator": "<",  "palette": "white_on_yellow", "value": 30 },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_green",  "value": 30 },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_red",    "value": 80 }
+                                    ],
+                                    "formulas": [{ "formula": "q" }],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:aws.ecs.service.memory_utilization{service:open-prompt-manager-frontend}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "custom_unit": "%",
+                            "precision": 1
+                        }
+                    }
+                ]
+            }
+        },
+
+        {
+            "definition": {
+                "title": "NAT Gateway — Network Cost Watch",
+                "background_color": "custom_orange",
+                "type": "group",
+                "layout_type": "ordered",
+                "widgets": [
+                    {
+                        "definition": {
+                            "type": "note",
+                            "content": "### ⚠️ Known Cost Risk: NAT Gateway\nOn **2026-04-15**, VPC endpoints were not applied — all ECR/ECS/SQS/STS traffic transited **3 NAT Gateways** at $0.059/GB, costing **$180.22 over 5 days**.\n\n**Fix applied:** 8 VPC endpoints created. Monitor alert threshold: >500 MB/hr bytes-out.\n\nIf this chart spikes, check VPC endpoint health: `aws ec2 describe-vpc-endpoints --filters Name=state,Values=available`",
+                            "background_color": "white",
+                            "font_size": "12",
+                            "text_align": "left",
+                            "show_tick": false,
+                            "has_padding": true
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "NAT Gateway bytes out — 7 d",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": { "live_span": "1w" },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:aws.natgateway.bytes_out_to_destination{region:ap-southeast-2}"
+                                        }
+                                    ],
+                                    "style": { "palette": "warm" },
+                                    "display_type": "line"
+                                }
+                            ],
+                            "markers": [
+                                { "value": "y = 524288000", "display_type": "error dashed", "label": "alert 500 MB/hr" }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "NAT Gateway bytes in — 7 d",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": { "live_span": "1w" },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:aws.natgateway.bytes_in_from_source{region:ap-southeast-2}"
+                                        }
+                                    ],
+                                    "style": { "palette": "cool" },
+                                    "display_type": "line"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "NAT Gateway bytes out — now (1 h)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": { "live_span": "1h" },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        { "hide_value": false, "comparator": "<",  "palette": "white_on_green",  "value": 524288000 },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_red",    "value": 524288000 }
+                                    ],
+                                    "formulas": [{ "formula": "q" }],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:aws.natgateway.bytes_out_to_destination{region:ap-southeast-2}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    }
+                ]
+            }
+        },
+
+        {
+            "definition": {
+                "title": "Budget Monitors & Alerts",
+                "background_color": "custom_green",
+                "type": "group",
+                "layout_type": "ordered",
+                "widgets": [
+                    {
+                        "definition": {
+                            "title": "All cost & billing monitors",
+                            "title_size": "13",
+                            "type": "manage_status",
+                            "display_format": "countsAndList",
+                            "color_preference": "text",
+                            "hide_zero_counts": false,
+                            "show_status": true,
+                            "last_triggered_format": "relative",
+                            "query": "billing OR spend OR cost OR NAT",
+                            "sort": "status,asc",
+                            "count": 50,
+                            "start": 0,
+                            "show_priority": false,
+                            "show_last_triggered": true
+                        }
+                    },
+                    {
+                        "definition": {
+                            "type": "note",
+                            "content": "### Budget Thresholds — Account 060367163877\n\n| Monitor | Threshold | Priority | Status |\n|---|---|---|---|\n| AWS daily spend | > $20/day | P1 | No Data |\n| Monthly spend forecast | > $600/mo | P2 | No Data |\n| NAT Gateway EC2 charges | > $10/hr | P2 | No Data |\n| NAT Gateway bytes out | > 500 MB/hr | P2 | **OK** |\n| Bedrock inference charges | > $5/hr | P3 | No Data |\n| AWS Config charges | > $2/hr | P3 | No Data |\n| CloudTrail charges | > $3/hr | P3 | No Data |\n\n⚠️ **All billing monitors show \"No Data\"** — AWS billing metrics update every 4–24 h. This is expected outside billing update windows.\n\n📧 All alerts route to `rad@rads.au`. P1 also pages `oncall-toval-platform`.",
+                            "background_color": "white",
+                            "font_size": "12",
+                            "text_align": "left",
+                            "show_tick": false,
+                            "has_padding": true
+                        }
+                    }
+                ]
+            }
+        },
+
+        {
+            "definition": {
+                "title": "Cost Incident History & FinOps Actions",
+                "background_color": "custom_pink",
+                "type": "group",
+                "layout_type": "ordered",
+                "widgets": [
+                    {
+                        "definition": {
+                            "type": "note",
+                            "content": "## Cost Incident Log\n\n### 2026-04-15 — NAT Gateway Blowout [$180.22]\n**Root cause:** VPC endpoints not applied. All ECR/ECS/SQS/STS traffic transited 3 NAT Gateways at $0.059/GB over 5 days.\n**Fix:** 8 VPC endpoints created. Traffic now stays within the VPC.\n**Ongoing risk:** New services or endpoints not covered by the allowlist will revert to NAT routing.\n\n---\n\n### 2026-04-15 — AWS Config Overcharge\n**Root cause:** High-churn resources (ECS task definitions, Lambda, EventBridge rules) recorded on every deploy.\n**Fix:** Switched 5 resource types to `EXCLUSION_BY_RESOURCE_TYPES`.\n**Ongoing risk:** New high-churn resource types added without adding to exclusion list.\n\n---\n\n### 2026-04-15 — CloudTrail S3 Data Events\n**Root cause:** `openclaw-trail` had a wildcard S3 data event selector recording every S3 API call across ALL buckets.\n**Fix:** Trail switched to WriteOnly management events only.\n**Ongoing risk:** New trail with data event logging re-added.",
+                            "background_color": "white",
+                            "font_size": "12",
+                            "text_align": "left",
+                            "show_tick": false,
+                            "has_padding": true
+                        }
+                    },
+                    {
+                        "definition": {
+                            "type": "note",
+                            "content": "## FinOps Action Items\n\n| # | Action | Impact | Owner |\n|---|---|---|---|\n| 1 | Add `project:open-prompt-manager` cost allocation tag to all OPM ECS tasks, ALB, and ECR repos | Enables OPM-specific billing isolation | DevOps |\n| 2 | Enable AWS Cost Explorer tag-based reports for `project:open-prompt-manager` | Accurate monthly OPM cost report | FinOps |\n| 3 | Right-size ECS task definitions if CPU/memory avg < 30% over 7 days | Reduce Fargate spend | Platform |\n| 4 | Wire notification targets on 5 cost monitors currently missing `@notification` | Faster anomaly response | Ops |\n| 5 | Set up AWS Budgets alert at $500/mo as a second guard rail | Independent of Datadog | FinOps |\n| 6 | Review NAT Gateway bytes monthly — confirm VPC endpoint coverage for any new AWS services added | Prevent NAT blowout recurrence | Platform |\n\n---\n\n**Budget baseline (estimated):**\n- Monthly target: < $600\n- Daily target: < $20/day\n- ECS Fargate (OPM share): ~$30–80/mo at current task sizes\n- NAT Gateway: < $5/mo with VPC endpoints healthy",
+                            "background_color": "white",
+                            "font_size": "12",
+                            "text_align": "left",
+                            "show_tick": false,
+                            "has_padding": true
+                        }
+                    }
+                ]
+            }
+        }
+
+    ]
+}
