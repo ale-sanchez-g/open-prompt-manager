@@ -1,0 +1,52 @@
+name: Mutation tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - 'release/*'
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/mutation.yml'
+
+permissions: {}  # Deny all at workflow level — each job opts in explicitly
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Frontend: mutation testing (Stryker)
+  # ─────────────────────────────────────────────────────────────────────────────
+  frontend-mutation-test:
+    name: Frontend Mutation Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Run Stryker mutation tests
+        run: npx stryker run
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: frontend-mutation-report
+          path: reports/mutation/
+          retention-days: 7
