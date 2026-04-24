@@ -638,13 +638,13 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Download backend coverage artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: backend-coverage
           path: quality-reports/backend
 
       - name: Download frontend coverage artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: frontend-coverage
           path: quality-reports/frontend
