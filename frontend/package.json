@@ -1,6 +1,6 @@
 {
   "name": "prompt-management-frontend",
-  "version": "2.2.5",
+  "version": "2.2.6",
   "private": true,
   "dependencies": {
     "ajv": "^8.20.0",
