@@ -3,7 +3,7 @@
   "version": "2.2.5",
   "private": true,
   "dependencies": {
-    "ajv": "^8.18.0",
+    "ajv": "^8.20.0",
     "axios": "^1.15.2",
     "eslint-plugin-react-hooks": "^7.1.0",
     "lucide-react": "^1.8.0",
