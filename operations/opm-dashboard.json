@@ -1,0 +1,655 @@
+{
+    "title": "Open Prompt Manager — Platform Snapshot",
+    "description": "Development team dashboard — ECS infrastructure, ALB traffic, synthetic health, monitor status, and quality engineering scorecard. Generated 2026-04-24.",
+    "widgets": [
+
+        {
+            "definition": {
+                "title": "OPM — At a glance",
+                "background_color": "custom_blue",
+                "type": "group",
+                "layout_type": "ordered",
+                "widgets": [
+                    {
+                        "definition": {
+                            "title": "Monitor status",
+                            "title_size": "16",
+                            "type": "manage_status",
+                            "display_format": "countsAndList",
+                            "color_preference": "text",
+                            "hide_zero_counts": false,
+                            "show_status": true,
+                            "last_triggered_format": "relative",
+                            "query": "OPM",
+                            "sort": "status,asc",
+                            "count": 50,
+                            "start": 0,
+                            "show_priority": false,
+                            "show_last_triggered": true
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "Backend tasks — running / desired",
+                            "title_size": "16",
+                            "title_align": "left",
+                            "time": { "live_span": "5m" },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_green", "value": 1 },
+                                        { "hide_value": false, "comparator": "<",  "palette": "white_on_red",   "value": 1 }
+                                    ],
+                                    "formulas": [{ "formula": "running / desired * 100" }],
+                                    "queries": [
+                                        { "data_source": "metrics", "name": "running", "query": "avg:aws.ecs.service.running{service:open-prompt-manager-backend}" },
+                                        { "data_source": "metrics", "name": "desired", "query": "avg:aws.ecs.service.desired{service:open-prompt-manager-backend}" }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "custom_unit": "%",
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "Frontend tasks — running / desired",
+                            "title_size": "16",
+                            "title_align": "left",
+                            "time": { "live_span": "5m" },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_green", "value": 1 },
+                                        { "hide_value": false, "comparator": "<",  "palette": "white_on_red",   "value": 1 }
+                                    ],
+                                    "formulas": [{ "formula": "running / desired * 100" }],
+                                    "queries": [
+                                        { "data_source": "metrics", "name": "running", "query": "avg:aws.ecs.service.running{service:open-prompt-manager-frontend}" },
+                                        { "data_source": "metrics", "name": "desired", "query": "avg:aws.ecs.service.desired{service:open-prompt-manager-frontend}" }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "custom_unit": "%",
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "ALB 5xx error rate (5 m)",
+                            "title_size": "16",
+                            "title_align": "left",
+                            "time": { "live_span": "5m" },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_green", "value": 0 },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_yellow","value": 1 },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_red",   "value": 5 }
+                                    ],
+                                    "formulas": [{ "formula": "clamp_min(errors,0) / clamp_min(requests,1) * 100" }],
+                                    "queries": [
+                                        { "data_source": "metrics", "name": "errors",   "query": "sum:aws.applicationelb.httpcode_target_5xx{project:open-prompt-manager}.as_count()" },
+                                        { "data_source": "metrics", "name": "requests", "query": "sum:aws.applicationelb.request_count{project:open-prompt-manager}.as_count()" }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "custom_unit": "%",
+                            "precision": 1
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "Synthetic healthcheck",
+                            "title_size": "16",
+                            "title_align": "left",
+                            "time": { "live_span": "15m" },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_green", "value": 1 },
+                                        { "hide_value": false, "comparator": "<",  "palette": "white_on_red",   "value": 1 }
+                                    ],
+                                    "formulas": [{ "formula": "q" }],
+                                    "queries": [
+                                        { "data_source": "metrics", "name": "q", "query": "avg:synthetics.test_runs{url:https://opm-dx1.com/api/ready}.as_count()" }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "definition": {
+                            "type": "note",
+                            "content": "## Quality Score: **64 / D**\n\n| Dimension | Score |\n|---|---|\n| Codebase Health | 70 C |\n| Security & Compliance | 72 C |\n| Reliability & Stability | 68 C |\n| User-Centric Quality | 60 D |\n| Workflow & Efficiency | 68 C |\n| Architecture & Design | 58 F |\n| Delivery Flow & DORA | 72 C |\n| **Operational Excellence** | **42 F** |\n\n_Updated 2026-04-24. Next priority: APM + log ingestion._",
+                            "background_color": "white",
+                            "font_size": "12",
+                            "text_align": "left",
+                            "show_tick": false,
+                            "has_padding": true
+                        }
+                    }
+                ]
+            }
+        },
+
+        {
+            "definition": {
+                "title": "ECS Infrastructure — Backend & Frontend",
+                "background_color": "gray",
+                "type": "group",
+                "layout_type": "ordered",
+                "widgets": [
+                    {
+                        "definition": {
+                            "title": "CPU utilization by service (%) — 4 h",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": { "live_span": "4h" },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        { "data_source": "metrics", "name": "q", "query": "avg:aws.ecs.service.cpuutilization{project:open-prompt-manager} by {servicename}" }
+                                    ],
+                                    "display_type": "line"
+                                }
+                            ],
+                            "markers": [
+                                { "value": "y = 80", "display_type": "warning dashed", "label": "warn 80%" },
+                                { "value": "y = 90", "display_type": "error dashed",   "label": "alert 90%" }
+                            ],
+                            "yaxis": { "min": "0", "max": "100" }
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "Memory utilization by service (%) — 4 h",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": { "live_span": "4h" },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        { "data_source": "metrics", "name": "q", "query": "avg:aws.ecs.service.memory_utilization{project:open-prompt-manager} by {servicename}" }
+                                    ],
+                                    "display_type": "line"
+                                }
+                            ],
+                            "markers": [
+                                { "value": "y = 80", "display_type": "warning dashed", "label": "warn 80%" },
+                                { "value": "y = 90", "display_type": "error dashed",   "label": "alert 90%" }
+                            ],
+                            "yaxis": { "min": "0", "max": "100" }
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "Backend — tasks running vs desired",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": { "live_span": "4h" },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        { "data_source": "metrics", "name": "desired", "query": "avg:aws.ecs.service.desired{service:open-prompt-manager-backend}" },
+                                        { "data_source": "metrics", "name": "running", "query": "avg:aws.ecs.service.running{service:open-prompt-manager-backend}" }
+                                    ],
+                                    "formulas": [
+                                        { "formula": "desired", "alias": "Desired" },
+                                        { "formula": "running", "alias": "Running" }
+                                    ],
+                                    "display_type": "line"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "Frontend — tasks running vs desired",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": { "live_span": "4h" },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        { "data_source": "metrics", "name": "desired", "query": "avg:aws.ecs.service.desired{service:open-prompt-manager-frontend}" },
+                                        { "data_source": "metrics", "name": "running", "query": "avg:aws.ecs.service.running{service:open-prompt-manager-frontend}" }
+                                    ],
+                                    "formulas": [
+                                        { "formula": "desired", "alias": "Desired" },
+                                        { "formula": "running", "alias": "Running" }
+                                    ],
+                                    "display_type": "line"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "Backend CPU % (now)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": { "live_span": "5m" },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_green",  "value": 0  },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_yellow", "value": 80 },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_red",    "value": 90 }
+                                    ],
+                                    "formulas": [{ "formula": "q" }],
+                                    "queries": [
+                                        { "data_source": "metrics", "name": "q", "query": "avg:aws.ecs.service.cpuutilization{service:open-prompt-manager-backend}" }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "custom_unit": "%",
+                            "precision": 1
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "Frontend CPU % (now)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": { "live_span": "5m" },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_green",  "value": 0  },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_yellow", "value": 80 },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_red",    "value": 90 }
+                                    ],
+                                    "formulas": [{ "formula": "q" }],
+                                    "queries": [
+                                        { "data_source": "metrics", "name": "q", "query": "avg:aws.ecs.service.cpuutilization{service:open-prompt-manager-frontend}" }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "custom_unit": "%",
+                            "precision": 1
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "Backend memory % (now)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": { "live_span": "5m" },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_green",  "value": 0  },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_yellow", "value": 80 },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_red",    "value": 90 }
+                                    ],
+                                    "formulas": [{ "formula": "q" }],
+                                    "queries": [
+                                        { "data_source": "metrics", "name": "q", "query": "avg:aws.ecs.service.memory_utilization{service:open-prompt-manager-backend}" }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "custom_unit": "%",
+                            "precision": 1
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "Frontend memory % (now)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": { "live_span": "5m" },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_green",  "value": 0  },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_yellow", "value": 80 },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_red",    "value": 90 }
+                                    ],
+                                    "formulas": [{ "formula": "q" }],
+                                    "queries": [
+                                        { "data_source": "metrics", "name": "q", "query": "avg:aws.ecs.service.memory_utilization{service:open-prompt-manager-frontend}" }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "custom_unit": "%",
+                            "precision": 1
+                        }
+                    }
+                ]
+            }
+        },
+
+        {
+            "definition": {
+                "title": "ALB — Traffic & Errors",
+                "background_color": "custom_blue",
+                "type": "group",
+                "layout_type": "ordered",
+                "widgets": [
+                    {
+                        "definition": {
+                            "title": "Request rate (req/s) — 4 h",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": { "live_span": "4h" },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        { "data_source": "metrics", "name": "q", "query": "sum:aws.applicationelb.request_count{project:open-prompt-manager}.as_rate()" }
+                                    ],
+                                    "style": { "palette": "blue" },
+                                    "display_type": "bars"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "5xx error rate (%) — 4 h",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": { "live_span": "4h" },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        { "data_source": "metrics", "name": "errors",   "query": "sum:aws.applicationelb.httpcode_target_5xx{project:open-prompt-manager}.as_count()" },
+                                        { "data_source": "metrics", "name": "requests", "query": "sum:aws.applicationelb.request_count{project:open-prompt-manager}.as_count()" }
+                                    ],
+                                    "formulas": [{ "formula": "clamp_min(errors,0) / clamp_min(requests,1) * 100", "alias": "5xx %" }],
+                                    "style": { "palette": "red" },
+                                    "display_type": "line"
+                                }
+                            ],
+                            "markers": [
+                                { "value": "y = 5", "display_type": "error dashed", "label": "alert threshold 5%" }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "4xx client errors — 4 h",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": { "live_span": "4h" },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        { "data_source": "metrics", "name": "q", "query": "sum:aws.applicationelb.httpcode_target_4xx{project:open-prompt-manager}.as_count()" }
+                                    ],
+                                    "style": { "palette": "warm" },
+                                    "display_type": "bars"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "Requests today",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": { "live_span": "1d" },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "formulas": [{ "formula": "q" }],
+                                    "queries": [
+                                        { "data_source": "metrics", "name": "q", "query": "sum:aws.applicationelb.request_count{project:open-prompt-manager}.as_count()" }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "5xx errors today",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": { "live_span": "1d" },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_green", "value": 0 },
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_red",   "value": 1 }
+                                    ],
+                                    "formulas": [{ "formula": "q" }],
+                                    "queries": [
+                                        { "data_source": "metrics", "name": "q", "query": "sum:aws.applicationelb.httpcode_target_5xx{project:open-prompt-manager}.as_count()" }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "ALB target response time p95 (ms) — 4 h",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": { "live_span": "4h" },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        { "data_source": "metrics", "name": "q", "query": "p95:aws.applicationelb.target_response_time{project:open-prompt-manager} * 1000" }
+                                    ],
+                                    "display_type": "line"
+                                }
+                            ],
+                            "markers": [
+                                { "value": "y = 1000", "display_type": "warning dashed", "label": "1 s" },
+                                { "value": "y = 3000", "display_type": "error dashed",   "label": "3 s" }
+                            ],
+                            "yaxis": {}
+                        }
+                    }
+                ]
+            }
+        },
+
+        {
+            "definition": {
+                "title": "Synthetic & Monitor Health",
+                "background_color": "custom_green",
+                "type": "group",
+                "layout_type": "ordered",
+                "widgets": [
+                    {
+                        "definition": {
+                            "title": "All OPM monitors",
+                            "title_size": "13",
+                            "type": "manage_status",
+                            "display_format": "countsAndList",
+                            "color_preference": "text",
+                            "hide_zero_counts": false,
+                            "show_status": true,
+                            "last_triggered_format": "relative",
+                            "query": "OPM",
+                            "sort": "status,asc",
+                            "count": 50,
+                            "start": 0,
+                            "show_priority": false,
+                            "show_last_triggered": true
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "Synthetic test runs — opm-dx1.com/api/ready (4 h)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": { "live_span": "4h" },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        { "data_source": "metrics", "name": "q", "query": "sum:synthetics.test_runs{url:https://opm-dx1.com/api/ready}.as_count()" }
+                                    ],
+                                    "style": { "palette": "green" },
+                                    "display_type": "bars"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "definition": {
+                            "title": "Synthetic test runs today",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": { "live_span": "1d" },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        { "hide_value": false, "comparator": ">=", "palette": "white_on_green", "value": 1 },
+                                        { "hide_value": false, "comparator": "<",  "palette": "white_on_red",   "value": 1 }
+                                    ],
+                                    "formulas": [{ "formula": "q" }],
+                                    "queries": [
+                                        { "data_source": "metrics", "name": "q", "query": "sum:synthetics.test_runs{url:https://opm-dx1.com/api/ready}.as_count()" }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "definition": {
+                            "type": "note",
+                            "content": "### Monitor Coverage\n\n**6 monitors active — all OK**\n\n| Monitor | Type | Notifies |\n|---|---|---|\n| Synthetic: opm-dx1.com/api/ready | Synthetics | anojan@ |\n| ALB 5xx error rate > 5% | Query alert | ⚠️ none |\n| ECS task deficit — backend | Query alert | ⚠️ none |\n| ECS task deficit — frontend | Query alert | ⚠️ none |\n| ECS CPU > 90% (all services) | Query alert | ⚠️ none |\n| ECS memory > 90% (all services) | Query alert | ⚠️ none |\n\n**Action needed:** wire `@notification` targets on 5 monitors.",
+                            "background_color": "white",
+                            "font_size": "12",
+                            "text_align": "left",
+                            "show_tick": false,
+                            "has_padding": true
+                        }
+                    }
+                ]
+            }
+        },
+
+        {
+            "definition": {
+                "title": "Quality Engineering Scorecard — snapshot 2026-04-24",
+                "background_color": "custom_purple",
+                "type": "group",
+                "layout_type": "ordered",
+                "widgets": [
+                    {
+                        "definition": {
+                            "type": "note",
+                            "content": "## Overall: 64 / 100 — Grade D\n\n_8-dimension swarm review · Claude Haiku agents · Branch: feat/frontend-mutation-testing_\n\n---\n\n### Dimension Scores\n\n| Dimension | Score | Grade | Top Finding |\n|---|---|---|---|\n| Codebase Health & Maintainability | 70 | C | ApiDocs.jsx 842-LOC monolith; MCP bypasses REST layer |\n| Security & Compliance | 72 | C | Default SQLite in prod; no secrets management; permissive CORS |\n| Reliability & Production Stability | 68 | C | No APM, no circuit breakers, no graceful shutdown |\n| User-Centric Quality | 60 | D | No React ErrorBoundary; 4 ARIA attrs in 4,700 LOC |\n| Workflow & Engineering Efficiency | 68 | C | 16 stalled branches; vague commit messages |\n| Architecture & System Design | 58 | F | 0% resilience pattern coverage; unbounded component rendering |\n| Delivery Flow & DORA | 72 | C | Manual release trigger; no post-deploy monitoring |\n| **Operational Excellence** | **42** | **F** | APM=0, logs=0, RUM=0 — app layer blind despite 6 monitors |\n\n---\n\n### Next Actions (priority order)\n\n1. **Install ddtrace** on backend ECS task + enable Datadog log collection → closes 2 critical findings, Operational jumps ~65\n2. **Wire notifications** on 5 monitors missing `@notification` targets\n3. **Add React ErrorBoundary** around all top-level routes\n4. **Replace SQLite** with PostgreSQL in production",
+                            "background_color": "white",
+                            "font_size": "12",
+                            "text_align": "left",
+                            "show_tick": false,
+                            "has_padding": true
+                        }
+                    },
+                    {
+                        "definition": {
+                            "type": "note",
+                            "content": "### Finding Summary\n\n| Severity | Count |\n|---|---|\n| 🔴 Critical | 10 |\n| 🟠 High | 19 |\n| 🟡 Medium | 23 |\n| 🔵 Low | 10 |\n| **Total** | **62** |\n\n---\n\n### Observability Gap (top blocker)\n\n| Signal | Status |\n|---|---|\n| ECS infra metrics | ✅ flowing |\n| Synthetic healthcheck | ✅ OK |\n| ALB metrics | ✅ flowing |\n| APM traces | ❌ 0 spans |\n| Log ingestion | ❌ 0 logs |\n| RUM events | ❌ 0 sessions |\n| Custom metrics | ❌ 0 |\n| Dashboards | ❌ 0 (this one is the first) |",
+                            "background_color": "white",
+                            "font_size": "12",
+                            "text_align": "left",
+                            "show_tick": false,
+                            "has_padding": true
+                        }
+                    }
+                ]
+            }
+        }
+
+    ],
+    "template_variables": [
+        {
+            "name": "env",
+            "prefix": "env",
+            "available_values": ["production", "staging"],
+            "default": "production"
+        },
+        {
+            "name": "service",
+            "prefix": "service",
+            "available_values": ["open-prompt-manager-backend", "open-prompt-manager-frontend"],
+            "default": "*"
+        }
+    ],
+    "layout_type": "ordered",
+    "notify_list": [],
+    "reflow_type": "auto",
+    "tags": ["team:opm"]
+}

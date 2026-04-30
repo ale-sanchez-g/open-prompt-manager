@@ -1,0 +1,2617 @@
+{
+    "title": "Rad-OpenClaw — Operations Center",
+    "description": "Operations dashboard — SOC2 compliance, agent services, LLM intelligence, host infrastructure, security",
+    "widgets": [
+        {
+            "id": 4941466831855576,
+            "definition": {
+                "title": "Operations at a glance",
+                "background_color": "custom_blue",
+                "type": "group",
+                "layout_type": "ordered",
+                "widgets": [
+                    {
+                        "id": 3707318607078497,
+                        "definition": {
+                            "title": "SOC2 score",
+                            "title_size": "16",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1h"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 90
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_yellow",
+                                            "value": 70
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 70
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:openclaw.soc2.score{host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "custom_unit": "%",
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "id": 2085322109983389,
+                        "definition": {
+                            "title": "Compliant",
+                            "title_size": "16",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1h"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 1
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 1
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:openclaw.soc2.compliant{host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "id": 3049647246402093,
+                        "definition": {
+                            "title": "LLM errors (15 m)",
+                            "title_size": "16",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "15m"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 1
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:ml_obs.span{ml_app:rad-openclaw,error:true}.as_count()"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "id": 8413952568530052,
+                        "definition": {
+                            "title": "LLM cost today",
+                            "title_size": "16",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1d"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:ml_obs.span.llm.total.cost{ml_app:rad-openclaw}.as_count()"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "custom_unit": "USD",
+                            "precision": 2
+                        }
+                    },
+                    {
+                        "id": 4356674421824730,
+                        "definition": {
+                            "title": "CPU %",
+                            "title_size": "16",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "5m"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_yellow",
+                                            "value": 75
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 90
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:system.cpu.user{host:openclaw-ec2} + avg:system.cpu.system{host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "custom_unit": "%",
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "id": 6975344976460093,
+                        "definition": {
+                            "title": "Disk used %",
+                            "title_size": "16",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "5m"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_yellow",
+                                            "value": 75
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 90
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "max:system.disk.in_use{host:openclaw-ec2,device:/dev/root} * 100"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "custom_unit": "%",
+                            "precision": 0
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "id": 6578484711375516,
+            "definition": {
+                "title": "External services — WhatsApp & Voice",
+                "background_color": "custom_blue",
+                "type": "group",
+                "layout_type": "ordered",
+                "widgets": [
+                    {
+                        "id": 5738953122531204,
+                        "definition": {
+                            "type": "note",
+                            "content": "WhatsApp",
+                            "background_color": "white",
+                            "font_size": "12",
+                            "text_align": "left",
+                            "show_tick": false,
+                            "has_padding": true
+                        }
+                    },
+                    {
+                        "id": 2526908848992991,
+                        "definition": {
+                            "title": "Process up",
+                            "title_size": "13",
+                            "type": "check_status",
+                            "check": "process.up",
+                            "grouping": "check",
+                            "group_by": [],
+                            "tags": [
+                                "service:openclaw-whatsapp"
+                            ]
+                        }
+                    },
+                    {
+                        "id": 3465041042240690,
+                        "definition": {
+                            "title": "Messages in (15 m)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "15m"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:openclaw.whatsapp.messages.received{service:openclaw-whatsapp}.as_count()"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "id": 275967078876955,
+                        "definition": {
+                            "title": "Errors (15 m)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "15m"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 1
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:openclaw.whatsapp.errors{service:openclaw-whatsapp}.as_count()"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "id": 1431101660277991,
+                        "definition": {
+                            "title": "Message volume (in / out)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": {
+                                "live_span": "4h"
+                            },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "sum:openclaw.whatsapp.messages.received{service:openclaw-whatsapp}.as_count()"
+                                        }
+                                    ],
+                                    "style": {
+                                        "palette": "green"
+                                    },
+                                    "display_type": "bars"
+                                },
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "sum:openclaw.whatsapp.messages.sent{service:openclaw-whatsapp}.as_count()"
+                                        }
+                                    ],
+                                    "style": {
+                                        "palette": "blue"
+                                    },
+                                    "display_type": "bars"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "id": 4562976626801321,
+                        "definition": {
+                            "type": "note",
+                            "content": "Aria Voice",
+                            "background_color": "white",
+                            "font_size": "12",
+                            "text_align": "left",
+                            "show_tick": false,
+                            "has_padding": true
+                        }
+                    },
+                    {
+                        "id": 5331422203649489,
+                        "definition": {
+                            "title": "Process up",
+                            "title_size": "13",
+                            "type": "check_status",
+                            "check": "process.up",
+                            "grouping": "check",
+                            "group_by": [],
+                            "tags": [
+                                "service:aria-voice"
+                            ]
+                        }
+                    },
+                    {
+                        "id": 6476845160743571,
+                        "definition": {
+                            "title": "Calls today",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1d"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:openclaw.voice.calls.initiated{service:aria-voice}.as_count()"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "id": 3566594299834812,
+                        "definition": {
+                            "title": "Failed calls (1 h)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1h"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 1
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:openclaw.voice.calls.failed{service:aria-voice}.as_count()"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "id": 4935975477009937,
+            "definition": {
+                "title": "Agent services — LangChain traces",
+                "background_color": "custom_blue",
+                "type": "group",
+                "layout_type": "ordered",
+                "widgets": [
+                    {
+                        "id": 4207038686521589,
+                        "definition": {
+                            "type": "note",
+                            "content": "APM · LangChain traces · `env:production`",
+                            "background_color": "white",
+                            "font_size": "12",
+                            "text_align": "left",
+                            "show_tick": false,
+                            "has_padding": true
+                        }
+                    },
+                    {
+                        "id": 823616120533322,
+                        "definition": {
+                            "title": "Monitor status",
+                            "title_size": "13",
+                            "type": "manage_status",
+                            "display_format": "countsAndList",
+                            "color_preference": "text",
+                            "hide_zero_counts": false,
+                            "show_status": true,
+                            "last_triggered_format": "relative",
+                            "query": "app:rad-openclaw",
+                            "sort": "status,asc",
+                            "count": 50,
+                            "start": 0,
+                            "show_priority": false,
+                            "show_last_triggered": false
+                        }
+                    },
+                    {
+                        "id": 1683324072477036,
+                        "definition": {
+                            "title": "Request rate by agent (req/s)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": {
+                                "live_span": "4h"
+                            },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "sum:trace.langchain.request.hits{env:production} by {service}.as_rate()"
+                                        }
+                                    ],
+                                    "display_type": "line"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "id": 6879022261590227,
+                        "definition": {
+                            "title": "Error rate by agent",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": {
+                                "live_span": "4h"
+                            },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "sum:trace.langchain.request.errors{env:production} by {service}.as_rate()"
+                                        }
+                                    ],
+                                    "display_type": "line"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "id": 8110852389610929,
+                        "definition": {
+                            "title": "p95 latency by agent (ms)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": {
+                                "live_span": "4h"
+                            },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "avg:trace.langchain.request.duration.by.service.95p{env:production} by {service}"
+                                        }
+                                    ],
+                                    "display_type": "line"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "id": 8299458719300344,
+                        "definition": {
+                            "title": "Requests today",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1d"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:trace.langchain.request.hits{env:production}.as_count()"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "id": 6003577953222289,
+                        "definition": {
+                            "title": "Errors today",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1d"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 1
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:trace.langchain.request.errors{env:production}.as_count()"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "id": 8805671815572661,
+            "definition": {
+                "title": "LLM intelligence",
+                "background_color": "custom_purple",
+                "type": "group",
+                "layout_type": "ordered",
+                "widgets": [
+                    {
+                        "id": 1081593033016583,
+                        "definition": {
+                            "title": "Token usage by agent (input / output)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": {
+                                "live_span": "4h"
+                            },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "sum:ml_obs.span.llm.input.tokens{ml_app:rad-openclaw} by {service}.as_count()"
+                                        }
+                                    ],
+                                    "display_type": "bars"
+                                },
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "sum:ml_obs.span.llm.output.tokens{ml_app:rad-openclaw} by {service}.as_count()"
+                                        }
+                                    ],
+                                    "display_type": "bars"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "id": 8910328731917594,
+                        "definition": {
+                            "title": "Cost by agent over time (USD)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": {
+                                "live_span": "4h"
+                            },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "sum:ml_obs.span.llm.total.cost{ml_app:rad-openclaw} by {service}.as_count()"
+                                        }
+                                    ],
+                                    "display_type": "line"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "id": 792457951538157,
+                        "definition": {
+                            "title": "Span duration p95 (ms)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": {
+                                "live_span": "4h"
+                            },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "p95:ml_obs.span.duration{ml_app:rad-openclaw} by {service}"
+                                        }
+                                    ],
+                                    "display_type": "line"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "id": 5801658109713161,
+                        "definition": {
+                            "title": "Input tokens today",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1d"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:ml_obs.span.llm.input.tokens{ml_app:rad-openclaw}.as_count()"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "id": 8555523271506173,
+                        "definition": {
+                            "title": "Output tokens today",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1d"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:ml_obs.span.llm.output.tokens{ml_app:rad-openclaw}.as_count()"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "id": 4494588948762242,
+            "definition": {
+                "title": "Host infrastructure",
+                "background_color": "gray",
+                "type": "group",
+                "layout_type": "ordered",
+                "widgets": [
+                    {
+                        "id": 7136145260913086,
+                        "definition": {
+                            "title": "CPU % (user + system)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": {
+                                "live_span": "4h"
+                            },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "avg:system.cpu.user{host:openclaw-ec2}"
+                                        },
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query2",
+                                            "query": "avg:system.cpu.system{host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "query1 + query2"
+                                        }
+                                    ],
+                                    "display_type": "line"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "id": 8682496887270382,
+                        "definition": {
+                            "title": "Memory usable %",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": {
+                                "live_span": "4h"
+                            },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "avg:system.mem.usable{host:openclaw-ec2}"
+                                        },
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query2",
+                                            "query": "avg:system.mem.total{host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "query1 / query2 * 100"
+                                        }
+                                    ],
+                                    "display_type": "line"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "id": 6637156878692588,
+                        "definition": {
+                            "title": "Network I/O (bytes/s)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": {
+                                "live_span": "4h"
+                            },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "avg:system.net.bytes_rcvd{host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "style": {
+                                        "palette": "green"
+                                    },
+                                    "display_type": "line"
+                                },
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "avg:system.net.bytes_sent{host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "style": {
+                                        "palette": "warm"
+                                    },
+                                    "display_type": "line"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "id": 4555809831658405,
+                        "definition": {
+                            "title": "System load (1 / 5 / 15 m)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": {
+                                "live_span": "4h"
+                            },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "avg:system.load.1{host:openclaw-ec2}"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "avg:system.load.5{host:openclaw-ec2}"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "avg:system.load.15{host:openclaw-ec2}"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "id": 7961875499827163,
+                        "definition": {
+                            "title": "Memory available",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1h"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:system.mem.usable{host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "id": 846753420101794,
+            "definition": {
+                "title": "SOC2 compliance",
+                "background_color": "custom_green",
+                "type": "group",
+                "layout_type": "ordered",
+                "widgets": [
+                    {
+                        "id": 7637682563564999,
+                        "definition": {
+                            "title": "Compliance score",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1h"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 90
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_yellow",
+                                            "value": 70
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 70
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:openclaw.soc2.score{host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "custom_unit": "%",
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "id": 3646116688001690,
+                        "definition": {
+                            "title": "Controls passing",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1h"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 7
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_yellow",
+                                            "value": 5
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 5
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:openclaw.soc2.controls.passing{host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "id": 7973290453007047,
+                        "definition": {
+                            "title": "Controls failing",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1h"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 1
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:openclaw.soc2.controls.failing{host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "id": 4318482323994371,
+                        "definition": {
+                            "title": "Controls warning",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1h"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_yellow",
+                                            "value": 1
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:openclaw.soc2.controls.warning{host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "id": 6909698371119860,
+                        "definition": {
+                            "title": "Compliance score over time (%)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": {
+                                "live_span": "4h"
+                            },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "avg:openclaw.soc2.score{host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "display_type": "line"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "id": 4118513143136108,
+                        "definition": {
+                            "type": "note",
+                            "content": "Per-control status",
+                            "background_color": "white",
+                            "font_size": "12",
+                            "text_align": "left",
+                            "show_tick": false,
+                            "has_padding": true
+                        }
+                    },
+                    {
+                        "id": 5490327268525950,
+                        "definition": {
+                            "title": "CC7.2 — CloudTrail",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1h"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0.9
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_yellow",
+                                            "value": 0.4
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 0.4
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:openclaw.soc2.control.status{control:cloudtrail,host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 1
+                        }
+                    },
+                    {
+                        "id": 4853422589187711,
+                        "definition": {
+                            "title": "CC7.1 — GuardDuty",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1h"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0.9
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_yellow",
+                                            "value": 0.4
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 0.4
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:openclaw.soc2.control.status{control:guardduty,host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 1
+                        }
+                    },
+                    {
+                        "id": 8925984017630983,
+                        "definition": {
+                            "title": "CC6.6 — AWS Config",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1h"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0.9
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_yellow",
+                                            "value": 0.4
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 0.4
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:openclaw.soc2.control.status{control:aws_config,host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 1
+                        }
+                    },
+                    {
+                        "id": 2797514818832101,
+                        "definition": {
+                            "title": "CC7.1 — Inspector v2",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1h"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0.9
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_yellow",
+                                            "value": 0.4
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 0.4
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:openclaw.soc2.control.status{control:inspector_v2,host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 1
+                        }
+                    },
+                    {
+                        "id": 8640236361716740,
+                        "definition": {
+                            "title": "CC7.1 — Security Hub",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1h"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0.9
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_yellow",
+                                            "value": 0.4
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 0.4
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:openclaw.soc2.control.status{control:security_hub,host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 1
+                        }
+                    },
+                    {
+                        "id": 232122481760563,
+                        "definition": {
+                            "title": "CC6.1 — IAM password policy",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1h"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0.9
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_yellow",
+                                            "value": 0.4
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 0.4
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:openclaw.soc2.control.status{control:iam_password_policy,host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 1
+                        }
+                    },
+                    {
+                        "id": 6570633355340203,
+                        "definition": {
+                            "title": "CC6.6 — VPC Flow Logs",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1h"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0.9
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_yellow",
+                                            "value": 0.4
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 0.4
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:openclaw.soc2.control.status{control:vpc_flow_logs,host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 1
+                        }
+                    },
+                    {
+                        "id": 6449632551063862,
+                        "definition": {
+                            "title": "CC6.1 — S3 encryption",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1h"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0.9
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_yellow",
+                                            "value": 0.4
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 0.4
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:openclaw.soc2.control.status{control:s3_encryption,host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 1
+                        }
+                    },
+                    {
+                        "id": 6445363616077562,
+                        "definition": {
+                            "title": "CC9.2 — Scan timer",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1h"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0.9
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_yellow",
+                                            "value": 0.4
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 0.4
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:openclaw.soc2.control.status{control:security_scan_timer,host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 1
+                        }
+                    },
+                    {
+                        "id": 7334157104945868,
+                        "definition": {
+                            "type": "note",
+                            "content": "CloudWatch SOC2 alarms (24 h)",
+                            "background_color": "white",
+                            "font_size": "12",
+                            "text_align": "left",
+                            "show_tick": false,
+                            "has_padding": true
+                        }
+                    },
+                    {
+                        "id": 2843521379661980,
+                        "definition": {
+                            "title": "Root logins",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1d"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 1
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:OpenClaw/SOC2.RootAccountUsage{*}.as_count()"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "id": 3852680230227036,
+                        "definition": {
+                            "title": "Console without MFA",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1d"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 1
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:OpenClaw/SOC2.ConsoleSigninWithoutMFA{*}.as_count()"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "id": 4877726505765546,
+                        "definition": {
+                            "title": "Unauthorised API calls",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1d"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_yellow",
+                                            "value": 1
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:OpenClaw/SOC2.UnauthorizedAPICalls{*}.as_count()"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "id": 6336933902351140,
+                        "definition": {
+                            "title": "CloudTrail tampering",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1d"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": "<",
+                                            "palette": "white_on_red",
+                                            "value": 1
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:OpenClaw/SOC2.CloudTrailChanges{*}.as_count()"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "id": 1995418975323441,
+                        "definition": {
+                            "title": "Security group changes",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1d"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_yellow",
+                                            "value": 1
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:OpenClaw/SOC2.SecurityGroupChanges{*}.as_count()"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "id": 5126234802792935,
+                        "definition": {
+                            "title": "IAM policy changes",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1d"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_yellow",
+                                            "value": 1
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:OpenClaw/SOC2.IAMPolicyChanges{*}.as_count()"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "id": 3673071271140038,
+                        "definition": {
+                            "title": "S3 policy changes",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1d"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "conditional_formats": [
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_green",
+                                            "value": 0
+                                        },
+                                        {
+                                            "hide_value": false,
+                                            "comparator": ">=",
+                                            "palette": "white_on_yellow",
+                                            "value": 1
+                                        }
+                                    ],
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "sum:OpenClaw/SOC2.S3BucketPolicyChanges{*}.as_count()"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "id": 1250999466935745,
+                        "definition": {
+                            "title": "Security events timeline",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": {
+                                "live_span": "4h"
+                            },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "sum:OpenClaw/SOC2.UnauthorizedAPICalls{*}.as_count()"
+                                        }
+                                    ],
+                                    "style": {
+                                        "palette": "warm"
+                                    },
+                                    "display_type": "bars"
+                                },
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "sum:OpenClaw/SOC2.IAMPolicyChanges{*}.as_count()"
+                                        }
+                                    ],
+                                    "style": {
+                                        "palette": "orange"
+                                    },
+                                    "display_type": "bars"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "id": 7284196573218409,
+                        "definition": {
+                            "title": "GuardDuty findings by severity",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": {
+                                "live_span": "4h"
+                            },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "sum:aws.guardduty.findings{severity:critical}.as_count()"
+                                        }
+                                    ],
+                                    "style": {
+                                        "palette": "red"
+                                    },
+                                    "display_type": "bars"
+                                },
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "sum:aws.guardduty.findings{severity:high}.as_count()"
+                                        }
+                                    ],
+                                    "style": {
+                                        "palette": "warm"
+                                    },
+                                    "display_type": "bars"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "id": 6173694284081136,
+                        "definition": {
+                            "title": "Nightly scan timer active",
+                            "title_size": "13",
+                            "type": "check_status",
+                            "check": "process.up",
+                            "grouping": "check",
+                            "group_by": [],
+                            "tags": [
+                                "service:openclaw-security-scan"
+                            ]
+                        }
+                    },
+                    {
+                        "id": 3705469490991747,
+                        "definition": {
+                            "title": "SOC2 reporter timer active",
+                            "title_size": "13",
+                            "type": "check_status",
+                            "check": "process.up",
+                            "grouping": "check",
+                            "group_by": [],
+                            "tags": [
+                                "service:openclaw-soc2-report"
+                            ]
+                        }
+                    },
+                    {
+                        "id": 5829459475213476,
+                        "definition": {
+                            "title": "SOC2 monitor overview",
+                            "title_size": "13",
+                            "type": "manage_status",
+                            "display_format": "countsAndList",
+                            "color_preference": "text",
+                            "hide_zero_counts": false,
+                            "show_status": true,
+                            "last_triggered_format": "relative",
+                            "query": "app:rad-openclaw,tag:soc2",
+                            "sort": "status,asc",
+                            "count": 50,
+                            "start": 0,
+                            "show_priority": false,
+                            "show_last_triggered": false
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "id": 4032520731036066,
+            "definition": {
+                "title": "Security & process integrity",
+                "background_color": "custom_pink",
+                "type": "group",
+                "layout_type": "ordered",
+                "widgets": [
+                    {
+                        "id": 741851309043330,
+                        "definition": {
+                            "title": "Running processes",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": {
+                                "live_span": "4h"
+                            },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "avg:system.processes.number{host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "display_type": "line"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "id": 304043005723422,
+                        "definition": {
+                            "title": "Outbound traffic (bytes/s)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": {
+                                "live_span": "4h"
+                            },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "avg:system.net.bytes_sent{host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "display_type": "line"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "id": 2974327576956006,
+                        "definition": {
+                            "title": "CPU steal % (noisy-neighbour / crypto mining indicator)",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": {
+                                "live_span": "4h"
+                            },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "avg:system.cpu.stolen{host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "display_type": "line"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "id": 1781614565788880,
+                        "definition": {
+                            "title": "I/O wait %",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "show_legend": true,
+                            "legend_layout": "auto",
+                            "time": {
+                                "live_span": "4h"
+                            },
+                            "type": "timeseries",
+                            "requests": [
+                                {
+                                    "response_format": "timeseries",
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "query1",
+                                            "query": "avg:system.cpu.iowait{host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "display_type": "line"
+                                }
+                            ],
+                            "yaxis": {}
+                        }
+                    },
+                    {
+                        "id": 1254734338030095,
+                        "definition": {
+                            "title": "Established TCP connections",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "5m"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "avg:system.net.tcp.current_established{host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "id": 149011880180017,
+                        "definition": {
+                            "title": "System uptime",
+                            "title_size": "13",
+                            "title_align": "left",
+                            "time": {
+                                "live_span": "1h"
+                            },
+                            "type": "query_value",
+                            "requests": [
+                                {
+                                    "formulas": [
+                                        {
+                                            "formula": "q"
+                                        }
+                                    ],
+                                    "queries": [
+                                        {
+                                            "data_source": "metrics",
+                                            "name": "q",
+                                            "query": "max:system.uptime{host:openclaw-ec2}"
+                                        }
+                                    ],
+                                    "response_format": "scalar"
+                                }
+                            ],
+                            "autoscale": true,
+                            "custom_unit": "s",
+                            "precision": 0
+                        }
+                    },
+                    {
+                        "id": 4533585032414104,
+                        "definition": {
+                            "title": "Security events — errors & auth failures",
+                            "title_size": "13",
+                            "time": {
+                                "live_span": "4h"
+                            },
+                            "requests": [
+                                {
+                                    "response_format": "event_list",
+                                    "query": {
+                                        "data_source": "logs_stream",
+                                        "query_string": "host:openclaw-ec2 status:error",
+                                        "indexes": [
+                                            "*"
+                                        ],
+                                        "storage": "hot",
+                                        "sort": {
+                                            "order": "desc",
+                                            "column": "timestamp"
+                                        }
+                                    },
+                                    "columns": [
+                                        {
+                                            "field": "status_line",
+                                            "width": "auto"
+                                        },
+                                        {
+                                            "field": "timestamp",
+                                            "width": "auto"
+                                        },
+                                        {
+                                            "field": "host",
+                                            "width": "auto"
+                                        },
+                                        {
+                                            "field": "service",
+                                            "width": "auto"
+                                        },
+                                        {
+                                            "field": "status",
+                                            "width": "auto"
+                                        },
+                                        {
+                                            "field": "content",
+                                            "width": "auto"
+                                        },
+                                        {
+                                            "field": "content",
+                                            "width": "compact"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "type": "list_stream"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "id": 599902582268622,
+            "definition": {
+                "title": "Live agent logs",
+                "background_color": "gray",
+                "type": "group",
+                "layout_type": "ordered",
+                "widgets": [
+                    {
+                        "id": 1691708091366056,
+                        "definition": {
+                            "title": "All OpenClaw agent logs",
+                            "title_size": "13",
+                            "time": {
+                                "live_span": "4h"
+                            },
+                            "requests": [
+                                {
+                                    "response_format": "event_list",
+                                    "query": {
+                                        "data_source": "logs_stream",
+                                        "query_string": "host:openclaw-ec2",
+                                        "indexes": [
+                                            "*"
+                                        ],
+                                        "storage": "hot",
+                                        "sort": {
+                                            "order": "desc",
+                                            "column": "timestamp"
+                                        }
+                                    },
+                                    "columns": [
+                                        {
+                                            "field": "status_line",
+                                            "width": "auto"
+                                        },
+                                        {
+                                            "field": "timestamp",
+                                            "width": "auto"
+                                        },
+                                        {
+                                            "field": "service",
+                                            "width": "auto"
+                                        },
+                                        {
+                                            "field": "status",
+                                            "width": "auto"
+                                        },
+                                        {
+                                            "field": "content",
+                                            "width": "auto"
+                                        },
+                                        {
+                                            "field": "content",
+                                            "width": "compact"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "type": "list_stream"
+                        }
+                    }
+                ]
+            }
+        }
+    ],
+    "template_variables": [],
+    "layout_type": "ordered",
+    "notify_list": [],
+    "pause_auto_refresh": false,
+    "reflow_type": "auto",
+    "tags": []
+}
