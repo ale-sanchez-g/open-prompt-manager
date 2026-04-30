@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+  <!-- Yellow background -->
+  <rect width="300" height="300" rx="56" fill="#FFD600"/>
+
+  <!-- Layer 3 — bottom (oldest) -->
+  <rect x="38" y="198" width="224" height="30" rx="8" fill="#1A1A0A" opacity="0.12"/>
+
+  <!-- Layer 2 — middle -->
+  <rect x="38" y="155" width="224" height="30" rx="8" fill="#1A1A0A" opacity="0.22"/>
+  <rect x="54" y="164" width="40" height="4" rx="2" fill="#1A1A0A" opacity="0.35"/>
+  <rect x="54" y="172" width="28" height="3" rx="1.5" fill="#1A1A0A" opacity="0.22"/>
+
+  <!-- Layer 1 — top (latest), solid dark -->
+  <rect x="38" y="112" width="224" height="36" rx="8" fill="#1A1A0A"/>
+  <!-- Cursor blink -->
+  <rect x="54" y="122" width="4" height="16" rx="2" fill="#FFD600"/>
+  <!-- Text lines -->
+  <rect x="64" y="124" width="52" height="4" rx="2" fill="#FFD600" opacity="0.7"/>
+  <rect x="64" y="132" width="36" height="3" rx="1.5" fill="#FFD600" opacity="0.45"/>
+  <!-- Latest dot — outer yellow, inner dark -->
+  <circle cx="242" cy="130" r="7" fill="#FFD600"/>
+  <circle cx="242" cy="130" r="3.5" fill="#1A1A0A"/>
+
+  <!-- Connector dashes -->
+  <line x1="58" y1="148" x2="58" y2="155" stroke="#1A1A0A" stroke-width="1" opacity="0.2" stroke-dasharray="2,2"/>
+  <line x1="58" y1="185" x2="58" y2="198" stroke="#1A1A0A" stroke-width="1" opacity="0.15" stroke-dasharray="2,2"/>
+</svg>
