@@ -3,6 +3,10 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    user: "0:0"
+    command: >
+      sh -c "mkdir -p /app/data && chown -R appuser:appuser /app/data &&
+      su appuser -s /bin/sh -c 'uvicorn main:app --host 0.0.0.0 --port 8000'"
     ports:
       - "8000:8000"
     volumes:
