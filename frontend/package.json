@@ -4,7 +4,7 @@
   "private": true,
   "dependencies": {
     "ajv": "^8.20.0",
-    "axios": "^1.16.0",
+    "axios": "^1.16.1",
     "eslint-plugin-react-hooks": "^7.1.0",
     "lucide-react": "^1.14.0",
     "react": "^19.2.4",
