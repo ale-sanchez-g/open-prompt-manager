@@ -30,7 +30,7 @@ Internet
 │           └──────┬──────────────┘                            │
 │                  │  (HTTP :80 / HTTPS :443)                   │
 │         ┌────────┴────────┐                                   │
-│         │  /api/*  /mcp*  │  (→ Backend)                      │
+│         │  /api/*  /auth/*  /mcp*  │  (→ Backend)                      │
 │         │  everything else│  (→ Frontend)                     │
 │         └────────┬────────┘                                   │
 │                  │                                            │
@@ -66,7 +66,7 @@ Internet
 | **Internet Gateway (IGW)** | Enables inbound/outbound internet traffic for the public subnets. |
 | **NAT Gateway** | Single NAT GW in the first public subnet (`ap-southeast-2a`); allows ECS tasks in private subnets to reach the internet (e.g. to pull ECR images) without being publicly reachable. |
 | **Route Tables** | Public RT routes `0.0.0.0/0` → IGW. Private RT routes `0.0.0.0/0` → NAT GW. |
-| **Application Load Balancer (ALB)** | Internet-facing, deployed across both public subnets. HTTP listener (port 80) redirects to HTTPS when enabled, otherwise forwards directly. Two listener rules: priority 10 (`/api/*` → backend REST API) and priority 20 (`/mcp`, `/mcp/*` → backend MCP server). All other traffic forwarded to the frontend React SPA. |
+| **Application Load Balancer (ALB)** | Internet-facing, deployed across both public subnets. HTTP listener (port 80) redirects to HTTPS when enabled, otherwise forwards directly. Two listener rules: priority 10 (`/api/*`, `/auth/*` → backend REST/auth API) and priority 20 (`/mcp`, `/mcp/*` → backend MCP server). All other traffic forwarded to the frontend React SPA. |
 | **Security Groups** | Four security groups: `alb-sg` (HTTP/HTTPS from `0.0.0.0/0`), `frontend-sg` (port 80 from ALB only), `backend-sg` (port 8000 from ALB only), `rds-sg` (port 5432 from backend SG only). |
 | **ACM Certificate** | Optional TLS certificate created via `certificate.tf` with DNS validation. Automatically adds `www.` SAN for apex domains. Can be provided externally via `acm_certificate_arn`. |
 | **ECS Fargate** | Serverless container runtime. Runs backend (512 CPU / 1024 MB, 2 tasks) and frontend (256 CPU / 512 MB, 2 tasks) in private subnets. Cluster has Container Insights enabled and supports both `FARGATE` and `FARGATE_SPOT`. |
@@ -300,7 +300,7 @@ Review the resources that will be created. Key items to confirm:
   - 1 Application Load Balancer (internet-facing, across both public subnets):
     - HTTP listener (port 80): redirects to HTTPS if enabled, else forwards to frontend
     - HTTPS listener (port 443, when `enable_https = true`): TLS 1.2+
-    - Listener rules: priority 10 `/api/*` → backend, priority 20 `/mcp` `/mcp/*` → backend
+    - Listener rules: priority 10 `/api/*` `/auth/*` → backend, priority 20 `/mcp` `/mcp/*` → backend
   - 1 ECS cluster with Container Insights and FARGATE / FARGATE_SPOT capacity providers
   - 2 ECS services (backend: 512 CPU/1024 MB × 2 tasks, frontend: 256 CPU/512 MB × 2 tasks)
   - 2 ECR repositories (backend, frontend)
@@ -491,7 +491,7 @@ terraform apply \
 | Port | Protocol | Behaviour |
 |------|----------|-----------|
 | 80 | HTTP | Redirects to HTTPS (301 permanent) when HTTPS enabled; forwards normally when disabled |
-| 443 | HTTPS | TLS 1.2+ only; routes `/api/*` → backend, `/mcp/*` → MCP, others → frontend |
+| 443 | HTTPS | TLS 1.2+ only; routes `/api/*` and `/auth/*` → backend, `/mcp/*` → MCP, others → frontend |
 
 The ALB uses `ELBSecurityPolicy-TLS-1-2-2017-01` (AWS-recommended) which enforces TLS 1.2+ and disables weak ciphers.
 

@@ -214,3 +214,12 @@ run "mcp_listener_rule_matches_mcp_wildcard" {
     error_message = "MCP listener rule must match /mcp/* sub-paths."
   }
 }
+
+run "backend_api_rule_matches_auth_path" {
+  command = plan
+
+  assert {
+    condition     = contains(flatten([for c in aws_lb_listener_rule.http_backend_api[0].condition : [for pp in c.path_pattern : pp.values]]), "/auth/*")
+    error_message = "Backend API listener rule must match /auth/* as well as /api/*."
+  }
+}

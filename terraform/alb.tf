@@ -88,7 +88,7 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-# HTTP listener rules for /api and /mcp routing (only if HTTPS is disabled)
+# HTTP listener rules for /api, /auth, and /mcp routing (only if HTTPS is disabled)
 resource "aws_lb_listener_rule" "http_backend_api" {
   count        = var.enable_https ? 0 : 1
   listener_arn = aws_lb_listener.http[0].arn
@@ -101,7 +101,7 @@ resource "aws_lb_listener_rule" "http_backend_api" {
 
   condition {
     path_pattern {
-      values = ["/api/*"]
+      values = ["/api/*", "/auth/*"]
     }
   }
 }
@@ -125,7 +125,7 @@ resource "aws_lb_listener_rule" "http_backend_mcp" {
 
 # ─────────────────────────────────────────────
 # HTTPS Listener (only created if enable_https = true)
-# /api/* routes go to the backend.
+# /api/* and /auth/* routes go to the backend.
 # /mcp and /mcp/* routes go to the backend MCP server.
 # Everything else is forwarded to the React frontend SPA.
 # ─────────────────────────────────────────────
@@ -175,7 +175,7 @@ resource "aws_lb_listener_rule" "https_backend_api" {
 
   condition {
     path_pattern {
-      values = ["/api/*"]
+      values = ["/api/*", "/auth/*"]
     }
   }
 }

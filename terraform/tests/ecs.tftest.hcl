@@ -326,3 +326,12 @@ run "frontend_service_has_required_tags" {
     error_message = "Frontend ECS service must have 'Environment' tag."
   }
 }
+
+run "backend_task_definition_exposes_jwt_secret" {
+  command = apply
+
+  assert {
+    condition     = strcontains(aws_ecs_task_definition.backend.container_definitions, "JWT_SECRET")
+    error_message = "Backend container definition must inject the JWT_SECRET secret."
+  }
+}

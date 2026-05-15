@@ -38,6 +38,8 @@ spec:
               value: {{ .Values.backend.env.DATABASE_URL | quote }}
             - name: CORS_ORIGINS
               value: {{ .Values.backend.env.CORS_ORIGINS | quote }}
+            - name: JWT_SECRET
+              value: {{ .Values.backend.env.JWT_SECRET | quote }}
           livenessProbe:
             httpGet:
               path: /health
