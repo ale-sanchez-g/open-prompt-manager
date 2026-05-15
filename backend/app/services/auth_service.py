@@ -13,7 +13,6 @@ from sqlalchemy.orm import Session
 from app.models.auth import RefreshToken, User
 
 PASSWORD_PATTERN = re.compile(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).{10,}$')
-EMAIL_PATTERN = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 REFRESH_COOKIE_NAME = 'refresh_token'
 ACCESS_TOKEN_TTL_SECONDS = 900
 REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60
@@ -53,7 +52,16 @@ def normalize_email(email: str) -> str:
 
 
 def validate_email(email: str) -> bool:
-    return bool(EMAIL_PATTERN.match(email.strip()))
+    normalized_email = email.strip()
+    if ' ' in normalized_email or '@' not in normalized_email:
+        return False
+
+    local_part, separator, domain_part = normalized_email.rpartition('@')
+    if separator == '' or not local_part or not domain_part or '.' not in domain_part:
+        return False
+
+    domain_labels = domain_part.split('.')
+    return all(label and label != '-' and not label.startswith('-') and not label.endswith('-') for label in domain_labels)
 
 
 def validate_password(password: str) -> bool:

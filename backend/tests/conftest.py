@@ -68,6 +68,7 @@ AUTH_TEST_USER = {'email': 'auth-test@opm.io', 'password': 'Str0ng!Pass1'}
 
 @pytest.fixture
 def anon_client(app):
+    # Use https so the TestClient stores Secure refresh-token cookies set by auth endpoints.
     with TestClient(app, base_url='https://localhost:8000') as c:
         yield c
 

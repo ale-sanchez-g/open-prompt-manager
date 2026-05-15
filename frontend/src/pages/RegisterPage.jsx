@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
@@ -11,8 +11,6 @@ export default function RegisterPage() {
   const [successMessage, setSuccessMessage] = useState('');
   const [serverError, setServerError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const inlinePasswordHelp = useMemo(() => passwordRequirements, []);
 
   const handleChange = (field) => (event) => {
     setForm((current) => ({ ...current, [field]: event.target.value }));
@@ -29,7 +27,7 @@ export default function RegisterPage() {
       nextErrors.email = 'Enter a valid email address';
     }
     if (!validatePassword(form.password)) {
-      nextErrors.password = inlinePasswordHelp;
+      nextErrors.password = passwordRequirements;
     }
 
     if (Object.keys(nextErrors).length > 0) {
@@ -84,7 +82,7 @@ export default function RegisterPage() {
               placeholder="Str0ng!Pass"
             />
           </label>
-          <p className="text-xs text-gray-500">{inlinePasswordHelp}</p>
+          <p className="text-xs text-gray-500">{passwordRequirements}</p>
           {errors.password ? <p className="text-sm text-red-400">{errors.password}</p> : null}
           {serverError ? <p className="text-sm text-red-400">{serverError}</p> : null}
           {successMessage ? <p className="text-sm text-green-400">{successMessage}</p> : null}

@@ -100,7 +100,7 @@ def create_prompt(payload: PromptCreate, request: Request, db: Session = Depends
         description=payload.description,
         content=payload.content,
         version=payload.version,
-        created_by=payload.created_by or getattr(request.state, 'user_email', None),
+        created_by=getattr(request.state, 'user_email', None),
         variables=[v.model_dump() for v in payload.variables],
         components=payload.components,
     )
