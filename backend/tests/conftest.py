@@ -1,9 +1,15 @@
+import os
+
+os.environ.setdefault('JWT_SECRET', 'test-jwt-secret-key-with-32-chars')
+os.environ.setdefault('TESTING', 'true')
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 # Import models so Base.metadata is fully populated before create_all
+from app.models.auth import User, RefreshToken  # noqa
 from app.models.prompt import Prompt, Tag, Agent, PromptMetric, PromptExecution  # noqa
 import app.database.base as db_module
 from app.database.base import Base, get_db
@@ -58,7 +64,21 @@ def setup_database(app):
     app.dependency_overrides.clear()
 
 
+AUTH_TEST_USER = {'email': 'auth-test@opm.io', 'password': 'not-real-password'}
+
+
 @pytest.fixture
-def client(app):
-    with TestClient(app, base_url='http://localhost:8000') as c:
+def anon_client(app):
+    # Use https so the TestClient stores Secure refresh-token cookies set by auth endpoints.
+    with TestClient(app, base_url='https://localhost:8000') as c:
         yield c
+
+
+@pytest.fixture
+def client(anon_client):
+    register_response = anon_client.post('/auth/register', json=AUTH_TEST_USER)
+    assert register_response.status_code == 201
+    login_response = anon_client.post('/auth/login', json=AUTH_TEST_USER)
+    assert login_response.status_code == 200
+    anon_client.headers.update({'Authorization': f"Bearer {login_response.json()['access_token']}"})
+    yield anon_client

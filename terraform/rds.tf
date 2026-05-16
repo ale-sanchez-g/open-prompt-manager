@@ -9,6 +9,33 @@ resource "random_password" "db_password" {
   override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
+resource "random_password" "jwt_secret" {
+  length  = 64
+  special = false
+}
+
+# ─────────────────────────────────────────────
+# Secrets Manager — JWT_SECRET
+# Stores the JWT signing secret used by the
+# backend for access and refresh tokens.
+# ─────────────────────────────────────────────
+resource "aws_secretsmanager_secret" "jwt_secret" {
+  name                    = "${var.project_name}/${var.environment}/jwt-secret"
+  description             = "JWT_SECRET for the ${var.project_name} backend service"
+  recovery_window_in_days = 7
+
+  tags = {
+    Name        = "${var.project_name}-jwt-secret"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "jwt_secret" {
+  secret_id     = aws_secretsmanager_secret.jwt_secret.id
+  secret_string = random_password.jwt_secret.result
+}
+
 # ─────────────────────────────────────────────
 # Secrets Manager — DATABASE_URL
 # Stores the full PostgreSQL connection string.

@@ -100,6 +100,10 @@ resource "aws_ecs_task_definition" "backend" {
         {
           name      = "DATABASE_URL"
           valueFrom = aws_secretsmanager_secret.db_url.arn
+        },
+        {
+          name      = "JWT_SECRET"
+          valueFrom = aws_secretsmanager_secret.jwt_secret.arn
         }
       ]
 

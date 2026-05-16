@@ -28,6 +28,7 @@ backend:
   env:
     DATABASE_URL: "sqlite:///./data/prompts.db"
     CORS_ORIGINS: "http://localhost,https://prompt-manager.example.com"
+    JWT_SECRET: ""
 
 frontend:
   replicaCount: 2
@@ -63,6 +64,9 @@ ingress:
           pathType: Prefix
           service: frontend
         - path: /api
+          pathType: Prefix
+          service: backend
+        - path: /auth
           pathType: Prefix
           service: backend
   tls: []

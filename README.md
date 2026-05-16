@@ -13,7 +13,7 @@ A production-ready open-source framework for managing AI prompts across agents a
 
 ## Application Overview
 
-When you open the application, you will first land on the **Landing Page** (`/`), which introduces Prompt Manager and explains how it works. From there, clicking **Get Started** or **Go to Dashboard** takes you to the **Dashboard** (`/dashboard`) where you can view statistics, recent prompts, and quality metrics.
+Authenticated users land on the protected **Landing Page** (`/`) after signing in. Unauthenticated visitors are redirected to **Login** (`/login`) or can register at **`/register`** before accessing the **Dashboard** (`/dashboard`) and the rest of the application.
 
 The application version displayed in the sidebar and landing page header is fetched dynamically from the `GET /api/health` endpoint, so it always reflects the current backend version.
 
@@ -21,7 +21,9 @@ The application version displayed in the sidebar and landing page header is fetc
 
 | Path | Page | Description |
 |------|------|-------------|
-| `/` | Landing Page | Introduction to the application and how it works |
+| `/login` | Login | Sign in with an email and password to get an access token |
+| `/register` | Register | Create a new account with password complexity validation |
+| `/` | Landing Page | Protected product overview shown after authentication |
 | `/dashboard` | Dashboard | Overview stats, recent prompts, and quality metrics |
 | `/prompts` | Prompt List | Browse and search all prompts |
 | `/prompts/new` | Prompt Editor | Create a new prompt |
@@ -40,6 +42,7 @@ The application version displayed in the sidebar and landing page header is fetc
 - **Quality Metrics** — Ratings, success rate, usage count, execution time, token count, cost
 - **Agent Management** — Define agents, associate prompts, track usage, manage status
 - **Variable System** — Typed variables (string, number, boolean, array, object) with validation
+- **JWT Authentication** — Email/password login, refresh-token cookies, route guards, and automatic access-token refresh
 
 ## Tech Stack
 
@@ -72,6 +75,8 @@ Access:
 - **Backend API**: http://localhost:8000/api
 - **API Docs**: http://localhost:8000/api/docs
 - **MCP Endpoint**: http://localhost:8000/mcp
+
+Set `JWT_SECRET` before starting Docker Compose or local backend development so the backend can sign access and refresh tokens. Terraform generates this secret automatically for ECS deployments, while Helm exposes `backend.env.JWT_SECRET` for cluster-specific secret injection.
 
 ### Local Development
 
@@ -244,6 +249,15 @@ Full interactive documentation is available at runtime:
 | POST | `/api/agents/` | Register an agent — name must be unique, returns 409 on conflict |
 | PUT | `/api/agents/{id}` | Partial update — only supplied fields are changed |
 | DELETE | `/api/agents/{id}` | Delete an agent and remove it from all associated prompts |
+
+### Authentication
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/auth/register` | Register a user account with email + password complexity validation |
+| POST | `/auth/login` | Issue a 15-minute access token and set the refresh token cookie |
+| POST | `/auth/refresh` | Exchange a valid refresh-token cookie for a new access token |
+| POST | `/auth/logout` | Revoke the current refresh token and clear the cookie |
 
 ### Health
 

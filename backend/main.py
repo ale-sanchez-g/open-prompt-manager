@@ -1,15 +1,18 @@
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 import app.database.base as db_module
 from app.database.base import create_tables
+from app.api.auth import router as auth_router
 from app.api.prompts import router as prompts_router
 from app.api.tags_agents import tags_router, agents_router
 from app.mcp_server import build_mcp_server
 from app import __version__
+from app.services.auth_service import AuthError, TokenValidationError, decode_token
 
 # Ensure data directory exists for SQLite
 os.makedirs('./data', exist_ok=True)
@@ -99,6 +102,10 @@ def create_app() -> FastAPI:
                 'name': 'health',
                 'description': 'Liveness / readiness check endpoint.',
             },
+            {
+                'name': 'auth',
+                'description': 'Registration, login, refresh, and logout endpoints for JWT authentication.',
+            },
         ],
         lifespan=lifespan,
     )
@@ -114,6 +121,40 @@ def create_app() -> FastAPI:
         allow_headers=['*'],
     )
 
+    @application.exception_handler(AuthError)
+    async def auth_error_handler(_request: Request, exc: AuthError):
+        return JSONResponse(status_code=exc.status_code, content={'error': exc.error})
+
+    public_prefixes = ('/api/docs', '/api/redoc', '/mcp')
+    public_paths = {'/auth/register', '/auth/login', '/auth/refresh', '/api/health', '/api/ready', '/api/openapi.json'}
+
+    @application.middleware('http')
+    async def require_authentication(request: Request, call_next):
+        path = request.url.path
+        if request.method == 'OPTIONS' or path in public_paths or any(path.startswith(prefix) for prefix in public_prefixes):
+            return await call_next(request)
+        if not path.startswith('/api') and path != '/auth/logout':
+            return await call_next(request)
+
+        authorization_header = request.headers.get('Authorization')
+        if authorization_header is None:
+            return JSONResponse(status_code=401, content={'error': 'missing_token'})
+
+        scheme, _, token = authorization_header.partition(' ')
+        if scheme.lower() != 'bearer' or not token:
+            return JSONResponse(status_code=401, content={'error': 'invalid_token'})
+
+        try:
+            payload = decode_token(token, expected_type='access')
+        except TokenValidationError as exc:
+            return JSONResponse(status_code=401, content={'error': exc.error})
+
+        request.state.user_id = payload['sub']
+        request.state.user_email = payload['email']
+        request.state.auth_user = {'sub': payload['sub'], 'email': payload['email']}
+        return await call_next(request)
+
+    application.include_router(auth_router)
     application.include_router(prompts_router)
     application.include_router(tags_router)
     application.include_router(agents_router)
