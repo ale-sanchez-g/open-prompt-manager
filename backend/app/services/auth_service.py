@@ -68,6 +68,18 @@ def validate_email(email: str) -> bool:
 
 
 def validate_password(password: str) -> bool:
+    """Return True if *password* satisfies complexity requirements.
+
+    In production (TESTING env-var absent or not 'true') the full pattern is
+    enforced: at least one lowercase, one uppercase, one digit, one special
+    character, and a minimum length of 10.
+
+    When ``TESTING=true`` only a minimum length of 8 is required so that
+    obviously-fake placeholder passwords (e.g. ``'not-real-password'``) can be
+    used in test fixtures without triggering secret-scanning rules.
+
+    **Never set TESTING=true in production deployments.**
+    """
     if os.getenv('TESTING', 'false').lower() == 'true':
         return bool(_TEST_PASSWORD_PATTERN.match(password))
     return bool(PASSWORD_PATTERN.match(password))

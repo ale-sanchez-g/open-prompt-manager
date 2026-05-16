@@ -79,7 +79,7 @@ export default function RegisterPage() {
               type="password"
               value={form.password}
               onChange={handleChange('password')}
-              placeholder="Str0ng!Pass"
+              placeholder="Min 10 chars, upper, lower, digit & symbol"
             />
           </label>
           <p className="text-xs text-gray-500">{passwordRequirements}</p>
