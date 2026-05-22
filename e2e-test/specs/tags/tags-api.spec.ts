@@ -4,13 +4,23 @@
 import { test, expect, APIRequestContext } from '@playwright/test';
 
 const NON_EXISTENT_TAG_ID = 99999;
+const STRONG_PASSWORD = 'Test@1234Secure!';
 
 function uniqueName(prefix: string): string {
   return `${prefix}-${Math.floor(Math.random() * 1000000)}`;
 }
 
+function uniqueEmail(prefix = 'tags-api-test'): string {
+  return `${prefix}-${Math.floor(Math.random() * 1000000)}@opm-test.io`;
+}
+
+function authHeaders(accessToken: string): Record<string, string> {
+  return { Authorization: `Bearer ${accessToken}` };
+}
+
 async function createTag(
   request: APIRequestContext,
+  accessToken: string,
   data?: Partial<{ name: string; color: string }>
 ): Promise<{ id: number; name: string; color?: string }> {
   const response = await request.post('/api/tags/', {
@@ -19,6 +29,7 @@ async function createTag(
       color: '#FF5733',
       ...data,
     },
+    headers: authHeaders(accessToken),
   });
 
   expect(response.status()).toBe(201);
@@ -27,6 +38,16 @@ async function createTag(
 
 test.describe('Tags API Tests', () => {
   let createdTagIds: number[];
+  let accessToken: string;
+
+  test.beforeAll(async ({ request }) => {
+    const email = uniqueEmail();
+    await request.post('/auth/register', { data: { email, password: STRONG_PASSWORD } });
+    const loginResponse = await request.post('/auth/login', { data: { email, password: STRONG_PASSWORD } });
+    expect(loginResponse.status()).toBe(200);
+    const loginBody = await loginResponse.json();
+    accessToken = loginBody.access_token;
+  });
 
   test.beforeEach(async () => {
     createdTagIds = [];
@@ -34,7 +55,7 @@ test.describe('Tags API Tests', () => {
 
   test.afterEach(async ({ request }) => {
     for (const tagId of createdTagIds) {
-      const response = await request.delete(`/api/tags/${tagId}`);
+      const response = await request.delete(`/api/tags/${tagId}`, { headers: authHeaders(accessToken) });
       expect([204, 404]).toContain(response.status());
     }
   });
@@ -46,6 +67,7 @@ test.describe('Tags API Tests', () => {
         name: expectedName,
         color: '#FF5733',
       },
+      headers: authHeaders(accessToken),
     });
 
     expect(response.status()).toBe(201);
@@ -62,6 +84,7 @@ test.describe('Tags API Tests', () => {
     const expectedName = uniqueName('simple-tag');
     const response = await request.post('/api/tags/', {
       data: { name: expectedName },
+      headers: authHeaders(accessToken),
     });
 
     expect(response.status()).toBe(201);
@@ -76,6 +99,7 @@ test.describe('Tags API Tests', () => {
   test('Tags - Create Tag with Missing Name', async ({ request }) => {
     const response = await request.post('/api/tags/', {
       data: { color: '#FF5733' },
+      headers: authHeaders(accessToken),
     });
 
     expect(response.status()).toBe(422);
@@ -85,7 +109,7 @@ test.describe('Tags API Tests', () => {
   });
 
   test('Tags - Get All Tags', async ({ request }) => {
-    const response = await request.get('/api/tags/');
+    const response = await request.get('/api/tags/', { headers: authHeaders(accessToken) });
 
     expect(response.status()).toBe(200);
     expect(response.headers()['content-type']).toContain('application/json');
@@ -94,13 +118,13 @@ test.describe('Tags API Tests', () => {
   });
 
   test('Tags - Verify Created Tag Exists in List', async ({ request }) => {
-    const tag = await createTag(request, {
+    const tag = await createTag(request, accessToken, {
       name: uniqueName('tag-to-retrieve'),
       color: '#00FF00',
     });
     createdTagIds.push(tag.id);
 
-    const listResponse = await request.get('/api/tags/');
+    const listResponse = await request.get('/api/tags/', { headers: authHeaders(accessToken) });
     expect(listResponse.status()).toBe(200);
     const tags = await listResponse.json();
 
@@ -111,13 +135,13 @@ test.describe('Tags API Tests', () => {
   });
 
   test('Tags - Get Non-existent Tag Endpoint Not Supported', async ({ request }) => {
-    const response = await request.get(`/api/tags/${NON_EXISTENT_TAG_ID}`);
+    const response = await request.get(`/api/tags/${NON_EXISTENT_TAG_ID}`, { headers: authHeaders(accessToken) });
 
     expect([404, 405]).toContain(response.status());
   });
 
   test('Tags - Update Tag Endpoint Not Supported', async ({ request }) => {
-    const tag = await createTag(request, {
+    const tag = await createTag(request, accessToken, {
       name: uniqueName('original-tag'),
       color: '#AABBCC',
     });
@@ -125,22 +149,23 @@ test.describe('Tags API Tests', () => {
 
     const updateResponse = await request.put(`/api/tags/${tag.id}`, {
       data: { name: uniqueName('updated-tag'), color: '#112233' },
+      headers: authHeaders(accessToken),
     });
 
     expect([404, 405]).toContain(updateResponse.status());
   });
 
   test('Tags - Delete Tag Successfully', async ({ request }) => {
-    const tag = await createTag(request, {
+    const tag = await createTag(request, accessToken, {
       name: uniqueName('tag-to-delete'),
       color: '#FFAA00',
     });
     createdTagIds.push(tag.id);
 
-    const deleteResponse = await request.delete(`/api/tags/${tag.id}`);
+    const deleteResponse = await request.delete(`/api/tags/${tag.id}`, { headers: authHeaders(accessToken) });
     expect(deleteResponse.status()).toBe(204);
 
-    const listResponse = await request.get('/api/tags/');
+    const listResponse = await request.get('/api/tags/', { headers: authHeaders(accessToken) });
     expect(listResponse.status()).toBe(200);
     const tags = await listResponse.json();
 

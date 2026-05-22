@@ -3,16 +3,27 @@
 
 import { test, expect, APIRequestContext } from '@playwright/test';
 
+const STRONG_PASSWORD = 'Test@1234Secure!';
+
 function uniqueName(prefix: string): string {
   return `${prefix}-${Math.floor(Math.random() * 1000000)}`;
 }
 
-async function createAgent(request: APIRequestContext, namePrefix = 'data-integrity-agent'): Promise<{ id: number }> {
+function uniqueEmail(prefix = 'data-integrity-test'): string {
+  return `${prefix}-${Math.floor(Math.random() * 1000000)}@opm-test.io`;
+}
+
+function authHeaders(accessToken: string): Record<string, string> {
+  return { Authorization: `Bearer ${accessToken}` };
+}
+
+async function createAgent(request: APIRequestContext, accessToken: string, namePrefix = 'data-integrity-agent'): Promise<{ id: number }> {
   const response = await request.post('/api/agents/', {
     data: {
       name: uniqueName(namePrefix),
       description: 'Agent for data integrity testing',
     },
+    headers: authHeaders(accessToken),
   });
 
   expect(response.status()).toBe(201);
@@ -21,6 +32,7 @@ async function createAgent(request: APIRequestContext, namePrefix = 'data-integr
 
 async function createTag(
   request: APIRequestContext,
+  accessToken: string,
   namePrefix: string,
   color: string
 ): Promise<{ id: number }> {
@@ -29,6 +41,7 @@ async function createTag(
       name: uniqueName(namePrefix),
       color,
     },
+    headers: authHeaders(accessToken),
   });
 
   expect(response.status()).toBe(201);
@@ -37,6 +50,7 @@ async function createTag(
 
 async function createPrompt(
   request: APIRequestContext,
+  accessToken: string,
   data: {
     namePrefix: string;
     content: string;
@@ -55,6 +69,7 @@ async function createPrompt(
       agent_ids: data.agent_ids,
       tag_ids: data.tag_ids,
     },
+    headers: authHeaders(accessToken),
   });
 
   expect(response.status()).toBe(201);
@@ -65,6 +80,16 @@ test.describe('Data Integrity and Relationships Tests', () => {
   let createdPromptIds: number[];
   let createdTagIds: number[];
   let createdAgentIds: number[];
+  let accessToken: string;
+
+  test.beforeAll(async ({ request }) => {
+    const email = uniqueEmail();
+    await request.post('/auth/register', { data: { email, password: STRONG_PASSWORD } });
+    const loginResponse = await request.post('/auth/login', { data: { email, password: STRONG_PASSWORD } });
+    expect(loginResponse.status()).toBe(200);
+    const loginBody = await loginResponse.json();
+    accessToken = loginBody.access_token;
+  });
 
   test.beforeEach(async () => {
     createdPromptIds = [];
@@ -74,29 +99,29 @@ test.describe('Data Integrity and Relationships Tests', () => {
 
   test.afterEach(async ({ request }) => {
     for (const promptId of createdPromptIds) {
-      const response = await request.delete(`/api/prompts/${promptId}`);
+      const response = await request.delete(`/api/prompts/${promptId}`, { headers: authHeaders(accessToken) });
       expect([204, 404]).toContain(response.status());
     }
 
     for (const tagId of createdTagIds) {
-      const response = await request.delete(`/api/tags/${tagId}`);
+      const response = await request.delete(`/api/tags/${tagId}`, { headers: authHeaders(accessToken) });
       expect([204, 404]).toContain(response.status());
     }
 
     for (const agentId of createdAgentIds) {
-      const response = await request.delete(`/api/agents/${agentId}`);
+      const response = await request.delete(`/api/agents/${agentId}`, { headers: authHeaders(accessToken) });
       expect([204, 404]).toContain(response.status());
     }
   });
 
   test('Cascade Delete Behavior', async ({ request }) => {
-    const agent = await createAgent(request, 'cascade-delete-agent');
+    const agent = await createAgent(request, accessToken, 'cascade-delete-agent');
     createdAgentIds.push(agent.id);
 
-    const tag = await createTag(request, 'cascade-tag', '#ABCDEF');
+    const tag = await createTag(request, accessToken, 'cascade-tag', '#ABCDEF');
     createdTagIds.push(tag.id);
 
-    const prompt = await createPrompt(request, {
+    const prompt = await createPrompt(request, accessToken, {
       namePrefix: 'cascade-prompt',
       content: 'Content for cascade test',
       description: 'Testing cascade behavior',
@@ -105,10 +130,10 @@ test.describe('Data Integrity and Relationships Tests', () => {
     });
     createdPromptIds.push(prompt.id);
 
-    const deleteAgentResponse = await request.delete(`/api/agents/${agent.id}`);
+    const deleteAgentResponse = await request.delete(`/api/agents/${agent.id}`, { headers: authHeaders(accessToken) });
     expect(deleteAgentResponse.status()).toBe(204);
 
-    const getPromptResponse = await request.get(`/api/prompts/${prompt.id}`);
+    const getPromptResponse = await request.get(`/api/prompts/${prompt.id}`, { headers: authHeaders(accessToken) });
     expect(getPromptResponse.status()).toBe(200);
 
     const promptBody = await getPromptResponse.json();
@@ -117,11 +142,11 @@ test.describe('Data Integrity and Relationships Tests', () => {
   });
 
   test('Tag Associations', async ({ request }) => {
-    const tag1 = await createTag(request, 'association-tag-1', '#FF0000');
-    const tag2 = await createTag(request, 'association-tag-2', '#00FF00');
+    const tag1 = await createTag(request, accessToken, 'association-tag-1', '#FF0000');
+    const tag2 = await createTag(request, accessToken, 'association-tag-2', '#00FF00');
     createdTagIds.push(tag1.id, tag2.id);
 
-    const prompt = await createPrompt(request, {
+    const prompt = await createPrompt(request, accessToken, {
       namePrefix: 'multi-tag-prompt',
       content: 'Prompt with multiple tags',
       description: 'Tag association test',
@@ -131,10 +156,10 @@ test.describe('Data Integrity and Relationships Tests', () => {
 
     expect(prompt.tags.length).toBe(2);
 
-    const deleteTagResponse = await request.delete(`/api/tags/${tag1.id}`);
+    const deleteTagResponse = await request.delete(`/api/tags/${tag1.id}`, { headers: authHeaders(accessToken) });
     expect(deleteTagResponse.status()).toBe(204);
 
-    const getPromptResponse = await request.get(`/api/prompts/${prompt.id}`);
+    const getPromptResponse = await request.get(`/api/prompts/${prompt.id}`, { headers: authHeaders(accessToken) });
     expect(getPromptResponse.status()).toBe(200);
 
     const updatedPrompt = await getPromptResponse.json();
@@ -146,7 +171,7 @@ test.describe('Data Integrity and Relationships Tests', () => {
   });
 
   test('Version Tracking', async ({ request }) => {
-    const prompt = await createPrompt(request, {
+    const prompt = await createPrompt(request, accessToken, {
       namePrefix: 'version-track-prompt',
       content: 'Initial content',
       description: 'Testing version tracking',
@@ -162,6 +187,7 @@ test.describe('Data Integrity and Relationships Tests', () => {
         content: 'Updated content v1.1.0',
         version: '1.1.0',
       },
+      headers: authHeaders(accessToken),
     });
     expect(version2Response.status()).toBe(201);
     const v2 = await version2Response.json();
@@ -175,6 +201,7 @@ test.describe('Data Integrity and Relationships Tests', () => {
         content: 'Updated content v1.2.0',
         version: '1.2.0',
       },
+      headers: authHeaders(accessToken),
     });
     expect(version3Response.status()).toBe(201);
     const v3 = await version3Response.json();

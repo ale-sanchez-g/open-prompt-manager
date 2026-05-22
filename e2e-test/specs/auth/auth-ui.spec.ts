@@ -64,8 +64,9 @@ test.describe('Auth UI Tests', () => {
     // 1. Navigate to /register
     await page.goto('/register');
 
-    // 2. Fill invalid email "not-an-email" in email field
-    await page.getByLabel('Email').fill('not-an-email');
+    // 2. Fill invalid email (has @ but no dot in domain — passes HTML5 type=email
+    //    constraint but fails the custom validateEmail regex)
+    await page.getByLabel('Email').fill('not-an-email@nodomain');
 
     // 3. Fill strong password in password field
     await page.getByLabel('Password').fill(STRONG_PASSWORD);
@@ -91,7 +92,9 @@ test.describe('Auth UI Tests', () => {
     await page.getByRole('button', { name: 'Create account' }).click();
 
     // expect: password complexity error is visible
-    await expect(page.getByText(/Password must be at least 10 characters/)).toBeVisible();
+    // Use nth(1) because the same text also appears as a permanent hint paragraph
+    // above the field; nth(1) targets the validation error paragraph specifically.
+    await expect(page.getByText(/Password must be at least 10 characters/).nth(1)).toBeVisible();
   });
 
   test('Auth UI - Register successfully shows success message', async ({ page }) => {

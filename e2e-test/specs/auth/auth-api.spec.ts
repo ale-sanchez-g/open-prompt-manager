@@ -35,7 +35,8 @@ test.describe('Auth API Tests', () => {
     expect(response.status()).toBe(201);
     const body = await response.json();
     expect(body).toHaveProperty('id');
-    expect(typeof body.id).toBe('number');
+    expect(typeof body.id).toBe('string');
+    expect((body.id as string).startsWith('usr_')).toBe(true);
   });
 
   test('Auth - Register with duplicate email', async ({ request }) => {
