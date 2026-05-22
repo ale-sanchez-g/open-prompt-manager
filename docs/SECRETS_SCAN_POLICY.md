@@ -43,5 +43,6 @@ gitleaks git --config .gitleaks.toml --redact --report-format json --report-path
 ## Governance Guidance
 
 - Do not add broad allowlists that hide real secrets.
-- Prefer file-scoped allowlists for generated artifacts only.
+- Prefer file-scoped allowlists for generated artifacts and intentional test-only examples.
+- If a test path is allowlisted, keep example values obviously fake and never copy production credentials into tests.
 - Rotate credentials immediately if a real leak is detected.
