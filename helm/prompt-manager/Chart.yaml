@@ -2,8 +2,8 @@ apiVersion: v2
 name: prompt-manager
 description: A production-ready Helm chart for the Prompt Management Framework
 type: application
-version: 2.2.7
-appVersion: "2.2.7"
+version: 2.2.8
+appVersion: "2.2.8"
 keywords:
   - ai
   - prompts
