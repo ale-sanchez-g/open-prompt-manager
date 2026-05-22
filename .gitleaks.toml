@@ -22,3 +22,14 @@ paths = [
   '''^e2e-test/playwright-report/.*$''',
   '''^e2e-test/test-results/.*$''',
 ]
+
+[[allowlists]]
+description = "Intentional secret examples in test-only source files"
+paths = [
+  '''^backend/tests/.*$''',
+  '''^frontend/src/__tests__/.*$''',
+  '''^e2e-test/specs/.*$''',
+  '''^mcp-package-node/tests/.*$''',
+  '''^mcp-package-python/tests/.*$''',
+  '''^terraform/tests/.*$''',
+]
