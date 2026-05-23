@@ -47,7 +47,7 @@ async function loginViaUI(page: Page, email: string): Promise<void> {
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(STRONG_PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL(/\/prompts/);
+  await page.waitForURL(/\/dashboard/);
 }
 
 /** Generate a collision-free display name for test data. */
