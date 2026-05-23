@@ -13,7 +13,7 @@ A production-ready open-source framework for managing AI prompts across agents a
 
 ## Application Overview
 
-Authenticated users land on the protected **Landing Page** (`/`) after signing in. Unauthenticated visitors are redirected to **Login** (`/login`) or can register at **`/register`** before accessing the **Dashboard** (`/dashboard`) and the rest of the application.
+Authenticated users land on the protected **Dashboard** (`/dashboard`) after signing in. Unauthenticated visitors are redirected to **Login** (`/login`) or can register at **`/register`** before accessing the rest of the application, including the protected **Landing Page** (`/`) and **Dashboard** (`/dashboard`).
 
 The application version displayed in the sidebar and landing page header is fetched dynamically from the `GET /api/health` endpoint, so it always reflects the current backend version.
 
