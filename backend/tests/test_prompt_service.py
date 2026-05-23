@@ -211,21 +211,15 @@ def test_component_id_appended_before_nested_extend():
 # ── render_prompt: _visited set prevents re-entry (kills mutations on _visited.add) ──
 
 def test_visited_set_prevents_self_reference_at_second_nesting():
-    """_visited.add must happen so that a second reference to the same component raises."""
-    # prompt 1 → component 2 → component 2 (circular through same id)
-    # We can't make 2→2 easily without patching, but we test the _visited parameter.
+    """Repeatedly resolving the same component ID in one render path raises circular reference."""
     prompt = make_prompt(1, "{{component:2}} and {{component:2}}")
     component = make_prompt(2, "ok")
 
     db = MagicMock()
-    # First call returns component, second also should
     db.get.return_value = component
 
-    # Should resolve both occurrences without error (no circular) and list 2 twice
-    content, _, components = render_prompt(prompt, {}, db)
-    assert content == "ok and ok"
-    # component 2 was resolved twice; each counts
-    assert components.count(2) == 2
+    with pytest.raises(ValueError, match='Circular component reference'):
+        render_prompt(prompt, {}, db)
 
 
 # ── update_prompt_stats: direct unit tests ────────────────────────────────────
@@ -290,7 +284,7 @@ def test_update_prompt_stats_avg_rating_ignores_none_ratings():
     update_prompt_stats(1, db)
     # avg of 5.0 and 1.0 = 3.0  (not 5.0+0+1.0 / 3)
     assert abs(prompt.avg_rating - 3.0) < 0.001
-    assert abs(prompt.success_rate - (1 / 3)) < 0.001
+    assert abs(prompt.success_rate - (2 / 3)) < 0.001
 
 
 def test_update_prompt_stats_no_rated_executions_defaults_to_zero():

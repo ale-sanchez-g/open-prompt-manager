@@ -3,36 +3,37 @@ Unit tests for mcp_server internals, targeting surviving mutmut mutations
 in _prompt_to_dict and build_mcp_server.
 """
 from datetime import datetime
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
 from app.mcp_server import _build_has_children, _prompt_to_dict, build_mcp_server
-from app.models.prompt import Agent, Prompt, Tag
+from app.models.prompt import Prompt
 
 
 # ── _prompt_to_dict field coverage ────────────────────────────────────────────
 
 def _make_prompt(**kwargs) -> Prompt:
-    """Build a Prompt instance with sensible defaults for unit testing."""
-    p = Prompt.__new__(Prompt)
-    p.id = kwargs.get('id', 1)
-    p.name = kwargs.get('name', 'Test Prompt')
-    p.description = kwargs.get('description', 'A description')
-    p.content = kwargs.get('content', 'Hello {{name}}')
-    p.version = kwargs.get('version', '1.2.3')
-    p.parent_id = kwargs.get('parent_id', None)
-    p.created_by = kwargs.get('created_by', 'author@opm.io')
-    p.variables = kwargs.get('variables', [{'name': 'name', 'type': 'string'}])
-    p.tags = kwargs.get('tags', [])
-    p.agents = kwargs.get('agents', [])
-    p.avg_rating = kwargs.get('avg_rating', 4.5)
-    p.usage_count = kwargs.get('usage_count', 10)
-    p.success_rate = kwargs.get('success_rate', 0.9)
+    """Build a prompt-like object with the attributes _prompt_to_dict reads."""
     ts = kwargs.get('ts', datetime(2024, 6, 1, 12, 0, 0))
-    p.created_at = kwargs.get('created_at', ts)
-    p.updated_at = kwargs.get('updated_at', ts)
-    return p
+    return SimpleNamespace(
+        id=kwargs.get('id', 1),
+        name=kwargs.get('name', 'Test Prompt'),
+        description=kwargs.get('description', 'A description'),
+        content=kwargs.get('content', 'Hello {{name}}'),
+        version=kwargs.get('version', '1.2.3'),
+        parent_id=kwargs.get('parent_id', None),
+        created_by=kwargs.get('created_by', 'author@opm.io'),
+        variables=kwargs.get('variables', [{'name': 'name', 'type': 'string'}]),
+        tags=kwargs.get('tags', []),
+        agents=kwargs.get('agents', []),
+        avg_rating=kwargs.get('avg_rating', 4.5),
+        usage_count=kwargs.get('usage_count', 10),
+        success_rate=kwargs.get('success_rate', 0.9),
+        created_at=kwargs.get('created_at', ts),
+        updated_at=kwargs.get('updated_at', ts),
+    )
 
 
 def test_prompt_to_dict_id_field():

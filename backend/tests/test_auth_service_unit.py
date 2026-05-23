@@ -9,6 +9,7 @@ revoke_refresh_token_from_cookie.
 """
 import time
 from datetime import timedelta
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import jwt
@@ -366,10 +367,10 @@ def test_decode_token_succeeds_for_valid_token():
 # ── ensure_refresh_token_is_active ────────────────────────────────────────────
 
 def _make_refresh_token(revoked_at=None, expires_offset_seconds=3600) -> RefreshToken:
-    rt = RefreshToken.__new__(RefreshToken)
-    rt.revoked_at = revoked_at
-    rt.expires_at = utcnow() + timedelta(seconds=expires_offset_seconds)
-    return rt
+    return SimpleNamespace(
+        revoked_at=revoked_at,
+        expires_at=utcnow() + timedelta(seconds=expires_offset_seconds),
+    )
 
 
 def test_ensure_refresh_token_is_active_returns_token_when_valid():
