@@ -6,10 +6,7 @@ from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-import pytest
-
 from app.mcp_server import _build_has_children, _prompt_to_dict, build_mcp_server
-from app.models.prompt import Prompt
 
 
 # ── _prompt_to_dict field coverage ────────────────────────────────────────────
@@ -122,28 +119,28 @@ def test_prompt_to_dict_tags_empty_list():
 
 
 def test_prompt_to_dict_tags_has_id_name_color():
-    tag = MagicMock(id=7, name='backend', color='#FF0000')
+    tag = SimpleNamespace(id=7, name='backend', color='#FF0000')
     p = _make_prompt(tags=[tag])
     result = _prompt_to_dict(p, set())
     assert result['tags'] == [{'id': 7, 'name': 'backend', 'color': '#FF0000'}]
 
 
 def test_prompt_to_dict_tags_id_value():
-    tag = MagicMock(id=99, name='tag99', color='#ABC')
+    tag = SimpleNamespace(id=99, name='tag99', color='#ABC')
     p = _make_prompt(tags=[tag])
     result = _prompt_to_dict(p, set())
     assert result['tags'][0]['id'] == 99
 
 
 def test_prompt_to_dict_tags_name_value():
-    tag = MagicMock(id=1, name='my-tag', color='#000')
+    tag = SimpleNamespace(id=1, name='my-tag', color='#000')
     p = _make_prompt(tags=[tag])
     result = _prompt_to_dict(p, set())
     assert result['tags'][0]['name'] == 'my-tag'
 
 
 def test_prompt_to_dict_tags_color_value():
-    tag = MagicMock(id=1, name='t', color='#123456')
+    tag = SimpleNamespace(id=1, name='t', color='#123456')
     p = _make_prompt(tags=[tag])
     result = _prompt_to_dict(p, set())
     assert result['tags'][0]['color'] == '#123456'
@@ -156,21 +153,21 @@ def test_prompt_to_dict_agents_empty_list():
 
 
 def test_prompt_to_dict_agents_has_id_name():
-    agent = MagicMock(id=3, name='my-agent')
+    agent = SimpleNamespace(id=3, name='my-agent')
     p = _make_prompt(agents=[agent])
     result = _prompt_to_dict(p, set())
     assert result['agents'] == [{'id': 3, 'name': 'my-agent'}]
 
 
 def test_prompt_to_dict_agents_id_value():
-    agent = MagicMock(id=55, name='agent55')
+    agent = SimpleNamespace(id=55, name='agent55')
     p = _make_prompt(agents=[agent])
     result = _prompt_to_dict(p, set())
     assert result['agents'][0]['id'] == 55
 
 
 def test_prompt_to_dict_agents_name_value():
-    agent = MagicMock(id=1, name='specific-agent')
+    agent = SimpleNamespace(id=1, name='specific-agent')
     p = _make_prompt(agents=[agent])
     result = _prompt_to_dict(p, set())
     assert result['agents'][0]['name'] == 'specific-agent'
