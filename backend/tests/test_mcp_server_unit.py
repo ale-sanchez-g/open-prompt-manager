@@ -11,7 +11,7 @@ from app.mcp_server import _build_has_children, _prompt_to_dict, build_mcp_serve
 
 # ── _prompt_to_dict field coverage ────────────────────────────────────────────
 
-def _make_prompt(**kwargs) -> Prompt:
+def _make_prompt(**kwargs) -> SimpleNamespace:
     """Build a prompt-like object with the attributes _prompt_to_dict reads."""
     ts = kwargs.get('ts', datetime(2024, 6, 1, 12, 0, 0))
     return SimpleNamespace(
