@@ -1,6 +1,7 @@
 import os
 
 os.environ.setdefault('JWT_SECRET', 'test-jwt-secret-key-with-32-chars')
+os.environ.setdefault('BCRYPT_ROUNDS', '4')
 
 import pytest
 from fastapi.testclient import TestClient

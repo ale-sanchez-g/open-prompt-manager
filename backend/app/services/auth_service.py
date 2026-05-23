@@ -16,6 +16,9 @@ PASSWORD_PATTERN = re.compile(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).{10
 REFRESH_COOKIE_NAME = 'refresh_token'
 ACCESS_TOKEN_TTL_SECONDS = 900
 REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60
+DEFAULT_BCRYPT_ROUNDS = 12
+MIN_BCRYPT_ROUNDS = 4
+MAX_BCRYPT_ROUNDS = 31
 
 
 def utcnow() -> datetime:
@@ -68,8 +71,23 @@ def validate_password(password: str) -> bool:
     return bool(PASSWORD_PATTERN.match(password))
 
 
+def get_bcrypt_rounds() -> int:
+    configured = os.getenv('BCRYPT_ROUNDS')
+    if configured is None:
+        return DEFAULT_BCRYPT_ROUNDS
+
+    try:
+        rounds = int(configured)
+    except ValueError:
+        return DEFAULT_BCRYPT_ROUNDS
+
+    if rounds < MIN_BCRYPT_ROUNDS or rounds > MAX_BCRYPT_ROUNDS:
+        return DEFAULT_BCRYPT_ROUNDS
+    return rounds
+
+
 def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(rounds=12)).decode('utf-8')
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(rounds=get_bcrypt_rounds())).decode('utf-8')
 
 
 def verify_password(password: str, password_hash: str) -> bool:

@@ -3,9 +3,17 @@ import os
 import jwt
 
 from app.models.auth import User
-from app.services.auth_service import ACCESS_TOKEN_TTL_SECONDS, create_access_token
+from app.services.auth_service import ACCESS_TOKEN_TTL_SECONDS, create_access_token, hash_password
 
 STRONG_PASSWORD = 'Str0ng!Pass1'
+
+
+def test_hash_password_uses_configured_bcrypt_rounds(monkeypatch):
+    monkeypatch.setenv('BCRYPT_ROUNDS', '4')
+
+    password_hash = hash_password(STRONG_PASSWORD)
+
+    assert password_hash.startswith('$2b$04$') or password_hash.startswith('$2a$04$')
 
 
 def test_register_success(anon_client):
