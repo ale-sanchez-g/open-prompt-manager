@@ -369,12 +369,29 @@ jobs:
   # Mutates app/ source code and checks that tests catch the introduced faults.
   # ─────────────────────────────────────────────────────────────────────────────
   backend-mutation-test:
-    name: Backend Mutation Tests
+    name: Backend Mutation Tests (${{ matrix.shard }})
     runs-on: ubuntu-latest
     needs: backend-test
     permissions:
       contents: read
       pull-requests: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: api
+            mutation_target: app/api/
+          - shard: services
+            mutation_target: app/services/
+          - shard: models
+            mutation_target: app/models/
+          - shard: database
+            mutation_target: app/database/
+          - shard: mcp-server
+            mutation_target: app/mcp_server.py
+          - shard: package-init
+            mutation_target: app/__init__.py
 
     defaults:
       run:
@@ -394,14 +411,46 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-mutation.txt
 
+      - name: Configure mutmut target shard
+        env:
+          MUTATION_TARGET: ${{ matrix.mutation_target }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          target = os.environ['MUTATION_TARGET']
+          cfg_path = Path('setup.cfg')
+          lines = cfg_path.read_text(encoding='utf-8').splitlines()
+
+          replaced = False
+          updated_lines = []
+          for line in lines:
+              if line.strip().startswith('paths_to_mutate ='):
+                  updated_lines.append(f'paths_to_mutate = {target}')
+                  replaced = True
+              else:
+                  updated_lines.append(line)
+
+          if not replaced:
+              raise RuntimeError('Could not find paths_to_mutate in setup.cfg')
+
+          cfg_path.write_text('\n'.join(updated_lines) + '\n', encoding='utf-8')
+          print(f'Configured mutmut shard target: {target}')
+          PY
+
       - name: Run mutation tests (mutmut)
         run: |
           mutmut run
           mutmut results > mutation_report.txt
 
       - name: Build mutation summary markdown
+        env:
+          MUTATION_TARGET: ${{ matrix.mutation_target }}
+          MUTATION_SHARD: ${{ matrix.shard }}
         run: |
           python3 - <<'PY'
+          import os
           from pathlib import Path
           import re
           report = Path('mutation_report.txt').read_text(encoding='utf-8')
@@ -412,6 +461,8 @@ jobs:
           lines = [
               '# 🧬 Mutation Testing Summary',
               '',
+              f"- **Shard:** {os.environ['MUTATION_SHARD']}",
+              f"- **Mutated target:** `{os.environ['MUTATION_TARGET']}`",
               f'- **Total mutants:** {total}',
               f'- **Killed:** {killed}',
               f'- **Survived:** {survived}',
@@ -430,7 +481,7 @@ jobs:
         uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: backend-mutation-summary
+          name: backend-mutation-summary-${{ matrix.shard }}
           path: backend/mutation-summary.md
           retention-days: 30
 
@@ -438,7 +489,7 @@ jobs:
         uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: backend-mutation-report
+          name: backend-mutation-report-${{ matrix.shard }}
           path: backend/mutation_report.txt
           retention-days: 30
 
@@ -449,10 +500,12 @@ jobs:
           (github.event.pull_request.head.repo.full_name == github.repository) &&
           hashFiles('backend/mutation-summary.md') != ''
         uses: actions/github-script@v9
+        env:
+          MUTATION_SHARD: ${{ matrix.shard }}
         with:
           script: |
             const fs = require('fs');
-            const marker = '<!-- mutation-test-summary -->';
+            const marker = `<!-- mutation-test-summary-${process.env.MUTATION_SHARD} -->`;
             const body = `${marker}\n${fs.readFileSync('backend/mutation-summary.md', 'utf8')}`;
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;
