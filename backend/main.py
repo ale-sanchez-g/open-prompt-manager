@@ -126,14 +126,14 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=exc.status_code, content={'error': exc.error})
 
     public_prefixes = ('/api/docs', '/api/redoc', '/mcp')
-    public_paths = {'/auth/register', '/auth/login', '/auth/refresh', '/api/health', '/api/ready', '/api/openapi.json'}
+    public_paths = {'/auth/register', '/auth/login', '/auth/refresh', '/auth/logout', '/api/health', '/api/ready', '/api/openapi.json'}
 
     @application.middleware('http')
     async def require_authentication(request: Request, call_next):
         path = request.url.path
         if request.method == 'OPTIONS' or path in public_paths or any(path.startswith(prefix) for prefix in public_prefixes):
             return await call_next(request)
-        if not path.startswith('/api') and path != '/auth/logout':
+        if not path.startswith('/api'):
             return await call_next(request)
 
         authorization_header = request.headers.get('Authorization')
