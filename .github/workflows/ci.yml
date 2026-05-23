@@ -959,6 +959,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Generate JWT secret for CI runtime
+        run: |
+          JWT_SECRET="$(openssl rand -hex 32)"
+          if [ "${#JWT_SECRET}" -ne 64 ]; then
+            echo "::error::Generated JWT secret must be exactly 64 characters"
+            exit 1
+          fi
+          echo "JWT_SECRET=$JWT_SECRET" >> "$GITHUB_ENV"
+
       - name: Start services
         run: docker compose up -d --build
         env:
