@@ -210,3 +210,21 @@ def test_ready_endpoint_documented(client):
     operation = schema['paths']['/api/ready']['get']
     assert operation.get('summary'), '/api/ready should have a summary'
     assert '503' in operation.get('responses', {}), '/api/ready should document 503 readiness failures'
+
+
+# ── security scheme ───────────────────────────────────────────────────────────
+
+def test_bearer_auth_security_scheme_present(client):
+    schema = _get_schema(client)
+    security_schemes = schema.get('components', {}).get('securitySchemes', {})
+    assert 'BearerAuth' in security_schemes, 'BearerAuth security scheme should be present in components'
+    bearer = security_schemes['BearerAuth']
+    assert bearer['type'] == 'http'
+    assert bearer['scheme'] == 'bearer'
+    assert bearer.get('bearerFormat') == 'JWT'
+
+
+def test_global_security_requires_bearer_auth(client):
+    schema = _get_schema(client)
+    security = schema.get('security', [])
+    assert {'BearerAuth': []} in security, 'Global security should require BearerAuth'

@@ -80,6 +80,10 @@ def create_app() -> FastAPI:
         },
         openapi_tags=[
             {
+                'name': 'auth',
+                'description': 'Registration, login, refresh, and logout endpoints for JWT authentication.',
+            },
+            {
                 'name': 'prompts',
                 'description': (
                     'Create, read, update, and delete prompts. '
@@ -101,10 +105,6 @@ def create_app() -> FastAPI:
             {
                 'name': 'health',
                 'description': 'Liveness / readiness check endpoint.',
-            },
-            {
-                'name': 'auth',
-                'description': 'Registration, login, refresh, and logout endpoints for JWT authentication.',
             },
         ],
         lifespan=lifespan,
@@ -190,6 +190,23 @@ def create_app() -> FastAPI:
     # reachable at http://<host>:8000/mcp after mounting at the app root.
     # This must be the LAST mount so it does not shadow the /api/* routes.
     application.mount('/', mcp.streamable_http_app())
+
+    # Inject BearerAuth security scheme so the Swagger UI "Authorize" button
+    # lets users supply a JWT access token for all protected endpoints.
+    _original_openapi = application.openapi
+
+    def _openapi_with_bearer():
+        schema = _original_openapi()
+        schema.setdefault('components', {}).setdefault('securitySchemes', {})['BearerAuth'] = {
+            'type': 'http',
+            'scheme': 'bearer',
+            'bearerFormat': 'JWT',
+            'description': 'Enter the JWT access token obtained from **POST /auth/login**.',
+        }
+        schema['security'] = [{'BearerAuth': []}]
+        return schema
+
+    application.openapi = _openapi_with_bearer
 
     return application
 
