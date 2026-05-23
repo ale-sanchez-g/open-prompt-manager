@@ -24,6 +24,7 @@ function StatusBadge({ code }) {
     201: 'bg-green-700 text-green-100',
     204: 'bg-gray-600 text-gray-100',
     400: 'bg-yellow-700 text-yellow-100',
+    401: 'bg-red-800 text-red-100',
     404: 'bg-orange-700 text-orange-100',
     409: 'bg-red-700 text-red-100',
     422: 'bg-red-700 text-red-100',
@@ -227,6 +228,17 @@ const METRIC_FIELDS = [
   { name: 'metadata', type: 'object', required: false, description: 'Optional key-value context.', example: '{"env": "prod"}' },
 ];
 
+const AUTH_REQUEST_FIELDS = [
+  { name: 'email', type: 'string', required: true, description: 'Email address identifying the user account.', example: '"user@opm.io"' },
+  { name: 'password', type: 'string', required: true, description: 'Plaintext password. Min 10 chars; must include uppercase, lowercase, digit, and special character.', example: '"Str0ng!Pass"' },
+];
+
+const TOKEN_RESPONSE_FIELDS = [
+  { name: 'access_token', type: 'string', required: true, description: 'JWT Bearer token. Include in the Authorization header for all protected endpoints.', example: '"eyJ..."' },
+  { name: 'token_type', type: 'string', required: true, description: 'Always "Bearer".', example: '"Bearer"' },
+  { name: 'expires_in', type: 'integer', required: true, description: 'Access token lifetime in seconds (900 = 15 minutes).', example: '900' },
+];
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function ApiDocs() {
@@ -234,6 +246,7 @@ export default function ApiDocs() {
     { id: 'overview', label: 'Overview' },
     { id: 'schemas', label: 'Schemas' },
     { id: 'journeys', label: 'User Journeys' },
+    { id: 'auth-api', label: 'Authentication' },
     { id: 'prompts-api', label: 'Prompts API' },
     { id: 'tags-api', label: 'Tags API' },
     { id: 'agents-api', label: 'Agents API' },
@@ -347,6 +360,7 @@ export default function ApiDocs() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
                 { code: 400, msg: 'Bad request' },
+                { code: 401, msg: 'Unauthorized / token missing or expired' },
                 { code: 404, msg: 'Not found' },
                 { code: 409, msg: 'Conflict (duplicate name)' },
                 { code: 422, msg: 'Validation / missing variable' },
@@ -357,6 +371,24 @@ export default function ApiDocs() {
                 </div>
               ))}
             </div>
+          </SubSection>
+
+          <SubSection title="Authentication">
+            <p className="text-gray-300 text-sm mb-3">
+              All <code className="bg-gray-800 text-blue-300 px-1 rounded text-xs">/api/*</code> endpoints
+              (except <code className="bg-gray-800 text-blue-300 px-1 rounded text-xs">/api/health</code>,{' '}
+              <code className="bg-gray-800 text-blue-300 px-1 rounded text-xs">/api/ready</code>, and the
+              interactive docs) require a JWT Bearer token. Obtain one via{' '}
+              <code className="bg-gray-800 text-blue-300 px-1 rounded text-xs">POST /auth/login</code> and
+              include it in every request:
+            </p>
+            <CodeBlock language="bash">{`Authorization: Bearer <access_token>`}</CodeBlock>
+            <p className="text-gray-400 text-xs mt-3">
+              Access tokens expire in <strong className="text-gray-300">15 minutes</strong>. Use{' '}
+              <code className="bg-gray-800 text-blue-300 px-1 rounded">POST /auth/refresh</code> (httpOnly
+              cookie is sent automatically) to obtain a fresh token without re-entering credentials.
+              The refresh token is valid for <strong className="text-gray-300">7 days</strong>.
+            </p>
           </SubSection>
         </Section>
 
@@ -380,10 +412,55 @@ export default function ApiDocs() {
           <SubSection title="Metric">
             <SchemaTable fields={METRIC_FIELDS} />
           </SubSection>
+          <SubSection title="Auth — Request body (register &amp; login)">
+            <SchemaTable fields={AUTH_REQUEST_FIELDS} />
+          </SubSection>
+          <SubSection title="Auth — Token response (login &amp; refresh)">
+            <SchemaTable fields={TOKEN_RESPONSE_FIELDS} />
+          </SubSection>
         </Section>
 
         {/* ── User Journeys ── */}
         <Section title="User Journeys" id="journeys">
+          <SubSection title="0 · Authenticate">
+            <JourneyStep
+              number={1}
+              title="Register a new account"
+              description="Only needed once. The response returns your user ID; no token is issued yet."
+              code={`POST /auth/register
+{
+  "email": "you@example.com",
+  "password": "Str0ng!Pass"
+}
+// 201 → { "id": "usr_abc123" }`}
+            />
+            <JourneyStep
+              number={2}
+              title="Log in and obtain a JWT"
+              description="The access token is returned in the response body. A 7-day refresh token is set as an httpOnly cookie automatically."
+              code={`POST /auth/login
+{
+  "email": "you@example.com",
+  "password": "Str0ng!Pass"
+}
+// 200 → { "access_token": "eyJ...", "token_type": "Bearer", "expires_in": 900 }`}
+            />
+            <JourneyStep
+              number={3}
+              title="Use the token on every API request"
+              description="Include the Authorization header on all /api/* calls. The token is valid for 15 minutes."
+              code={`GET /api/prompts/
+Authorization: Bearer eyJ...`}
+            />
+            <JourneyStep
+              number={4}
+              title="Refresh the access token silently"
+              description="When the access token expires, call /auth/refresh. The browser sends the httpOnly cookie automatically — no credentials needed."
+              code={`POST /auth/refresh
+// 200 → { "access_token": "eyJ...", "token_type": "Bearer", "expires_in": 900 }`}
+            />
+          </SubSection>
+
           <SubSection title="1 · Create and render a prompt">
             <JourneyStep
               number={1}
@@ -549,6 +626,63 @@ export default function ApiDocs() {
 // components_resolved: [2]`}
             />
           </SubSection>
+        </Section>
+
+        {/* ── Auth API ── */}
+        <Section title="Authentication API" id="auth-api">
+          <p className="text-gray-400 text-sm mb-4">
+            Auth endpoints live under <code className="bg-gray-800 text-blue-300 px-1 rounded text-xs">/auth</code> (not
+            <code className="bg-gray-800 text-blue-300 px-1 rounded text-xs">/api</code>). They are public and do
+            not require a Bearer token.
+          </p>
+          <Endpoint
+            method="POST"
+            path="/auth/register"
+            summary="Register a user account"
+            description="Creates a new user account. Passwords must be at least 10 characters and contain uppercase, lowercase, numeric, and special characters. Does not issue a JWT — call /auth/login after registering."
+            requestBody={`{
+  "email": "you@example.com",
+  "password": "Str0ng!Pass"
+}`}
+            responses={[
+              { status: 201, description: 'RegisterResponse — { "id": "usr_abc123" }' },
+              { status: 409, description: 'Email already registered.' },
+              { status: 422, description: 'Password or email validation failed.' },
+            ]}
+          />
+          <Endpoint
+            method="POST"
+            path="/auth/login"
+            summary="Log in and issue JWTs"
+            description="Authenticates by email and password. Returns a 15-minute access token in the response body and sets a 7-day httpOnly refresh-token cookie."
+            requestBody={`{
+  "email": "you@example.com",
+  "password": "Str0ng!Pass"
+}`}
+            responses={[
+              { status: 200, description: 'TokenResponse — { access_token, token_type: "Bearer", expires_in: 900 }' },
+              { status: 401, description: 'Invalid credentials.' },
+            ]}
+          />
+          <Endpoint
+            method="POST"
+            path="/auth/refresh"
+            summary="Refresh an access token"
+            description="Reads the refresh token from the httpOnly cookie (sent automatically by the browser), validates it, and returns a fresh 15-minute access token. No request body needed."
+            responses={[
+              { status: 200, description: 'TokenResponse — fresh access token.' },
+              { status: 401, description: 'Refresh token missing, expired, or revoked.' },
+            ]}
+          />
+          <Endpoint
+            method="POST"
+            path="/auth/logout"
+            summary="Log out the current user"
+            description="Revokes the current refresh token (if present) and clears the httpOnly cookie, ending the authenticated session."
+            responses={[
+              { status: 204, description: 'Session ended. No content returned.' },
+            ]}
+          />
         </Section>
 
         {/* ── Prompts API ── */}
