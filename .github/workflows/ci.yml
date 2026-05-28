@@ -953,6 +953,7 @@ jobs:
   e2e-smoke:
     name: E2E Smoke Test
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: docker-build
     permissions:
       contents: read
