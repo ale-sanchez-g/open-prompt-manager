@@ -224,7 +224,12 @@ def test_bearer_auth_security_scheme_present(client):
     assert bearer.get('bearerFormat') == 'JWT'
 
 
-def test_global_security_requires_bearer_auth(client):
+def test_protected_api_operations_require_bearer_auth(client):
     schema = _get_schema(client)
-    security = schema.get('security', [])
-    assert {'BearerAuth': []} in security, 'Global security should require BearerAuth'
+    prompts_operation = schema['paths']['/api/prompts/']['get']
+    health_operation = schema['paths']['/api/health']['get']
+    login_operation = schema['paths']['/auth/login']['post']
+
+    assert prompts_operation.get('security') == [{'BearerAuth': []}]
+    assert health_operation.get('security') == []
+    assert login_operation.get('security') == []

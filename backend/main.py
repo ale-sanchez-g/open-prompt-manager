@@ -203,7 +203,18 @@ def create_app() -> FastAPI:
             'bearerFormat': 'JWT',
             'description': 'Enter the JWT access token obtained from **POST /auth/login**.',
         }
-        schema['security'] = [{'BearerAuth': []}]
+        protected_prefix = '/api/'
+        public_paths = {'/api/health', '/api/ready'}
+        http_methods = {'get', 'post', 'put', 'delete', 'patch', 'options', 'head', 'trace'}
+
+        for path, operations in schema.get('paths', {}).items():
+            for method, operation in operations.items():
+                if method not in http_methods or not isinstance(operation, dict):
+                    continue
+                if path.startswith(protected_prefix) and path not in public_paths:
+                    operation['security'] = [{'BearerAuth': []}]
+                else:
+                    operation['security'] = []
         return schema
 
     application.openapi = _openapi_with_bearer
