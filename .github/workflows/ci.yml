@@ -1019,21 +1019,27 @@ jobs:
         run: npm ci
         working-directory: e2e-test
 
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(node -e "console.log(require('./e2e-test/node_modules/@playwright/test/package.json').version)")" >> $GITHUB_OUTPUT
+
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ hashFiles('e2e-test/package-lock.json') }}-${{ runner.os }}
-          restore-keys: |
-            playwright-chromium-${{ hashFiles('e2e-test/package-lock.json') }}-
-            playwright-chromium-
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
 
-      - name: Install Playwright browsers
+      - name: Install Playwright browsers + deps (cache miss)
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
-        working-directory: e2e-test     
+        working-directory: e2e-test
 
+      - name: Install Playwright system deps only (cache hit)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+        working-directory: e2e-test
+      
       - name: Run Playwright E2E tests
         run: npm run test:api
         working-directory: e2e-test
