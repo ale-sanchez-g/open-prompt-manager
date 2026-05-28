@@ -46,12 +46,6 @@
       "justification": "Public subnets assign public IPs by design for ALB and NAT gateway placement. Risk accepted: no EC2 instances are launched in public subnets; only managed AWS resources (ALB, NAT GW) use them."
     },
     {
-      "id": "CKV_AWS_131",
-      "owner": "github-agents",
-      "expires": "2026-06-30",
-      "justification": "ALB does not yet drop invalid HTTP headers. Planned: set drop_invalid_header_fields = true on the ALB resource."
-    },
-    {
       "id": "CKV_AWS_136",
       "owner": "github-agents",
       "expires": "2026-06-30",
@@ -86,12 +80,6 @@
       "owner": "github-agents",
       "expires": "2026-06-30",
       "justification": "RDS uses password-based auth via Secrets Manager. Planned: enable IAM database authentication as an additional access control layer."
-    },
-    {
-      "id": "CKV_AWS_226",
-      "owner": "github-agents",
-      "expires": "2026-06-30",
-      "justification": "RDS auto_minor_version_upgrade not explicitly set. Planned: set auto_minor_version_upgrade = true to receive security patches automatically."
     },
     {
       "id": "CKV_AWS_260",
@@ -176,12 +164,6 @@
       "owner": "github-agents",
       "expires": "2026-06-30",
       "justification": "Secrets Manager automatic rotation not configured. Planned: add aws_secretsmanager_secret_rotation with Lambda rotation function for database credentials."
-    },
-    {
-      "id": "CKV2_AWS_60",
-      "owner": "github-agents",
-      "expires": "2026-06-30",
-      "justification": "RDS copy_tags_to_snapshot not enabled. Planned: set copy_tags_to_snapshot = true for tag propagation to automated and manual snapshots."
     }
   ]
 }
