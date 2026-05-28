@@ -5,6 +5,7 @@
   "scripts": {
     "test": "playwright test",
     "test:api": "playwright test specs/",
+    "test:auth": "playwright test specs/auth/",
     "test:health": "playwright test specs/health/",
     "test:agents": "playwright test specs/agents/",
     "test:tags": "playwright test specs/tags/",

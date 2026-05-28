@@ -29,7 +29,26 @@ const RENDER_TIMEOUT_MS = 10000;
 /** Max ms to wait for an element to become visible (e.g. async-loaded pills, cards). */
 const VISIBILITY_TIMEOUT_MS = 10000;
 
+const STRONG_PASSWORD = 'Test@1234Secure!';
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+function uniqueEmail(prefix = 'user-journey-test'): string {
+  return `${prefix}-${Math.floor(Math.random() * 1000000)}@opm-test.io`;
+}
+
+function authHeaders(accessToken: string): Record<string, string> {
+  return { Authorization: `Bearer ${accessToken}` };
+}
+
+/** Log in via the React login form and wait until the app redirects away from /login. */
+async function loginViaUI(page: Page, email: string): Promise<void> {
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(STRONG_PASSWORD);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.waitForURL(/\/dashboard/);
+}
 
 /** Generate a collision-free display name for test data. */
 function uid(prefix: string): string {
@@ -44,8 +63,8 @@ function promptIdFromUrl(url: string): number {
 }
 
 /** Fetch a JSON list from the given API path. */
-async function fetchList(request: APIRequestContext, path: string): Promise<any[]> {
-  return (await request.get(path)).json();
+async function fetchList(request: APIRequestContext, path: string, accessToken: string): Promise<any[]> {
+  return (await request.get(path, { headers: authHeaders(accessToken) })).json();
 }
 
 /**
@@ -61,6 +80,20 @@ async function addVariable(page: Page, name: string): Promise<void> {
 // ── Journey 1: Create and Render a Prompt ─────────────────────────────────────
 
 test.describe('UI Journey 1 — Create and Render a Prompt', () => {
+  let testEmail: string;
+  let accessToken: string;
+
+  test.beforeAll(async ({ request }) => {
+    testEmail = uniqueEmail('j1-journey');
+    await request.post('/auth/register', { data: { email: testEmail, password: STRONG_PASSWORD } });
+    const loginResp = await request.post('/auth/login', { data: { email: testEmail, password: STRONG_PASSWORD } });
+    expect(loginResp.status()).toBe(200);
+    accessToken = (await loginResp.json()).access_token;
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await loginViaUI(page, testEmail);
+  });
   test('API Docs page shows the Create + Render user journey steps', async ({ page }) => {
     await page.goto('/api-docs');
     await page.waitForLoadState('domcontentloaded');
@@ -113,16 +146,30 @@ test.describe('UI Journey 1 — Create and Render a Prompt', () => {
     await expect(page.getByText('Hi Carol, welcome to the platform!')).toBeVisible();
 
     // Cleanup
-    await request.delete(`/api/prompts/${promptId}`);
-    const tags = await fetchList(request, '/api/tags/');
+    await request.delete(`/api/prompts/${promptId}`, { headers: authHeaders(accessToken) });
+    const tags = await fetchList(request, '/api/tags/', accessToken);
     const tag = tags.find((t: any) => t.name === tagName);
-    if (tag) await request.delete(`/api/tags/${tag.id}`);
+    if (tag) await request.delete(`/api/tags/${tag.id}`, { headers: authHeaders(accessToken) });
   });
 });
 
 // ── Journey 2: Version a Prompt ───────────────────────────────────────────────
 
 test.describe('UI Journey 2 — Version a Prompt', () => {
+  let testEmail: string;
+  let accessToken: string;
+
+  test.beforeAll(async ({ request }) => {
+    testEmail = uniqueEmail('j2-journey');
+    await request.post('/auth/register', { data: { email: testEmail, password: STRONG_PASSWORD } });
+    const loginResp = await request.post('/auth/login', { data: { email: testEmail, password: STRONG_PASSWORD } });
+    expect(loginResp.status()).toBe(200);
+    accessToken = (await loginResp.json()).access_token;
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await loginViaUI(page, testEmail);
+  });
   test('API Docs page shows the Versioning user journey steps', async ({ page }) => {
     await page.goto('/api-docs');
     await page.waitForLoadState('domcontentloaded');
@@ -167,14 +214,28 @@ test.describe('UI Journey 2 — Version a Prompt', () => {
     await expect(page.getByText('Latest')).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // Cleanup
-    await request.delete(`/api/prompts/${v2Id}`);
-    await request.delete(`/api/prompts/${v1Id}`);
+    await request.delete(`/api/prompts/${v2Id}`, { headers: authHeaders(accessToken) });
+    await request.delete(`/api/prompts/${v1Id}`, { headers: authHeaders(accessToken) });
   });
 });
 
 // ── Journey 3: Register an Agent and Track Executions ─────────────────────────
 
 test.describe('UI Journey 3 — Register an Agent and Track Executions', () => {
+  let testEmail: string;
+  let accessToken: string;
+
+  test.beforeAll(async ({ request }) => {
+    testEmail = uniqueEmail('j3-journey');
+    await request.post('/auth/register', { data: { email: testEmail, password: STRONG_PASSWORD } });
+    const loginResp = await request.post('/auth/login', { data: { email: testEmail, password: STRONG_PASSWORD } });
+    expect(loginResp.status()).toBe(200);
+    accessToken = (await loginResp.json()).access_token;
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await loginViaUI(page, testEmail);
+  });
   test('API Docs page shows the Agent Execution Tracking user journey steps', async ({ page }) => {
     await page.goto('/api-docs');
     await page.waitForLoadState('domcontentloaded');
@@ -201,7 +262,7 @@ test.describe('UI Journey 3 — Register an Agent and Track Executions', () => {
     ).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // Retrieve the created agent's ID via API
-    const agents = await fetchList(request, '/api/agents/');
+    const agents = await fetchList(request, '/api/agents/', accessToken);
     const agent = agents.find((a: any) => a.name === agentName);
     agentId = agent.id;
 
@@ -224,6 +285,7 @@ test.describe('UI Journey 3 — Register an Agent and Track Executions', () => {
     // Step 3: Record an execution via API and reload to verify updated stats
     await request.post(`/api/prompts/${promptId}/executions`, {
       data: { agent_id: agentId, success: 1, rating: 4 },
+      headers: authHeaders(accessToken),
     });
     await page.reload();
     await page.waitForLoadState('networkidle');
@@ -240,14 +302,28 @@ test.describe('UI Journey 3 — Register an Agent and Track Executions', () => {
     await expect(page.locator('a[href="/agents"]')).toBeVisible({ timeout: VISIBILITY_TIMEOUT_MS });
 
     // Cleanup
-    await request.delete(`/api/prompts/${promptId}`);
-    await request.delete(`/api/agents/${agentId}`);
+    await request.delete(`/api/prompts/${promptId}`, { headers: authHeaders(accessToken) });
+    await request.delete(`/api/agents/${agentId}`, { headers: authHeaders(accessToken) });
   });
 });
 
 // ── Journey 4: Build a Composable Prompt ──────────────────────────────────────
 
 test.describe('UI Journey 4 — Build a Composable Prompt', () => {
+  let testEmail: string;
+  let accessToken: string;
+
+  test.beforeAll(async ({ request }) => {
+    testEmail = uniqueEmail('j4-journey');
+    await request.post('/auth/register', { data: { email: testEmail, password: STRONG_PASSWORD } });
+    const loginResp = await request.post('/auth/login', { data: { email: testEmail, password: STRONG_PASSWORD } });
+    expect(loginResp.status()).toBe(200);
+    accessToken = (await loginResp.json()).access_token;
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await loginViaUI(page, testEmail);
+  });
   test('API Docs page shows the Composable Prompt user journey steps', async ({ page }) => {
     await page.goto('/api-docs');
     await expect(page.getByText('4 · Build a composable prompt')).toBeVisible();
@@ -307,7 +383,7 @@ test.describe('UI Journey 4 — Build a Composable Prompt', () => {
     await expect(page.getByText('Disclaimer: for informational purposes only.')).toBeVisible();
 
     // Cleanup
-    await request.delete(`/api/prompts/${parentId}`);
-    await request.delete(`/api/prompts/${componentId}`);
+    await request.delete(`/api/prompts/${parentId}`, { headers: authHeaders(accessToken) });
+    await request.delete(`/api/prompts/${componentId}`, { headers: authHeaders(accessToken) });
   });
 });

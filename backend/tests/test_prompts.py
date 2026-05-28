@@ -51,6 +51,26 @@ def test_get_prompt(client):
 def test_get_prompt_not_found(client):
     response = client.get("/api/prompts/999")
     assert response.status_code == 404
+    assert response.json()["detail"] == "Prompt 999 not found"
+
+
+def test_get_prompt_not_found_other_id(client):
+    """Check that the detail message includes the specific prompt ID requested."""
+    response = client.get("/api/prompts/12345")
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Prompt 12345 not found"
+
+
+def test_get_prompt_returns_correct_prompt(client):
+    """Fetching a specific prompt ID returns THAT prompt, not any other."""
+    first = client.post("/api/prompts/", json=PROMPT_PAYLOAD).json()
+    second = client.post("/api/prompts/", json={**PROMPT_PAYLOAD, "name": "Second Prompt"}).json()
+    response = client.get(f"/api/prompts/{first['id']}")
+    assert response.status_code == 200
+    assert response.json()["id"] == first["id"]
+    assert response.json()["name"] == PROMPT_PAYLOAD["name"]
+    # Must not return the second prompt
+    assert response.json()["id"] != second["id"]
 
 
 def test_update_prompt(client):
@@ -241,6 +261,35 @@ def test_get_versions_is_latest_flags(client):
     by_id = {v["id"]: v for v in versions}
     assert by_id[parent["id"]]["is_latest"] is False
     assert by_id[child["id"]]["is_latest"] is True
+
+
+def test_is_latest_only_checks_given_prompt_id(client):
+    """
+    Verifies _is_latest checks the SPECIFIC prompt_id, not a constant or different field.
+    Creates two independent prompts. Prompt A has a child; prompt B does not.
+    If the filter were wrong (e.g. parent_id == 0 or parent_id == None), both would
+    return the same value — but they must differ.
+    """
+    prompt_a = client.post("/api/prompts/", json=PROMPT_PAYLOAD).json()
+    prompt_b = client.post("/api/prompts/", json={**PROMPT_PAYLOAD, "name": "Prompt B"}).json()
+    # Create a version of A but NOT of B
+    client.post(f"/api/prompts/{prompt_a['id']}/versions", json={})
+    data_a = client.get(f"/api/prompts/{prompt_a['id']}").json()
+    data_b = client.get(f"/api/prompts/{prompt_b['id']}").json()
+    # A has a child so is NOT latest; B has no child so IS latest
+    assert data_a["is_latest"] is False
+    assert data_b["is_latest"] is True
+
+
+def test_is_latest_child_remains_latest_when_no_grandchild(client):
+    """
+    The child of a versioned prompt must also report is_latest=True as long as
+    nothing has been versioned from it. Verifies the filter uses parent_id correctly.
+    """
+    parent = client.post("/api/prompts/", json=PROMPT_PAYLOAD).json()
+    child = client.post(f"/api/prompts/{parent['id']}/versions", json={}).json()
+    child_data = client.get(f"/api/prompts/{child['id']}").json()
+    assert child_data["is_latest"] is True
 
 
 # ── Executions ────────────────────────────────────────────────────────────────

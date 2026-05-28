@@ -1,15 +1,18 @@
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 import app.database.base as db_module
 from app.database.base import create_tables
+from app.api.auth import router as auth_router
 from app.api.prompts import router as prompts_router
 from app.api.tags_agents import tags_router, agents_router
 from app.mcp_server import build_mcp_server
 from app import __version__
+from app.services.auth_service import AuthError, TokenValidationError, decode_token
 
 # Ensure data directory exists for SQLite
 os.makedirs('./data', exist_ok=True)
@@ -77,6 +80,10 @@ def create_app() -> FastAPI:
         },
         openapi_tags=[
             {
+                'name': 'auth',
+                'description': 'Registration, login, refresh, and logout endpoints for JWT authentication.',
+            },
+            {
                 'name': 'prompts',
                 'description': (
                     'Create, read, update, and delete prompts. '
@@ -114,6 +121,40 @@ def create_app() -> FastAPI:
         allow_headers=['*'],
     )
 
+    @application.exception_handler(AuthError)
+    async def auth_error_handler(_request: Request, exc: AuthError):
+        return JSONResponse(status_code=exc.status_code, content={'error': exc.error})
+
+    public_prefixes = ('/api/docs', '/api/redoc', '/mcp')
+    public_paths = {'/auth/register', '/auth/login', '/auth/refresh', '/auth/logout', '/api/health', '/api/ready', '/api/openapi.json'}
+
+    @application.middleware('http')
+    async def require_authentication(request: Request, call_next):
+        path = request.url.path
+        if request.method == 'OPTIONS' or path in public_paths or any(path.startswith(prefix) for prefix in public_prefixes):
+            return await call_next(request)
+        if not path.startswith('/api'):
+            return await call_next(request)
+
+        authorization_header = request.headers.get('Authorization')
+        if authorization_header is None:
+            return JSONResponse(status_code=401, content={'error': 'missing_token'})
+
+        scheme, _, token = authorization_header.partition(' ')
+        if scheme.lower() != 'bearer' or not token:
+            return JSONResponse(status_code=401, content={'error': 'invalid_token'})
+
+        try:
+            payload = decode_token(token, expected_type='access')
+        except TokenValidationError as exc:
+            return JSONResponse(status_code=401, content={'error': exc.error})
+
+        request.state.user_id = payload['sub']
+        request.state.user_email = payload['email']
+        request.state.auth_user = {'sub': payload['sub'], 'email': payload['email']}
+        return await call_next(request)
+
+    application.include_router(auth_router)
     application.include_router(prompts_router)
     application.include_router(tags_router)
     application.include_router(agents_router)
@@ -149,6 +190,34 @@ def create_app() -> FastAPI:
     # reachable at http://<host>:8000/mcp after mounting at the app root.
     # This must be the LAST mount so it does not shadow the /api/* routes.
     application.mount('/', mcp.streamable_http_app())
+
+    # Inject BearerAuth security scheme so the Swagger UI "Authorize" button
+    # lets users supply a JWT access token for all protected endpoints.
+    _original_openapi = application.openapi
+
+    def _openapi_with_bearer():
+        schema = _original_openapi()
+        schema.setdefault('components', {}).setdefault('securitySchemes', {})['BearerAuth'] = {
+            'type': 'http',
+            'scheme': 'bearer',
+            'bearerFormat': 'JWT',
+            'description': 'Enter the JWT access token obtained from **POST /auth/login**.',
+        }
+        protected_prefix = '/api/'
+        public_paths = {'/api/health', '/api/ready'}
+        http_methods = {'get', 'post', 'put', 'delete', 'patch', 'options', 'head', 'trace'}
+
+        for path, operations in schema.get('paths', {}).items():
+            for method, operation in operations.items():
+                if method not in http_methods or not isinstance(operation, dict):
+                    continue
+                if path.startswith(protected_prefix) and path not in public_paths:
+                    operation['security'] = [{'BearerAuth': []}]
+                else:
+                    operation['security'] = []
+        return schema
+
+    application.openapi = _openapi_with_bearer
 
     return application
 

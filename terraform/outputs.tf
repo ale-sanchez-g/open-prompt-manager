@@ -91,3 +91,8 @@ output "db_secret_arn" {
   description = "ARN of the Secrets Manager secret that holds the DATABASE_URL. Reference this to retrieve credentials."
   value       = aws_secretsmanager_secret.db_url.arn
 }
+
+output "jwt_secret_arn" {
+  description = "ARN of the Secrets Manager secret that holds JWT_SECRET for backend token signing."
+  value       = aws_secretsmanager_secret.jwt_secret.arn
+}
