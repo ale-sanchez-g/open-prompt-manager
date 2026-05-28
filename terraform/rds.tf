@@ -106,9 +106,11 @@ resource "aws_db_instance" "main" {
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.rds.id]
 
-  multi_az            = var.db_multi_az
-  publicly_accessible = false
-  deletion_protection = var.db_deletion_protection
+  multi_az                   = var.db_multi_az
+  publicly_accessible        = false
+  deletion_protection        = var.db_deletion_protection
+  auto_minor_version_upgrade = true
+  copy_tags_to_snapshot      = true
 
   # Take a final snapshot before deletion only when deletion_protection is on,
   # which signals a production-grade deployment.

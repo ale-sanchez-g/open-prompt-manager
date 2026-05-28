@@ -61,6 +61,15 @@ run "alb_has_required_tags" {
   }
 }
 
+run "alb_drops_invalid_headers" {
+  command = plan
+
+  assert {
+    condition     = aws_lb.main.drop_invalid_header_fields == true
+    error_message = "ALB must drop invalid HTTP header fields."
+  }
+}
+
 # ─────────────────────────────────────────────
 # Target Groups
 # ─────────────────────────────────────────────
