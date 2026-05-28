@@ -1,10 +1,10 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppLayout } from '../App';
 import * as apiService from '../services/api';
+import * as authContext from '../context/AuthContext';
 
-// Stub page components so the test has no external API dependencies
 jest.mock('../pages/Dashboard', () => () => <div>Dashboard</div>);
 jest.mock('../pages/PromptList', () => () => <div>PromptList</div>);
 jest.mock('../pages/PromptEditor', () => () => <div>PromptEditor</div>);
@@ -14,18 +14,23 @@ jest.mock('../pages/AgentsManagement', () => () => <div>AgentsManagement</div>);
 jest.mock('../pages/AgentDetail', () => () => <div>AgentDetail</div>);
 jest.mock('../pages/ApiDocs', () => () => <div>ApiDocs</div>);
 jest.mock('../services/api');
+jest.mock('../context/AuthContext', () => ({ useAuth: jest.fn() }));
 
 function renderAppLayout(initialPath = '/dashboard') {
   return render(
     <MemoryRouter initialEntries={[initialPath]}>
       <AppLayout />
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 }
 
 describe('AppLayout sidebar', () => {
+  let logout;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    logout = jest.fn();
+    authContext.useAuth.mockReturnValue({ logout });
     apiService.healthApi = {
       check: jest.fn().mockResolvedValue({ data: { version: '1.0.0' } }),
     };
@@ -67,5 +72,11 @@ describe('AppLayout sidebar', () => {
     await waitFor(() => {
       expect(screen.getByText('vUnknown')).toBeInTheDocument();
     });
+  });
+
+  it('calls logout when the logout button is clicked', async () => {
+    renderAppLayout();
+    fireEvent.click(await screen.findByRole('button', { name: /logout/i }));
+    expect(logout).toHaveBeenCalled();
   });
 });

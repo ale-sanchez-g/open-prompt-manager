@@ -330,6 +330,8 @@ jobs:
     needs: [prebuild-lint-matrix, version-pinning-check]
     permissions:
       contents: read
+    env:
+      BCRYPT_ROUNDS: '4'
 
     defaults:
       run:
@@ -375,6 +377,8 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+    env:
+      BCRYPT_ROUNDS: '4'
 
     defaults:
       run:
@@ -958,6 +962,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+
+      - name: Generate JWT secret for CI runtime
+        run: |
+          JWT_SECRET="$(openssl rand -hex 32)"
+          if [ "${#JWT_SECRET}" -ne 64 ]; then
+            echo "::error::Generated JWT secret must be exactly 64 characters"
+            exit 1
+          fi
+          echo "JWT_SECRET=$JWT_SECRET" >> "$GITHUB_ENV"
 
       - name: Start services
         run: docker compose up -d --build

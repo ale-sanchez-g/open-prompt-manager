@@ -1,9 +1,108 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || '',
+  baseURL: import.meta.env.VITE_API_URL || '',
+  withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 });
+
+let accessToken = null;
+let refreshRequest = null;
+const authFailureListeners = new Set();
+
+function notifyAuthFailure() {
+  authFailureListeners.forEach((listener) => listener());
+}
+
+function isAuthPath(url = '') {
+  return url.startsWith('/auth/');
+}
+
+export function getAccessToken() {
+  return accessToken;
+}
+
+export function setAccessToken(token) {
+  accessToken = token;
+}
+
+export function clearAccessToken() {
+  accessToken = null;
+}
+
+export function subscribeToAuthFailures(listener) {
+  authFailureListeners.add(listener);
+  return () => authFailureListeners.delete(listener);
+}
+
+async function refreshAccessToken() {
+  if (!refreshRequest) {
+    refreshRequest = api
+      .post('/auth/refresh', null, { _skipAuthFailureNotification: true })
+      .then((response) => {
+        setAccessToken(response.data.access_token);
+        return response.data.access_token;
+      })
+      .catch((error) => {
+        clearAccessToken();
+        notifyAuthFailure();
+        throw error;
+      })
+      .finally(() => {
+        refreshRequest = null;
+      });
+  }
+
+  return refreshRequest;
+}
+
+api.interceptors.request.use((config) => {
+  const nextConfig = { ...config, headers: config.headers || {} };
+  if (accessToken && !nextConfig.headers.Authorization && !isAuthPath(nextConfig.url || '')) {
+    nextConfig.headers.Authorization = `Bearer ${accessToken}`;
+  }
+  return nextConfig;
+});
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    const errorCode = error.response?.data?.error;
+
+    if (!originalRequest || error.response?.status !== 401) {
+      throw error;
+    }
+
+    if (originalRequest.url === '/auth/refresh') {
+      clearAccessToken();
+      notifyAuthFailure();
+      throw error;
+    }
+
+    if (errorCode === 'token_expired' && !originalRequest._retry && !isAuthPath(originalRequest.url || '')) {
+      originalRequest._retry = true;
+      const refreshedToken = await refreshAccessToken();
+      originalRequest.headers = originalRequest.headers || {};
+      originalRequest.headers.Authorization = `Bearer ${refreshedToken}`;
+      return api(originalRequest);
+    }
+
+    if (!originalRequest._skipAuthFailureNotification && !isAuthPath(originalRequest.url || '')) {
+      clearAccessToken();
+      notifyAuthFailure();
+    }
+
+    throw error;
+  },
+);
+
+export const authApi = {
+  register: (data) => api.post('/auth/register', data),
+  login: (data) => api.post('/auth/login', data),
+  refresh: () => api.post('/auth/refresh'),
+  logout: () => api.post('/auth/logout'),
+};
 
 // ── Prompts ───────────────────────────────────────────────────────────────────
 export const promptsApi = {

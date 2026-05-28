@@ -1,6 +1,6 @@
 from collections import deque
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.database.base import get_db
@@ -94,13 +94,13 @@ def list_prompts(
     ),
     response_description='The newly created prompt including auto-assigned `id`, timestamps, and computed `is_latest`.',
 )
-def create_prompt(payload: PromptCreate, db: Session = Depends(get_db)):
+def create_prompt(payload: PromptCreate, request: Request, db: Session = Depends(get_db)):
     db_prompt = Prompt(
         name=payload.name,
         description=payload.description,
         content=payload.content,
         version=payload.version,
-        created_by=payload.created_by,
+        created_by=getattr(request.state, 'user_email', None),
         variables=[v.model_dump() for v in payload.variables],
         components=payload.components,
     )

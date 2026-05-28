@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, NavLink, Link } from 'react-router-dom';
-import { LayoutDashboard, FileText, Tag, Bot, BookOpen } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Navigate, Routes, Route, NavLink, Link } from 'react-router-dom';
+import { BookOpen, Bot, FileText, LayoutDashboard, LogOut, Tag } from 'lucide-react';
 
+import { AuthProvider, useAuth } from './context/AuthContext';
 import LandingPage from './pages/LandingPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import Dashboard from './pages/Dashboard';
 import PromptList from './pages/PromptList';
 import PromptEditor from './pages/PromptEditor';
@@ -31,7 +34,32 @@ function NavItem({ to, icon: Icon, label }) {
   );
 }
 
+function AuthGate({ children }) {
+  return <div className="min-h-screen bg-gray-900 text-gray-100 flex items-center justify-center">{children}</div>;
+}
+
+export function ProtectedRoute({ children }) {
+  const { isAuthenticated, isReady } = useAuth();
+
+  if (!isReady) {
+    return <AuthGate>Restoring your session...</AuthGate>;
+  }
+
+  return isAuthenticated ? children : <Navigate to="/login" replace />;
+}
+
+export function PublicOnlyRoute({ children }) {
+  const { isAuthenticated, isReady } = useAuth();
+
+  if (!isReady) {
+    return <AuthGate>Checking your session...</AuthGate>;
+  }
+
+  return isAuthenticated ? <Navigate to="/dashboard" replace /> : children;
+}
+
 export function AppLayout() {
+  const { logout } = useAuth();
   const [appVersion, setAppVersion] = useState('Loading...');
 
   useEffect(() => {
@@ -50,7 +78,6 @@ export function AppLayout() {
 
   return (
     <div className="flex h-screen bg-gray-900 text-gray-100">
-      {/* Sidebar */}
       <aside className="w-56 flex-shrink-0 bg-gray-800 flex flex-col py-6 px-3 gap-2">
         <div className="px-4 mb-4">
           <Link to="/" className="block hover:opacity-80 transition-opacity">
@@ -63,9 +90,16 @@ export function AppLayout() {
         <NavItem to="/tags" icon={Tag} label="Tags" />
         <NavItem to="/agents" icon={Bot} label="Agents" />
         <NavItem to="/api-docs" icon={BookOpen} label="API Docs" />
+        <button
+          type="button"
+          onClick={logout}
+          className="mt-auto flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+        >
+          <LogOut size={18} />
+          Logout
+        </button>
       </aside>
 
-      {/* Main content */}
       <main className="flex-1 overflow-auto bg-gray-900 p-6">
         <Routes>
           <Route path="/dashboard" element={<Dashboard />} />
@@ -77,6 +111,7 @@ export function AppLayout() {
           <Route path="/agents" element={<AgentsManagement />} />
           <Route path="/agents/:id" element={<AgentDetail />} />
           <Route path="/api-docs" element={<ApiDocs />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </main>
     </div>
@@ -86,10 +121,42 @@ export function AppLayout() {
 export default function App() {
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/*" element={<AppLayout />} />
-      </Routes>
+      <AuthProvider>
+        <Routes>
+          <Route
+            path="/login"
+            element={(
+              <PublicOnlyRoute>
+                <LoginPage />
+              </PublicOnlyRoute>
+            )}
+          />
+          <Route
+            path="/register"
+            element={(
+              <PublicOnlyRoute>
+                <RegisterPage />
+              </PublicOnlyRoute>
+            )}
+          />
+          <Route
+            path="/"
+            element={(
+              <ProtectedRoute>
+                <LandingPage />
+              </ProtectedRoute>
+            )}
+          />
+          <Route
+            path="/*"
+            element={(
+              <ProtectedRoute>
+                <AppLayout />
+              </ProtectedRoute>
+            )}
+          />
+        </Routes>
+      </AuthProvider>
     </Router>
   );
 }

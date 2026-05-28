@@ -3,25 +3,49 @@
 
 import { test, expect, APIRequestContext } from '@playwright/test';
 
+const STRONG_PASSWORD = 'Test@1234Secure!';
+
 function uniqueName(prefix: string): string {
   return `${prefix}-${Math.floor(Math.random() * 1000000)}`;
 }
 
+function uniqueEmail(prefix = 'performance-test'): string {
+  return `${prefix}-${Math.floor(Math.random() * 1000000)}@opm-test.io`;
+}
+
+function authHeaders(accessToken: string): Record<string, string> {
+  return { Authorization: `Bearer ${accessToken}` };
+}
+
 async function createPrompt(
   request: APIRequestContext,
+  accessToken: string,
   payload: {
     name: string;
     content: string;
     description: string;
   }
 ): Promise<any> {
-  const response = await request.post('/api/prompts/', { data: payload });
+  const response = await request.post('/api/prompts/', {
+    data: payload,
+    headers: authHeaders(accessToken),
+  });
   expect(response.status()).toBe(201);
   return response.json();
 }
 
 test.describe('Performance and Load Tests', () => {
   let createdPromptIds: number[];
+  let accessToken: string;
+
+  test.beforeAll(async ({ request }) => {
+    const email = uniqueEmail();
+    await request.post('/auth/register', { data: { email, password: STRONG_PASSWORD } });
+    const loginResponse = await request.post('/auth/login', { data: { email, password: STRONG_PASSWORD } });
+    expect(loginResponse.status()).toBe(200);
+    const loginBody = await loginResponse.json();
+    accessToken = loginBody.access_token;
+  });
 
   test.beforeEach(async () => {
     createdPromptIds = [];
@@ -29,7 +53,7 @@ test.describe('Performance and Load Tests', () => {
 
   test.afterEach(async ({ request }) => {
     for (const promptId of createdPromptIds) {
-      const response = await request.delete(`/api/prompts/${promptId}`);
+      const response = await request.delete(`/api/prompts/${promptId}`, { headers: authHeaders(accessToken) });
       expect([204, 404]).toContain(response.status());
     }
   });
@@ -38,7 +62,7 @@ test.describe('Performance and Load Tests', () => {
     const startTime = Date.now();
 
     const concurrentResponses = await Promise.all(
-      Array.from({ length: 10 }, () => request.get('/api/prompts/'))
+      Array.from({ length: 10 }, () => request.get('/api/prompts/', { headers: authHeaders(accessToken) }))
     );
 
     const totalTime = Date.now() - startTime;
@@ -58,7 +82,7 @@ test.describe('Performance and Load Tests', () => {
   test('Large Dataset Pagination', async ({ request }) => {
     const batchSize = 50;
     for (let i = 1; i <= batchSize; i++) {
-      const prompt = await createPrompt(request, {
+      const prompt = await createPrompt(request, accessToken, {
         name: uniqueName(`large-dataset-prompt-${i}`),
         content: `Content for large dataset test ${i}`,
         description: `Performance test prompt ${i}`,
@@ -75,7 +99,7 @@ test.describe('Performance and Load Tests', () => {
 
     for (const { skip, limit } of paginationTests) {
       const startTime = Date.now();
-      const response = await request.get(`/api/prompts/?skip=${skip}&limit=${limit}`);
+      const response = await request.get(`/api/prompts/?skip=${skip}&limit=${limit}`, { headers: authHeaders(accessToken) });
       const elapsed = Date.now() - startTime;
 
       expect(response.status()).toBe(200);

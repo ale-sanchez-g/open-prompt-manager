@@ -3,6 +3,28 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 
+class AuthRequest(BaseModel):
+    email: str = Field(..., description='Email address used to identify the user account.', examples=['user@opm.io'])
+    password: str = Field(..., description='Plaintext password submitted for registration or login.', examples=['Str0ng!Pass'])
+
+    model_config = {
+        'json_schema_extra': {
+            'example': {'email': 'user@opm.io', 'password': 'Str0ng!Pass'},
+        }
+    }
+
+
+class RegisterResponse(BaseModel):
+    id: str = Field(..., description='Server-generated user identifier.', examples=['usr_abc123'])
+
+
+class TokenResponse(BaseModel):
+    access_token: str = Field(..., description='JWT access token that must be sent in the Authorization header.')
+    token_type: str = Field('Bearer', description='Authentication scheme for the access token.', examples=['Bearer'])
+    expires_in: int = Field(900, description='Access token lifetime in seconds.', examples=[900])
+
+
+
 # Tag schemas
 class TagBase(BaseModel):
     name: str = Field(
