@@ -935,8 +935,8 @@ jobs:
           context: ./backend
           push: false
           tags: prompt-manager-backend:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=backend-image
+          cache-to: type=gha,scope=backend-image,mode=min
 
       - name: Build frontend image
         uses: docker/build-push-action@v7
@@ -944,8 +944,8 @@ jobs:
           context: ./frontend
           push: false
           tags: prompt-manager-frontend:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=frontend-image
+          cache-to: type=gha,scope=frontend-image,mode=min
 
   # ─────────────────────────────────────────────────────────────────────────────
   # End-to-end tests: spin up docker-compose, run the full Playwright suite
@@ -1023,12 +1023,14 @@ jobs:
         id: playwright-version
         run: echo "version=$(node -e "console.log(require('./e2e-test/node_modules/@playwright/test/package.json').version)")" >> $GITHUB_OUTPUT
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
+      - name: Restore Playwright browsers cache
+        uses: actions/cache/restore@v4
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
 
       - name: Install Playwright browsers + deps (cache miss)
         if: steps.playwright-cache.outputs.cache-hit != 'true'
@@ -1039,6 +1041,16 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
         working-directory: e2e-test
+
+      - name: Save Playwright browsers cache
+        if: >-
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          steps.playwright-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
       
       - name: Run Playwright E2E tests
         run: npm run test:api
