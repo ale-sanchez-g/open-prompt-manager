@@ -63,6 +63,7 @@ load_or_generate_jwt_secret() {
     fi
   fi
 
+  command -v openssl &>/dev/null || fail "'openssl' is not installed or not in PATH"
   JWT_SECRET=$(openssl rand -hex 32)
   ok "Generated new JWT secret for first-time deployment."
 }
