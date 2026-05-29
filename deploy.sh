@@ -37,15 +37,30 @@ load_or_generate_jwt_secret() {
     --output text 2>/dev/null || true)
 
   if [[ -n "${existing_secret_arn}" && "${existing_secret_arn}" != "None" ]]; then
-    JWT_SECRET=$(aws secretsmanager get-secret-value \
+    local deleted_date
+    deleted_date=$(aws secretsmanager describe-secret \
       --secret-id "${existing_secret_arn}" \
       --region "${AWS_REGION}" \
-      --query SecretString \
+      --query DeletedDate \
       --output text 2>/dev/null || true)
 
-    [[ -n "${JWT_SECRET}" && "${JWT_SECRET}" != "None" ]] || fail "Existing JWT secret was found but could not be read from Secrets Manager."
-    ok "Loaded existing JWT secret from Secrets Manager."
-    return 0
+    if [[ -n "${deleted_date}" && "${deleted_date}" != "None" ]]; then
+      warn "Secret '${secret_name}' is scheduled for deletion — force-deleting now..."
+      aws secretsmanager delete-secret \
+        --secret-id "${existing_secret_arn}" \
+        --force-delete-without-recovery \
+        --region "${AWS_REGION}" >/dev/null
+    else
+      JWT_SECRET=$(aws secretsmanager get-secret-value \
+        --secret-id "${existing_secret_arn}" \
+        --region "${AWS_REGION}" \
+        --query SecretString \
+        --output text 2>/dev/null || true)
+
+      [[ -n "${JWT_SECRET}" && "${JWT_SECRET}" != "None" ]] || fail "Existing JWT secret was found but could not be read from Secrets Manager."
+      ok "Loaded existing JWT secret from Secrets Manager."
+      return 0
+    fi
   fi
 
   JWT_SECRET=$(openssl rand -hex 32)
