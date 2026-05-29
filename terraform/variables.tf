@@ -55,6 +55,13 @@ variable "backend_image" {
   default     = ""
 }
 
+variable "jwt_secret" {
+  description = "JWT signing secret used by the backend. If unset, Terraform generates one."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "frontend_image" {
   description = "Full URI of the frontend Docker image (ECR or any registry)."
   type        = string

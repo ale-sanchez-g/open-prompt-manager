@@ -24,6 +24,33 @@ ACM_CERTIFICATE_ARN=""
 ROUTE53_ZONE_ID=""
 PRIMARY_DOMAIN=""
 DOMAIN_NAMES=()
+JWT_SECRET=""
+
+load_or_generate_jwt_secret() {
+  local secret_name="${PROJECT_NAME}/${ENVIRONMENT}/jwt-secret"
+  local existing_secret_arn=""
+
+  existing_secret_arn=$(aws secretsmanager describe-secret \
+    --secret-id "${secret_name}" \
+    --region "${AWS_REGION}" \
+    --query ARN \
+    --output text 2>/dev/null || true)
+
+  if [[ -n "${existing_secret_arn}" && "${existing_secret_arn}" != "None" ]]; then
+    JWT_SECRET=$(aws secretsmanager get-secret-value \
+      --secret-id "${existing_secret_arn}" \
+      --region "${AWS_REGION}" \
+      --query SecretString \
+      --output text 2>/dev/null || true)
+
+    [[ -n "${JWT_SECRET}" && "${JWT_SECRET}" != "None" ]] || fail "Existing JWT secret was found but could not be read from Secrets Manager."
+    ok "Loaded existing JWT secret from Secrets Manager."
+    return 0
+  fi
+
+  JWT_SECRET=$(openssl rand -hex 32)
+  ok "Generated new JWT secret for first-time deployment."
+}
 
 # ─────────────────────────────────────────────
 # Parse arguments
@@ -266,6 +293,7 @@ ensure_acm_certificate_is_issued() {
     -var="aws_region=${AWS_REGION}" \
     -var="environment=${ENVIRONMENT}" \
     -var="project_name=${PROJECT_NAME}" \
+    -var="jwt_secret=${JWT_SECRET}" \
     -var="enable_https=${ENABLE_HTTPS}" \
     -var="create_certificate=${CREATE_CERTIFICATE}" \
     -var="domain_name=${PRIMARY_DOMAIN}" \
@@ -345,6 +373,8 @@ AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/de
   || fail "AWS credentials are not configured. Run 'aws configure' first."
 ok "AWS credentials valid (account: ${AWS_ACCOUNT_ID})"
 
+load_or_generate_jwt_secret
+
 DEPLOY_TAG=$(git -C "${SCRIPT_DIR}" rev-parse --short HEAD 2>/dev/null || date +%Y%m%d%H%M%S)
 ok "Deploy image tag: ${DEPLOY_TAG}"
 
@@ -369,6 +399,7 @@ if [[ "$DESTROY" == "true" ]]; then
     -var="aws_region=${AWS_REGION}" \
     -var="environment=${ENVIRONMENT}" \
     -var="project_name=${PROJECT_NAME}" \
+    -var="jwt_secret=${JWT_SECRET}" \
     -var="enable_https=${ENABLE_HTTPS}" \
     -var="create_certificate=${CREATE_CERTIFICATE}" \
     -var="acm_certificate_arn=${ACM_CERTIFICATE_ARN}" \
@@ -397,7 +428,8 @@ terraform plan -out="${PLAN_FILE}.ecr" \
   -target=aws_lb_listener.http \
   -var="aws_region=${AWS_REGION}" \
   -var="environment=${ENVIRONMENT}" \
-  -var="project_name=${PROJECT_NAME}" 2>&1 | tee "${PLAN_FILE}.ecr.log"
+  -var="project_name=${PROJECT_NAME}" \
+  -var="jwt_secret=${JWT_SECRET}" 2>&1 | tee "${PLAN_FILE}.ecr.log"
 
 log "Applying ECR repository changes with Terraform..."
 terraform apply -auto-approve "${PLAN_FILE}.ecr"
@@ -472,6 +504,7 @@ terraform plan -out="${PLAN_FILE}" \
   -var="aws_region=${AWS_REGION}" \
   -var="environment=${ENVIRONMENT}" \
   -var="project_name=${PROJECT_NAME}" \
+  -var="jwt_secret=${JWT_SECRET}" \
   -var="backend_image=${BACKEND_IMAGE_URI}" \
   -var="frontend_image=${FRONTEND_IMAGE_URI}" \
   -var="enable_https=${ENABLE_HTTPS}" \
