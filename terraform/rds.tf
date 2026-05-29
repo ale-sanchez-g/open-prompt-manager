@@ -33,7 +33,7 @@ resource "aws_secretsmanager_secret" "jwt_secret" {
 
 resource "aws_secretsmanager_secret_version" "jwt_secret" {
   secret_id     = aws_secretsmanager_secret.jwt_secret.id
-  secret_string = random_password.jwt_secret.result
+  secret_string = var.jwt_secret != "" ? var.jwt_secret : random_password.jwt_secret.result
 }
 
 # ─────────────────────────────────────────────

@@ -32,3 +32,16 @@ run "rds_copy_tags_to_snapshot_enabled" {
     error_message = "RDS must copy tags to snapshots."
   }
 }
+
+run "jwt_secret_override_uses_provided_value" {
+  command = plan
+
+  variables {
+    jwt_secret = "test-jwt-secret-value"
+  }
+
+  assert {
+    condition     = aws_secretsmanager_secret_version.jwt_secret.secret_string == "test-jwt-secret-value"
+    error_message = "jwt_secret override must store the provided value, not the generated random_password."
+  }
+}
