@@ -50,9 +50,9 @@ The application version displayed in the sidebar and landing page header is fetc
 |-------|-----------|
 | Backend | Python 3.14, FastAPI, SQLAlchemy 2.0, Pydantic v2 |
 | Database | SQLite (upgradeable to PostgreSQL/MySQL) |
-| Frontend | React 20, Tailwind CSS, React Router v6, Axios |
+| Frontend | React 19, Tailwind CSS, React Router v7, Axios |
 | Infrastructure | Docker, Kubernetes, Helm 3 |
-| AI Connectivity | MCP (Model Context Protocol) via `mcp==1.23.3` |
+| AI Connectivity | MCP (Model Context Protocol) via `mcp==1.27.1` |
 
 ## Quick Start
 
@@ -60,8 +60,8 @@ The application version displayed in the sidebar and landing page header is fetc
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/prompt-management-framework
-cd prompt-management-framework
+git clone https://github.com/ale-sanchez-g/open-prompt-manager.git
+cd open-prompt-manager
 
 # Start all services
 make up
@@ -89,7 +89,7 @@ cd backend && pip install -r requirements.txt && uvicorn main:app --reload --por
 # Frontend (separate terminal)
 make dev-frontend
 # or
-cd frontend && npm install && npm start
+cd frontend && npm ci --legacy-peer-deps && npm start
 ```
 
 ## AWS Terraform Deployment
@@ -418,7 +418,7 @@ curl -X POST http://localhost:8000/api/prompts/1/render \
 ## Project Structure
 
 ```
-prompt-management-framework/
+open-prompt-manager/
 ├── backend/
 │   ├── app/
 │   │   ├── models/
@@ -440,17 +440,21 @@ prompt-management-framework/
 ├── frontend/
 │   ├── src/
 │   │   ├── pages/
-│   │   │   ├── LandingPage.js
-│   │   │   ├── Dashboard.js
-│   │   │   ├── PromptList.js
-│   │   │   ├── PromptEditor.js
-│   │   │   ├── PromptDetail.js
-│   │   │   ├── TagsManagement.js
-│   │   │   └── AgentsManagement.js
+│   │   │   ├── LandingPage.jsx
+│   │   │   ├── LoginPage.jsx
+│   │   │   ├── RegisterPage.jsx
+│   │   │   ├── Dashboard.jsx
+│   │   │   ├── PromptList.jsx
+│   │   │   ├── PromptEditor.jsx
+│   │   │   ├── PromptDetail.jsx
+│   │   │   ├── TagsManagement.jsx
+│   │   │   ├── AgentsManagement.jsx
+│   │   │   ├── AgentDetail.jsx
+│   │   │   └── ApiDocs.jsx
 │   │   ├── services/
 │   │   │   └── api.js
-│   │   ├── App.js
-│   │   └── index.js
+│   │   ├── App.jsx
+│   │   └── index.jsx
 │   ├── package.json
 │   ├── Dockerfile
 │   └── nginx.conf
@@ -522,7 +526,7 @@ helm install prompt-manager ./helm/prompt-manager \
 ### Frontend
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `REACT_APP_API_URL` | `` (same origin) | Backend API base URL — leave empty when deploying behind a reverse proxy or ALB. Set to the full backend URL (e.g. `http://localhost:8000`) only for standalone local development. |
+| `VITE_API_URL` | `` (same origin) | Backend API base URL — leave empty when deploying behind a reverse proxy or ALB. Set to the full backend URL (e.g. `http://localhost:8000`) only for standalone local development. |
 
 ## Version Control
 

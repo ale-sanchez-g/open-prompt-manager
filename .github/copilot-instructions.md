@@ -34,7 +34,7 @@ The backend exposes both a REST API (`/api/*`) and an MCP endpoint (`/mcp`) via 
 - Functional components and hooks only — no class components.
 - Tailwind CSS utility classes for all styling — avoid custom CSS.
 - All API calls go through `src/services/api.js` via the exported axios wrappers (`promptsApi`, `tagsApi`, `agentsApi`). Never use `fetch`/`axios` directly in components.
-- Register new routes in `src/App.js` and add them to the README route table.
+- Register new routes in `src/App.jsx` and add them to the README route table.
 - Icons come from `lucide-react`.
 
 ### MCP Packages
@@ -54,7 +54,7 @@ pytest tests/ --cov=app --cov-report=term-missing -v
 # ── Frontend ─────────────────────────────────────────────
 cd frontend
 npm ci --legacy-peer-deps
-npm test -- --watchAll=false
+npm test -- --coverage
 
 # ── MCP Python package ───────────────────────────────────
 cd mcp-package-python
@@ -82,7 +82,7 @@ Always run the relevant test suite **before** committing. CI (`.github/workflows
 - **Never commit code that breaks existing tests.** Run the affected suite locally before pushing.
 - **Coverage threshold: ≥ 80% on new code.** Both backend (`pytest --cov`) and frontend (`npm test -- --coverage`) report coverage. PRs that drop coverage below the threshold will be flagged in review.
 - Backend tests use FastAPI's `TestClient` (or `httpx.AsyncClient` for async). MCP tool tests go through the same test database thanks to `conftest.py`'s `SessionLocal` patch.
-- Frontend tests use React Testing Library + Jest. Test user-visible behaviour, not implementation details.
+- Frontend tests use React Testing Library + Vitest. Test user-visible behaviour, not implementation details.
 
 ## Conventions
 
@@ -151,7 +151,7 @@ When in doubt about patterns, read these files first:
 | `backend/app/services/prompt_service.py` | Business logic, recursive component resolution, circular-ref detection |
 | `backend/tests/conftest.py` | In-memory SQLite setup, `SessionLocal` patch for MCP tools |
 | `frontend/src/services/api.js` | Centralized axios client, `promptsApi`/`tagsApi`/`agentsApi` wrappers |
-| `frontend/src/App.js` | Route registration, layout, React Router v7 structure |
+| `frontend/src/App.jsx` | Route registration, layout, React Router v7 structure |
 
 ## Common Pitfalls
 
