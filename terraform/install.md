@@ -73,7 +73,7 @@ Internet
 | **ECR** | Private container image registry with lifecycle policies for backend and frontend Docker images. |
 | **RDS PostgreSQL 16** | `db.t4g.micro` with 20 GiB gp3 storage, encrypted at rest, in the private subnets. Multi-AZ disabled by default (enable via `db_multi_az = true`). |
 | **Secrets Manager** | Stores the auto-generated PostgreSQL `DATABASE_URL` at `<project>/<env>/database-url`. Injected into the backend ECS container at task start — never a plain-text env var. |
-| **CloudWatch Logs** | Log groups `/ecs/<project>/backend` and `/ecs/<project>/frontend` with 30-day retention. |
+| **CloudWatch Logs** | Log groups `/ecs/<project>/backend` and `/ecs/<project>/frontend` with configurable retention (`cloudwatch_log_retention_in_days`, default 365). RDS exports `postgresql` and `upgrade` logs to CloudWatch. |
 
 ---
 
@@ -416,6 +416,7 @@ backend_cpu            = 512
 backend_memory         = 1024
 frontend_cpu           = 256
 frontend_memory        = 512
+cloudwatch_log_retention_in_days = 365
 ```
 
 ### Using CLI flags
@@ -857,6 +858,7 @@ db_instance_class      = "db.t4g.small"   # upgrade for higher throughput
 db_allocated_storage   = 50               # GiB
 db_multi_az            = true             # enable for production HA
 db_deletion_protection = true             # prevent accidental drops
+cloudwatch_log_retention_in_days = 365    # policy-aligned log retention
 ```
 
 > **Note:** Enabling `db_deletion_protection = true` also triggers a final RDS snapshot before any `terraform destroy`.
