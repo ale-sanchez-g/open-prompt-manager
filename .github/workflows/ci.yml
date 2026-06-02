@@ -448,11 +448,7 @@ jobs:
               f'- **Survived:** {survived}',
               f'- **Mutation score:** {pct:.1f}%',
               '',
-              '---',
-              '',
-              '```text',
-              report.strip(),
-              '```',
+              '_Detailed per-mutant results are intentionally omitted from PR summaries for security._',
           ]
           Path('mutation-summary.md').write_text('\n'.join(lines), encoding='utf-8')
           PY
@@ -463,14 +459,6 @@ jobs:
         with:
           name: backend-mutation-summary
           path: backend/mutation-summary.md
-          retention-days: 30
-
-      - name: Upload mutation report
-        uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: backend-mutation-report
-          path: backend/mutation_report.txt
           retention-days: 30
 
       - name: Comment mutation summary on PR
