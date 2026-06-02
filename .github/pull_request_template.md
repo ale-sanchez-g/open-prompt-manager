@@ -24,7 +24,7 @@
 <!-- Include relevant commands, e.g.: pytest tests/test_prompts.py -v -->
 
 - [ ] Backend unit / integration tests (`cd backend && pytest tests/ -v`)
-- [ ] Frontend unit tests (`npm test -- --watchAll=false`)
+- [ ] Frontend unit tests (`cd frontend && npm test -- --coverage`)
 - [ ] Docker Compose smoke test (`make up && curl http://localhost:8000/api/health`)
 - [ ] Manual testing (describe below)
 

@@ -117,7 +117,7 @@ Copy and adjust as needed — defaults work for local development out of the box
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `REACT_APP_API_URL` | *(empty)* | Backend base URL — leave empty when using a reverse proxy |
+| `VITE_API_URL` | *(empty)* | Backend base URL — leave empty when using a reverse proxy |
 
 ---
 
@@ -140,7 +140,7 @@ open-prompt-manager/
 │   ├── src/
 │   │   ├── pages/         # React page components
 │   │   ├── services/      # Axios API client
-│   │   └── __tests__/     # Jest test suite
+│   │   └── __tests__/     # Vitest + React Testing Library test suite
 │   └── package.json
 ├── e2e-test/              # Playwright API end-to-end tests
 │   ├── specs/
@@ -180,7 +180,7 @@ open-prompt-manager/
 - **Style**: Use functional components and React hooks. No class components.
 - **CSS**: Use Tailwind CSS utility classes. Avoid custom CSS unless absolutely necessary.
 - **API calls**: Go through `src/services/api.js`. Do not call `fetch`/`axios` directly from components.
-- **Routing**: Add new pages to `src/App.js` and document the route in the README.
+- **Routing**: Add new pages to `src/App.jsx` and document the route in the README.
 
 ### Git
 
@@ -216,12 +216,12 @@ pytest tests/ --cov=app --cov-report=term-missing -v
 ```bash
 cd frontend
 npm ci --legacy-peer-deps
-npm test -- --watchAll=false --ci --coverage
+npm test -- --coverage
 ```
 
 - Tests live in `frontend/src/__tests__/`.
-- Use [React Testing Library](https://testing-library.com/react) for component tests.
-- Mock API calls via `jest.mock('../services/api')`.
+- Use [React Testing Library](https://testing-library.com/react) with Vitest for component tests.
+- Mock API calls with Vitest (`vi.mock(...)`). Existing `jest.*` calls still run through the compatibility transform in `frontend/vite.config.js`, but new tests should use Vitest syntax directly.
 
 ### Full stack (Docker Compose smoke test)
 
@@ -343,11 +343,11 @@ Add the corresponding API call to `frontend/src/services/api.js`.
 
 ### 7. Frontend — UI
 
-Add or update a page in `frontend/src/pages/`. Register the route in `frontend/src/App.js` and update the README route table.
+Add or update a page in `frontend/src/pages/`. Register the route in `frontend/src/App.jsx` and update the README route table.
 
 ### 8. Frontend — tests
 
-Add Jest tests in `frontend/src/__tests__/`. Mock the API service and cover key user interactions.
+Add Vitest tests in `frontend/src/__tests__/`. Mock the API service and cover key user interactions.
 
 ### 9. Documentation
 
