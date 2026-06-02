@@ -400,18 +400,45 @@ jobs:
 
       - name: Run mutation tests (mutmut)
         run: |
-          mutmut run
-          mutmut results > mutation_report.txt
+          set -euo pipefail
+          # Keep run output so summary generation can parse final counters if needed.
+          mutmut run | tee mutation_run.log
+          mutmut results --all true > mutation_report.txt
 
       - name: Build mutation summary markdown
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
-          report = Path('mutation_report.txt').read_text(encoding='utf-8')
+
+          report = Path('mutation_report.txt').read_text(encoding='utf-8', errors='ignore')
+          run_log_path = Path('mutation_run.log')
+          run_log = run_log_path.read_text(encoding='utf-8', errors='ignore') if run_log_path.exists() else ''
+
           total = len(re.findall(r'^\s*app\.', report, re.MULTILINE))
-          survived = len(re.findall(r': survived', report))
-          killed = total - survived
+          survived = len(re.findall(r':\s*survived\b', report))
+          killed = len(re.findall(r':\s*killed\b', report))
+
+          # Fallback: parse mutmut progress summary line (emoji counters)
+          # Example: "495/495  🎉 462 ... 🙁 33 ..."
+          run_totals = re.findall(
+            r'(\d+)\s*/\s*(\d+).*?🎉\s*(\d+).*?🙁\s*(\d+)',
+            run_log,
+            re.DOTALL,
+          )
+          if run_totals:
+            _, progress_total, run_killed, run_survived = run_totals[-1]
+            if total == 0:
+              total = int(progress_total)
+            if killed == 0 and int(run_killed) > 0:
+              killed = int(run_killed)
+            if survived == 0 and int(run_survived) > 0:
+              survived = int(run_survived)
+
+          # Last resort: if killed isn't explicitly available, derive from total-survived.
+          if killed == 0 and total >= survived:
+            killed = total - survived
+
           pct = (killed / total * 100) if total else 0.0
           lines = [
               '# 🧬 Mutation Testing Summary',

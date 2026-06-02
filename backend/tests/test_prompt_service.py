@@ -84,6 +84,26 @@ def test_required_variable_missing_raises():
         render_prompt(prompt, {}, db)
 
 
+def test_variable_missing_required_flag_defaults_to_optional():
+    prompt = make_prompt(1, "Hello, {{name}}!", variables=[
+        {"name": "name", "type": "string"}
+    ])
+    db = MagicMock()
+    content, vars_used, _ = render_prompt(prompt, {}, db)
+    assert "{{name}}" in content
+    assert vars_used == []
+
+
+def test_required_variable_with_default_does_not_raise_and_uses_default():
+    prompt = make_prompt(1, "Hello, {{name}}!", variables=[
+        {"name": "name", "type": "string", "required": True, "default": "Guest"}
+    ])
+    db = MagicMock()
+    content, vars_used, _ = render_prompt(prompt, {}, db)
+    assert content == "Hello, Guest!"
+    assert vars_used == ["name"]
+
+
 def test_component_resolution():
     component = make_prompt(2, "I am a component.")
     parent = make_prompt(1, "Start. {{component:2}} End.")
