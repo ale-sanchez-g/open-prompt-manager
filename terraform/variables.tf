@@ -116,6 +116,12 @@ variable "frontend_port" {
   default     = 80
 }
 
+variable "cloudwatch_log_retention_in_days" {
+  description = "Retention in days for ECS and RDS CloudWatch log groups. Set to 365 in production."
+  type        = number
+  default     = 365
+}
+
 # ─────────────────────────────────────────────
 # Database (RDS PostgreSQL)
 # ─────────────────────────────────────────────

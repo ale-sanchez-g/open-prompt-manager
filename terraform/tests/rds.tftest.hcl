@@ -33,6 +33,20 @@ run "rds_copy_tags_to_snapshot_enabled" {
   }
 }
 
+run "rds_cloudwatch_log_exports_enabled" {
+  command = plan
+
+  assert {
+    condition     = contains(aws_db_instance.main.enabled_cloudwatch_logs_exports, "postgresql")
+    error_message = "RDS must export PostgreSQL logs to CloudWatch."
+  }
+
+  assert {
+    condition     = contains(aws_db_instance.main.enabled_cloudwatch_logs_exports, "upgrade")
+    error_message = "RDS must export upgrade logs to CloudWatch."
+  }
+}
+
 run "jwt_secret_override_uses_provided_value" {
   command = plan
 
