@@ -49,7 +49,7 @@ The application version displayed in the sidebar and landing page header is fetc
 | Layer | Technology |
 |-------|-----------|
 | Backend | Python 3.14, FastAPI, SQLAlchemy 2.0, Pydantic v2 |
-| Database | SQLite (upgradeable to PostgreSQL/MySQL) |
+| Database | SQLite (upgradeable to PostgreSQL) |
 | Frontend | React 19, Tailwind CSS, React Router v7, Axios |
 | Infrastructure | Docker, Kubernetes, Helm 3 |
 | AI Connectivity | MCP (Model Context Protocol) via `mcp==1.27.1` |
