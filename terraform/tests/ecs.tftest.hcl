@@ -11,17 +11,18 @@ mock_provider "aws" {
 }
 
 variables {
-  project_name           = "opm-test"
-  environment            = "test"
-  aws_region             = "us-east-1"
-  backend_cpu            = 512
-  backend_memory         = 1024
-  frontend_cpu           = 256
-  frontend_memory        = 512
-  backend_port           = 8000
-  frontend_port          = 80
-  backend_desired_count  = 2
-  frontend_desired_count = 2
+  project_name                     = "opm-test"
+  environment                      = "test"
+  aws_region                       = "us-east-1"
+  backend_cpu                      = 512
+  backend_memory                   = 1024
+  frontend_cpu                     = 256
+  frontend_memory                  = 512
+  backend_port                     = 8000
+  frontend_port                    = 80
+  backend_desired_count            = 2
+  frontend_desired_count           = 2
+  cloudwatch_log_retention_in_days = 365
 }
 
 # ─────────────────────────────────────────────
@@ -49,13 +50,13 @@ run "log_groups_have_retention" {
   command = plan
 
   assert {
-    condition     = aws_cloudwatch_log_group.backend.retention_in_days > 0
-    error_message = "Backend log group must have a retention policy set."
+    condition     = aws_cloudwatch_log_group.backend.retention_in_days == var.cloudwatch_log_retention_in_days
+    error_message = "Backend log group retention must match var.cloudwatch_log_retention_in_days."
   }
 
   assert {
-    condition     = aws_cloudwatch_log_group.frontend.retention_in_days > 0
-    error_message = "Frontend log group must have a retention policy set."
+    condition     = aws_cloudwatch_log_group.frontend.retention_in_days == var.cloudwatch_log_retention_in_days
+    error_message = "Frontend log group retention must match var.cloudwatch_log_retention_in_days."
   }
 }
 
