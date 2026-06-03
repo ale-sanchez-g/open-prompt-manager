@@ -2,7 +2,7 @@ backend:
   replicaCount: 2
   image:
     repository: prompt-manager-backend
-    tag: "3.0.1"
+    tag: "3.0.2"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -34,7 +34,7 @@ frontend:
   replicaCount: 2
   image:
     repository: prompt-manager-frontend
-    tag: "3.0.1"
+    tag: "3.0.2"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
