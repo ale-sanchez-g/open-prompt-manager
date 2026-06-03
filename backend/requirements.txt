@@ -4,7 +4,7 @@ uvicorn[standard]==0.48.0
 sqlalchemy==2.0.50
 pydantic==2.13.4
 pydantic-settings==2.14.1
-python-multipart==0.0.29
+python-multipart==0.0.30
 psycopg2-binary==2.9.11
 mcp==1.27.2
 bcrypt==5.0.0
