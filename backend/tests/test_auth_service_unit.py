@@ -8,7 +8,7 @@ ensure_refresh_token_is_active, revoke_refresh_token,
 revoke_refresh_token_from_cookie.
 """
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -16,6 +16,7 @@ import jwt
 import pytest
 
 from app.models.auth import RefreshToken, User
+from app.models.auth import _utcnow as model_utcnow
 from app.services.auth_service import (
     ACCESS_TOKEN_TTL_SECONDS,
     DEFAULT_BCRYPT_ROUNDS,
@@ -46,11 +47,35 @@ def test_utcnow_returns_naive_datetime():
     assert result.tzinfo is None
 
 
+def test_utcnow_passes_timezone_utc_to_datetime_now():
+    fixed_aware_now = datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+    with patch('app.services.auth_service.datetime') as mock_datetime:
+        mock_datetime.now.return_value = fixed_aware_now
+        result = utcnow()
+
+    mock_datetime.now.assert_called_once_with(timezone.utc)
+    assert result == fixed_aware_now.replace(tzinfo=None)
+
+
 def test_utcnow_is_approximately_now():
-    from datetime import datetime
     result = utcnow()
     now = datetime.utcnow()
     assert abs((now - result).total_seconds()) < 2
+
+
+def test_model_utcnow_returns_naive_datetime():
+    result = model_utcnow()
+    assert result.tzinfo is None
+
+
+def test_model_utcnow_passes_timezone_utc_to_datetime_now():
+    fixed_aware_now = datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+    with patch('app.models.auth.datetime') as mock_datetime:
+        mock_datetime.now.return_value = fixed_aware_now
+        result = model_utcnow()
+
+    mock_datetime.now.assert_called_once_with(timezone.utc)
+    assert result == fixed_aware_now.replace(tzinfo=None)
 
 
 # ── AuthError ─────────────────────────────────────────────────────────────────
@@ -91,13 +116,13 @@ def test_get_jwt_secret_returns_env_value(monkeypatch):
 
 def test_get_jwt_secret_raises_when_empty_string(monkeypatch):
     monkeypatch.setenv('JWT_SECRET', '')
-    with pytest.raises(RuntimeError, match='JWT_SECRET'):
+    with pytest.raises(RuntimeError, match='^JWT_SECRET environment variable is required$'):
         _get_jwt_secret()
 
 
 def test_get_jwt_secret_raises_when_not_set(monkeypatch):
     monkeypatch.delenv('JWT_SECRET', raising=False)
-    with pytest.raises(RuntimeError, match='JWT_SECRET'):
+    with pytest.raises(RuntimeError, match='^JWT_SECRET environment variable is required$'):
         _get_jwt_secret()
 
 
@@ -128,6 +153,12 @@ def test_get_cookie_secure_false_when_x_forwarded_proto_is_http():
 
 def test_get_cookie_secure_false_when_forwarded_proto_is_unset():
     assert get_cookie_secure(_make_request('http', '')) is False
+
+
+def test_get_cookie_secure_reads_expected_header_key_with_default_empty_string():
+    request = _make_request('http')
+    get_cookie_secure(request)
+    request.headers.get.assert_called_once_with('x-forwarded-proto', '')
 
 
 # ── validate_email ─────────────────────────────────────────────────────────────
@@ -401,9 +432,19 @@ def test_ensure_refresh_token_is_active_raises_when_expired():
 
 def test_ensure_refresh_token_is_active_raises_when_expires_at_exactly_now():
     """Token expiry boundary: expires_at == utcnow() should be expired."""
-    rt = _make_refresh_token(expires_offset_seconds=0)
-    with pytest.raises(TokenValidationError):
-        ensure_refresh_token_is_active(rt)
+    fixed_now = datetime(2026, 1, 2, 3, 4, 5)
+    rt = SimpleNamespace(revoked_at=None, expires_at=fixed_now)
+    with patch('app.services.auth_service.utcnow', return_value=fixed_now):
+        with pytest.raises(TokenValidationError, match='^token_expired$'):
+            ensure_refresh_token_is_active(rt)
+
+
+def test_ensure_refresh_token_is_active_accepts_expiry_strictly_after_now():
+    fixed_now = datetime(2026, 1, 2, 3, 4, 5)
+    rt = SimpleNamespace(revoked_at=None, expires_at=fixed_now + timedelta(microseconds=1))
+    with patch('app.services.auth_service.utcnow', return_value=fixed_now):
+        result = ensure_refresh_token_is_active(rt)
+    assert result is rt
 
 
 # ── revoke_refresh_token ──────────────────────────────────────────────────────
@@ -419,6 +460,16 @@ def test_revoke_refresh_token_sets_revoked_at():
 
     assert rt.revoked_at is not None
     db.commit.assert_called_once()
+
+
+def test_revoke_refresh_token_propagates_token_id_to_lookup():
+    rt = _make_refresh_token()
+    db = MagicMock()
+
+    with patch('app.services.auth_service.get_refresh_token_record', return_value=rt) as mock_get_record:
+        revoke_refresh_token(db, 'token-id-propagation')
+
+    mock_get_record.assert_called_once_with(db, 'token-id-propagation')
 
 
 def test_revoke_refresh_token_is_noop_when_already_revoked():
@@ -489,3 +540,13 @@ def test_revoke_refresh_token_from_cookie_revokes_valid_token(monkeypatch):
 
     assert rt.revoked_at is not None
     db.commit.assert_called_once()
+
+
+def test_revoke_refresh_token_from_cookie_propagates_jti_to_revoke():
+    db = MagicMock()
+    with patch('app.services.auth_service.decode_token', return_value={'jti': 'cookie-jti-123'}) as mock_decode:
+        with patch('app.services.auth_service.revoke_refresh_token') as mock_revoke:
+            revoke_refresh_token_from_cookie(db, 'valid-cookie-token')
+
+    mock_decode.assert_called_once_with('valid-cookie-token', expected_type='refresh')
+    mock_revoke.assert_called_once_with(db, 'cookie-jti-123')
