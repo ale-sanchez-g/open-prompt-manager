@@ -4,7 +4,7 @@ in _prompt_to_dict and build_mcp_server.
 """
 from datetime import datetime
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from app.mcp_server import _build_has_children, _prompt_to_dict, build_mcp_server
 
@@ -262,3 +262,17 @@ def test_build_mcp_server_has_expected_tools():
     assert 'create_prompt' in tool_names
     assert 'list_tags' in tool_names
     assert 'list_agents' in tool_names
+
+
+def test_build_mcp_server_sets_transport_security_allowed_hosts():
+    expected_hosts = ['host-a.local', 'host-b.local:8000']
+    fake_transport_settings = object()
+
+    with patch('app.mcp_server._allowed_hosts', expected_hosts):
+        with patch('app.mcp_server.TransportSecuritySettings', return_value=fake_transport_settings) as mock_security:
+            with patch('app.mcp_server.FastMCP', return_value=MagicMock()) as mock_fastmcp:
+                build_mcp_server()
+
+    mock_security.assert_called_once_with(allowed_hosts=expected_hosts)
+    _, kwargs = mock_fastmcp.call_args
+    assert kwargs['transport_security'] is fake_transport_settings
