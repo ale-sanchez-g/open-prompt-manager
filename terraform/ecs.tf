@@ -60,7 +60,7 @@ locals {
   frontend_image_uri = var.frontend_image != "" ? var.frontend_image : "${aws_ecr_repository.frontend.repository_url}:latest"
   # "vscode-app" is the netloc VS Code sends in its Origin header (vscode-file://vscode-app).
   # It must be included so the MCP SDK does not reject VS Code client connections with 403.
-  mcp_allowed_hosts  = join(",", distinct(compact(concat(["vscode-app", aws_lb.main.dns_name], var.domain_names, var.domain_name != "" ? [var.domain_name] : []))))
+  mcp_allowed_hosts = join(",", distinct(compact(concat(["vscode-app", aws_lb.main.dns_name], var.domain_names, var.domain_name != "" ? [var.domain_name] : []))))
 }
 
 resource "aws_ecs_task_definition" "backend" {
