@@ -58,7 +58,9 @@ resource "aws_ecs_cluster_capacity_providers" "main" {
 locals {
   backend_image_uri  = var.backend_image != "" ? var.backend_image : "${aws_ecr_repository.backend.repository_url}:latest"
   frontend_image_uri = var.frontend_image != "" ? var.frontend_image : "${aws_ecr_repository.frontend.repository_url}:latest"
-  mcp_allowed_hosts  = join(",", distinct(compact(concat([aws_lb.main.dns_name], var.domain_names, var.domain_name != "" ? [var.domain_name] : []))))
+  # "vscode-app" is the netloc VS Code sends in its Origin header (vscode-file://vscode-app).
+  # It must be included so the MCP SDK does not reject VS Code client connections with 403.
+  mcp_allowed_hosts = join(",", distinct(compact(concat(["vscode-app", aws_lb.main.dns_name], var.domain_names, var.domain_name != "" ? [var.domain_name] : []))))
 }
 
 resource "aws_ecs_task_definition" "backend" {

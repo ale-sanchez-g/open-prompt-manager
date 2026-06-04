@@ -21,7 +21,10 @@ from app.services.prompt_service import render_prompt as _render_prompt
 # Allow the host names that legitimate MCP clients will connect from.
 # Defaults cover local development and Docker Compose.  Set MCP_ALLOWED_HOSTS
 # as a comma-separated list to extend for production deployments.
-_default_hosts = "localhost,localhost:8000,127.0.0.1,127.0.0.1:8000"
+# "vscode-app" is included by default because VS Code sends
+# Origin: vscode-file://vscode-app when its MCP client connects; the MCP SDK
+# checks the netloc of that URL ("vscode-app") against this list.
+_default_hosts = "localhost,localhost:8000,127.0.0.1,127.0.0.1:8000,vscode-app"
 _allowed_hosts = [
     h.strip()
     for h in os.getenv("MCP_ALLOWED_HOSTS", _default_hosts).split(",")

@@ -276,3 +276,12 @@ def test_build_mcp_server_sets_transport_security_allowed_hosts():
     mock_security.assert_called_once_with(allowed_hosts=expected_hosts)
     _, kwargs = mock_fastmcp.call_args
     assert kwargs['transport_security'] is fake_transport_settings
+
+
+def test_vscode_origin_in_default_allowed_hosts():
+    """VS Code sends Origin: vscode-file://vscode-app whose netloc is 'vscode-app'.
+    It must appear in the default allowed hosts so the MCP SDK does not reject
+    connections from VS Code with 403 Invalid Origin header."""
+    import app.mcp_server as mcp_mod
+
+    assert 'vscode-app' in [h.strip() for h in mcp_mod._default_hosts.split(',') if h.strip()]
