@@ -313,7 +313,7 @@ The server uses the **Streamable HTTP** transport (`stateless_http=True`), which
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MCP_ALLOWED_HOSTS` | `localhost,localhost:8000,127.0.0.1,127.0.0.1:8000` | Comma-separated list of host names allowed to connect to the MCP endpoint (DNS rebinding protection). Add your production domain here. |
+| `MCP_ALLOWED_HOSTS` | `localhost,localhost:8000,127.0.0.1,127.0.0.1:8000,vscode-app` | Comma-separated list of host names allowed to connect to the MCP endpoint (DNS rebinding protection). Add your production domain here. `vscode-app` is included by default to allow VS Code MCP clients (which send `Origin: vscode-file://vscode-app`). |
 
 ### Connect from VS Code (GitHub Copilot)
 
