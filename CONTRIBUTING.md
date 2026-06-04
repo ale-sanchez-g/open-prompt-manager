@@ -111,7 +111,7 @@ Copy and adjust as needed — defaults work for local development out of the box
 |----------|---------|-------------|
 | `DATABASE_URL` | `sqlite:///./data/prompts.db` | Database connection string |
 | `CORS_ORIGINS` | `http://localhost,http://localhost:80,http://localhost:3000` | Allowed CORS origins |
-| `MCP_ALLOWED_HOSTS` | `localhost,localhost:8000,127.0.0.1,127.0.0.1:8000` | Hosts allowed to connect to the MCP endpoint |
+| `MCP_ALLOWED_HOSTS` | `localhost,localhost:8000,127.0.0.1,127.0.0.1:8000,vscode-app` | Hosts allowed to connect to the MCP endpoint. `vscode-app` is required for VS Code MCP clients. |
 
 **Frontend** (`frontend/`):
 
