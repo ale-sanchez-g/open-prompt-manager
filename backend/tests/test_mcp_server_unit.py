@@ -266,14 +266,16 @@ def test_build_mcp_server_has_expected_tools():
 
 def test_build_mcp_server_sets_transport_security_allowed_hosts():
     expected_hosts = ['host-a.local', 'host-b.local:8000']
+    expected_origins = ['vscode-file://vscode-app']
     fake_transport_settings = object()
 
     with patch('app.mcp_server._allowed_hosts', expected_hosts):
-        with patch('app.mcp_server.TransportSecuritySettings', return_value=fake_transport_settings) as mock_security:
-            with patch('app.mcp_server.FastMCP', return_value=MagicMock()) as mock_fastmcp:
-                build_mcp_server()
+        with patch('app.mcp_server._allowed_origins', expected_origins):
+            with patch('app.mcp_server.TransportSecuritySettings', return_value=fake_transport_settings) as mock_security:
+                with patch('app.mcp_server.FastMCP', return_value=MagicMock()) as mock_fastmcp:
+                    build_mcp_server()
 
-    mock_security.assert_called_once_with(allowed_hosts=expected_hosts)
+    mock_security.assert_called_once_with(allowed_hosts=expected_hosts, allowed_origins=expected_origins)
     _, kwargs = mock_fastmcp.call_args
     assert kwargs['transport_security'] is fake_transport_settings
 
@@ -285,3 +287,11 @@ def test_vscode_origin_in_default_allowed_hosts():
     import app.mcp_server as mcp_mod
 
     assert 'vscode-app' in [h.strip() for h in mcp_mod._default_hosts.split(',') if h.strip()]
+
+
+def test_vscode_file_origin_in_default_allowed_origins():
+    import importlib
+    import app.mcp_server as mcp_mod
+
+    importlib.reload(mcp_mod)
+    assert 'vscode-file://vscode-app' in mcp_mod._allowed_origins

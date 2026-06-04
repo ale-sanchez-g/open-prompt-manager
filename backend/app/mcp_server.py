@@ -21,14 +21,21 @@ from app.services.prompt_service import render_prompt as _render_prompt
 # Allow the host names that legitimate MCP clients will connect from.
 # Defaults cover local development and Docker Compose.  Set MCP_ALLOWED_HOSTS
 # as a comma-separated list to extend for production deployments.
-# "vscode-app" is included by default because VS Code sends
-# Origin: vscode-file://vscode-app when its MCP client connects; the MCP SDK
-# checks the netloc of that URL ("vscode-app") against this list.
+# "vscode-app" is included by default because MCP clients connect from VS Code.
 _default_hosts = "localhost,localhost:8000,127.0.0.1,127.0.0.1:8000,vscode-app"
 _allowed_hosts = [
     h.strip()
     for h in os.getenv("MCP_ALLOWED_HOSTS", _default_hosts).split(",")
     if h.strip()
+]
+
+# VS Code's extension host sends Origin: vscode-file://vscode-app for MCP
+# requests. The MCP SDK validates this value against allowed_origins.
+_default_origins = "vscode-file://vscode-app"
+_allowed_origins = [
+    o.strip()
+    for o in os.getenv("MCP_ALLOWED_ORIGINS", _default_origins).split(",")
+    if o.strip()
 ]
 
 
@@ -77,7 +84,10 @@ def build_mcp_server() -> FastMCP:
         # stateless_http=True: each request is self-contained; no cross-request
         # session state is needed because every tool call opens its own DB session.
         stateless_http=True,
-        transport_security=TransportSecuritySettings(allowed_hosts=_allowed_hosts),
+        transport_security=TransportSecuritySettings(
+            allowed_hosts=_allowed_hosts,
+            allowed_origins=_allowed_origins,
+        ),
     )
 
     # ── Tools ──────────────────────────────────────────────────────────────────
