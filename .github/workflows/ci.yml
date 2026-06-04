@@ -1039,7 +1039,7 @@ jobs:
         run: echo "version=$(node -e "console.log(require('./e2e-test/node_modules/@playwright/test/package.json').version)")" >> $GITHUB_OUTPUT
 
       - name: Restore Playwright browsers cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
@@ -1062,7 +1062,7 @@ jobs:
           github.event_name == 'push' &&
           github.ref == 'refs/heads/main' &&
           steps.playwright-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
