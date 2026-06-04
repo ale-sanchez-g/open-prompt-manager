@@ -66,3 +66,17 @@ run "task_role_has_required_tags" {
     error_message = "ECS task role must have 'Environment' tag."
   }
 }
+
+run "rds_monitoring_role_configuration" {
+  command = plan
+
+  assert {
+    condition     = aws_iam_role.rds_enhanced_monitoring.name == "${var.project_name}-${var.environment}-rds-monitoring-role"
+    error_message = "RDS monitoring role name must follow '<project>-<environment>-rds-monitoring-role'."
+  }
+
+  assert {
+    condition     = aws_iam_role_policy_attachment.rds_enhanced_monitoring.policy_arn == "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
+    error_message = "RDS monitoring role must attach AmazonRDSEnhancedMonitoringRole managed policy."
+  }
+}

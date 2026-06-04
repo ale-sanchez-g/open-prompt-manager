@@ -47,6 +47,24 @@ run "rds_cloudwatch_log_exports_enabled" {
   }
 }
 
+run "rds_enhanced_monitoring_enabled" {
+  command = plan
+
+  assert {
+    condition     = aws_db_instance.main.monitoring_interval == 60
+    error_message = "RDS enhanced monitoring must be enabled with 60-second granularity."
+  }
+}
+
+run "rds_performance_insights_enabled" {
+  command = plan
+
+  assert {
+    condition     = aws_db_instance.main.performance_insights_enabled == true
+    error_message = "RDS Performance Insights must be enabled."
+  }
+}
+
 run "jwt_secret_override_uses_provided_value" {
   command = plan
 
