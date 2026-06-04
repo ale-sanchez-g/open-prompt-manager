@@ -351,7 +351,7 @@ Claude Code will now be able to call `list_prompts`, `get_prompt`, `render_promp
 When running behind a load balancer or reverse proxy, allow the production host:
 
 ```bash
-MCP_ALLOWED_HOSTS="localhost,localhost:8000,prompt-manager.yourdomain.com" docker-compose up -d
+MCP_ALLOWED_HOSTS="localhost,localhost:8000,127.0.0.1,127.0.0.1:8000,vscode-app,prompt-manager.yourdomain.com" docker-compose up -d
 ```
 
 The AWS ALB listener rule in `terraform/alb.tf` already routes `/mcp` and `/mcp/*` requests to the backend target group.
