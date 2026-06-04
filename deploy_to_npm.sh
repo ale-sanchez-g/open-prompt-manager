@@ -95,7 +95,7 @@ else
 fi
 
 log 'Previewing publish payload (npm pack --dry-run)'
-npm --prefix "${PACKAGE_DIR}" pack --dry-run
+(cd "${PACKAGE_DIR}" && npm pack --dry-run)
 
 if [[ "${DRY_RUN}" == 'true' ]]; then
   log 'Dry run complete. Skipping npm publish.'
@@ -103,6 +103,6 @@ if [[ "${DRY_RUN}" == 'true' ]]; then
 fi
 
 log 'Publishing package to npm'
-npm --prefix "${PACKAGE_DIR}" publish
+(cd "${PACKAGE_DIR}" && npm publish)
 
 log "Publish complete: ${PACKAGE_NAME}@${PACKAGE_VERSION}"
