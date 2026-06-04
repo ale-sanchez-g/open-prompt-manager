@@ -150,14 +150,11 @@ The deploy workflow is staged and safer by default:
 ### Publish MCP Node package to npm
 
 Use the repository helper script to publish `mcp-package-node` (`open-prompt-manager-mcp`) to npm with preflight checks.
+Versioning is intentionally handled outside this script.
 
 ```bash
-# Default publish flow (patch bump + tests + npm publish)
+# Default publish flow (tests + npm publish)
 ./deploy_to_npm.sh
-
-# Minor/major releases
-./deploy_to_npm.sh --bump minor
-./deploy_to_npm.sh --bump major
 
 # Validate publish payload without publishing
 ./deploy_to_npm.sh --dry-run
@@ -166,12 +163,10 @@ Use the repository helper script to publish `mcp-package-node` (`open-prompt-man
 What the script does:
 - Validates required tools (`git`, `node`, `npm`) and npm authentication (`npm whoami`)
 - Enforces Node.js 24+ (matches `mcp-package-node` engines)
-- Bumps monorepo version via `scripts/release/bump_version.sh` unless `--skip-bump` is used
 - Installs dependencies, runs `mcp-package-node` tests, and runs `npm pack --dry-run`
 - Publishes with `npm publish` (unless `--dry-run`)
 
 Optional flags:
-- `--skip-bump` to publish without changing versions
 - `--skip-tests` to skip package tests
 - `--allow-dirty` to allow publishing from a non-clean git working tree
 

@@ -4,24 +4,17 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="${SCRIPT_DIR}"
 PACKAGE_DIR="${ROOT_DIR}/mcp-package-node"
-VERSION_FILE="${ROOT_DIR}/.version"
-DEFAULT_BUMP_TYPE='patch'
-
-BUMP_TYPE="${DEFAULT_BUMP_TYPE}"
-SKIP_BUMP='false'
 SKIP_TESTS='false'
 DRY_RUN='false'
 ALLOW_DIRTY='false'
 
 usage() {
   cat <<'EOF'
-Usage: ./.deploy_to_npm.sh [options]
+Usage: ./deploy_to_npm.sh [options]
 
 Publishes the mcp-package-node package (open-prompt-manager-mcp) to npm.
 
 Options:
-  --bump <patch|minor|major>  Version bump type (default: patch)
-  --skip-bump                 Do not bump versions before publishing
   --skip-tests                Skip npm test before publishing
   --dry-run                   Run all checks and npm pack --dry-run, but do not publish
   --allow-dirty               Allow publishing with uncommitted git changes
@@ -44,15 +37,6 @@ require_cmd() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --bump)
-      [[ $# -ge 2 ]] || fail '--bump requires an argument'
-      BUMP_TYPE="$2"
-      shift 2
-      ;;
-    --skip-bump)
-      SKIP_BUMP='true'
-      shift
-      ;;
     --skip-tests)
       SKIP_TESTS='true'
       shift
@@ -75,19 +59,11 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ "${SKIP_BUMP}" == 'false' ]]; then
-  case "${BUMP_TYPE}" in
-    patch|minor|major) ;;
-    *) fail 'Invalid --bump value. Use patch, minor, or major.' ;;
-  esac
-fi
-
 require_cmd git
 require_cmd node
 require_cmd npm
 
 [[ -d "${PACKAGE_DIR}" ]] || fail "Package directory not found: ${PACKAGE_DIR}"
-[[ -f "${VERSION_FILE}" ]] || fail "Version file not found: ${VERSION_FILE}"
 
 if [[ "${ALLOW_DIRTY}" == 'false' ]]; then
   if [[ -n "$(git -C "${ROOT_DIR}" status --porcelain)" ]]; then
@@ -104,15 +80,9 @@ if (( NODE_MAJOR < 24 )); then
   fail 'Node.js 24+ is required by mcp-package-node (engines.node >=24).'
 fi
 
-if [[ "${SKIP_BUMP}" == 'false' ]]; then
-  log "Bumping monorepo version with type: ${BUMP_TYPE}"
-  "${ROOT_DIR}/scripts/release/bump_version.sh" "${BUMP_TYPE}"
-else
-  log 'Skipping version bump'
-fi
-
-NEW_VERSION="$(tr -d '[:space:]' < "${VERSION_FILE}")"
-log "Target version: ${NEW_VERSION}"
+PACKAGE_NAME="$(npm --prefix "${PACKAGE_DIR}" pkg get name | tr -d '"')"
+PACKAGE_VERSION="$(npm --prefix "${PACKAGE_DIR}" pkg get version | tr -d '"')"
+log "Package target: ${PACKAGE_NAME}@${PACKAGE_VERSION}"
 
 log 'Installing dependencies in mcp-package-node'
 npm --prefix "${PACKAGE_DIR}" ci
@@ -135,4 +105,4 @@ fi
 log 'Publishing package to npm'
 npm --prefix "${PACKAGE_DIR}" publish
 
-log "Publish complete: open-prompt-manager-mcp@${NEW_VERSION}"
+log "Publish complete: ${PACKAGE_NAME}@${PACKAGE_VERSION}"
