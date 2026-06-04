@@ -110,7 +110,10 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    cors_origins_env = os.getenv('CORS_ORIGINS', 'http://localhost,http://localhost:3000,http://localhost:80')
+    cors_origins_env = os.getenv(
+        'CORS_ORIGINS',
+        'http://localhost,http://localhost:3000,http://localhost:80,vscode-file://vscode-app',
+    )
     cors_origins = [o.strip() for o in cors_origins_env.split(',')]
 
     application.add_middleware(

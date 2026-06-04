@@ -520,7 +520,7 @@ helm install prompt-manager ./helm/prompt-manager \
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATABASE_URL` | `sqlite:///./data/prompts.db` | Database connection string |
-| `CORS_ORIGINS` | `http://localhost,http://localhost:3000` | Comma-separated allowed CORS origins |
+| `CORS_ORIGINS` | `http://localhost,http://localhost:3000,vscode-file://vscode-app` | Comma-separated allowed CORS origins. Include `vscode-file://vscode-app` for VS Code MCP clients. |
 | `MCP_ALLOWED_HOSTS` | `localhost,localhost:8000,127.0.0.1,127.0.0.1:8000` | Comma-separated host names allowed to connect to the MCP endpoint |
 
 ### Frontend

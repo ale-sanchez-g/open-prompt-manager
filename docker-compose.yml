@@ -9,7 +9,7 @@ services:
       - backend-data:/app/data
     environment:
       - DATABASE_URL=sqlite:///./data/prompts.db
-      - CORS_ORIGINS=http://localhost,http://localhost:3000,http://localhost:80
+      - CORS_ORIGINS=http://localhost,http://localhost:3000,http://localhost:80,vscode-file://vscode-app
       # MCP (Model Context Protocol) server is available at http://localhost:8000/mcp
       # Add any additional host names that MCP clients will use in MCP_ALLOWED_HOSTS.
       # "vscode-app" is required for VS Code MCP clients (Origin: vscode-file://vscode-app).
