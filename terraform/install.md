@@ -810,9 +810,10 @@ The Terraform configuration provisions an Amazon RDS PostgreSQL 16 instance in t
 
 | Resource | Details |
 |---|---|
-| `aws_db_instance` | PostgreSQL 16, `db.t4g.micro` by default, encrypted with gp3 storage |
+| `aws_db_instance` | PostgreSQL 16, `db.t4g.micro` by default, encrypted with gp3 storage, Enhanced Monitoring (60s), and Performance Insights |
 | `aws_db_subnet_group` | Uses the existing private subnets (multi-AZ ready) |
 | `aws_security_group.rds` | Port 5432 open only from the backend ECS security group |
+| `aws_iam_role.rds_enhanced_monitoring` | IAM role trusted by `monitoring.rds.amazonaws.com` for Enhanced Monitoring |
 | `random_password` | 32-char random password, never stored in state as plain text |
 | `aws_secretsmanager_secret` | Full `DATABASE_URL` stored at `<project>/<env>/database-url` |
 
@@ -859,6 +860,7 @@ db_allocated_storage   = 50               # GiB
 db_multi_az            = true             # enable for production HA
 db_deletion_protection = true             # prevent accidental drops
 cloudwatch_log_retention_in_days = 365    # policy-aligned log retention
+db_performance_insights_kms_key_id = "arn:aws:kms:ap-southeast-2:123456789012:key/abcd-1234" # optional CMK for PI encryption
 ```
 
 > **Note:** Enabling `db_deletion_protection = true` also triggers a final RDS snapshot before any `terraform destroy`.
@@ -873,11 +875,11 @@ terraform/
 ├── variables.tf         # All input variables with defaults
 ├── vpc.tf               # VPC, subnets, IGW, NAT Gateway, route tables
 ├── security_groups.tf   # Security groups for ALB, frontend, backend, and RDS
-├── iam.tf               # IAM roles for ECS task execution + Secrets Manager policy
+├── iam.tf               # IAM roles for ECS and RDS Enhanced Monitoring
 ├── ecr.tf               # ECR repositories and lifecycle policies
 ├── alb.tf               # Application Load Balancer, target groups, listener rules
 ├── ecs.tf               # ECS cluster (Container Insights), task definitions, services
-├── rds.tf               # RDS PostgreSQL, DB subnet group, and Secrets Manager secret
+├── rds.tf               # RDS PostgreSQL with Enhanced Monitoring/Performance Insights, subnet group, and DB secret
 ├── certificate.tf       # ACM certificate creation and local certificate_arn resolution
 ├── dns.tf               # Route 53 hosted zone, A/CNAME records, ACM DNS validation
 ├── outputs.tf           # Output values (URLs, IDs, DB endpoint, secret ARN)

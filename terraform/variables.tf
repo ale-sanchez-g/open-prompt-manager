@@ -161,6 +161,12 @@ variable "db_deletion_protection" {
   default     = false
 }
 
+variable "db_performance_insights_kms_key_id" {
+  description = "Optional KMS key ARN or ID used to encrypt RDS Performance Insights data. Leave null to use the AWS managed key."
+  type        = string
+  default     = null
+}
+
 # ─────────────────────────────────────────────
 # TLS/HTTPS
 # ─────────────────────────────────────────────

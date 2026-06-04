@@ -15,6 +15,18 @@ data "aws_iam_policy_document" "ecs_task_assume_role" {
   }
 }
 
+data "aws_iam_policy_document" "rds_monitoring_assume_role" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["monitoring.rds.amazonaws.com"]
+    }
+  }
+}
+
 resource "aws_iam_role" "ecs_task_execution" {
   name               = "${var.project_name}-ecs-task-execution-role"
   assume_role_policy = data.aws_iam_policy_document.ecs_task_assume_role.json
@@ -68,4 +80,20 @@ resource "aws_iam_role_policy" "ecs_execution_secrets" {
       }
     ]
   })
+}
+
+resource "aws_iam_role" "rds_enhanced_monitoring" {
+  name               = "${var.project_name}-${var.environment}-rds-monitoring-role"
+  assume_role_policy = data.aws_iam_policy_document.rds_monitoring_assume_role.json
+
+  tags = {
+    Name        = "${var.project_name}-rds-monitoring-role"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "rds_enhanced_monitoring" {
+  role       = aws_iam_role.rds_enhanced_monitoring.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
 }
