@@ -147,6 +147,34 @@ The deploy workflow is staged and safer by default:
 - Stores plan logs under `terraform/.terraform.plans/`
 - Checks ACM certificate status before creating HTTPS listener-dependent resources
 
+### Publish MCP Node package to npm
+
+Use the repository helper script to publish `mcp-package-node` (`open-prompt-manager-mcp`) to npm with preflight checks.
+
+```bash
+# Default publish flow (patch bump + tests + npm publish)
+./deploy_to_npm.sh
+
+# Minor/major releases
+./deploy_to_npm.sh --bump minor
+./deploy_to_npm.sh --bump major
+
+# Validate publish payload without publishing
+./deploy_to_npm.sh --dry-run
+```
+
+What the script does:
+- Validates required tools (`git`, `node`, `npm`) and npm authentication (`npm whoami`)
+- Enforces Node.js 24+ (matches `mcp-package-node` engines)
+- Bumps monorepo version via `scripts/release/bump_version.sh` unless `--skip-bump` is used
+- Installs dependencies, runs `mcp-package-node` tests, and runs `npm pack --dry-run`
+- Publishes with `npm publish` (unless `--dry-run`)
+
+Optional flags:
+- `--skip-bump` to publish without changing versions
+- `--skip-tests` to skip package tests
+- `--allow-dirty` to allow publishing from a non-clean git working tree
+
 ### GitHub Actions tag-triggered deploy
 
 `/.github/workflows/deploy.yml` runs automatically on pushes to release tags matching `v*.*.*` (for example `v1.4.2`), uses AWS OIDC (`aws-actions/configure-aws-credentials`) with no static AWS access keys, then:
