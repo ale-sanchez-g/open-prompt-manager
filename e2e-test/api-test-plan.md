@@ -539,18 +539,7 @@ Comprehensive API test suite for the Open Prompt Manager, a production-ready fra
     - expect: Pagination works efficiently
     - expect: Response times remain reasonable even with large offsets
 
-### 8. MCP Protocol Tests
-
-**Seed:** `e2e-test/seed.spec.ts`
-
-#### 8.1. MCP Endpoint Basic Connectivity
-
-**File:** `e2e-test/specs/mcp/mcp-connectivity.spec.ts`
-
-**Steps:**
-  1. Send POST request to /mcp endpoint with valid MCP protocol data
-    - expect: Response status code is 200
-    - expect: Response indicates MCP protocol is active
+### 8. MCP Protocol Tests - REMOVED
 
 ### 9. User Journey E2E Tests
 

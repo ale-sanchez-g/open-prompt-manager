@@ -10,11 +10,10 @@ This is a monorepo with five independently testable components:
 |-----------|------|---------|---------|
 | Backend API | `backend/` | Python 3.14, FastAPI, SQLAlchemy 2.0 | REST API + MCP server |
 | Frontend | `frontend/` | React 19, Tailwind CSS, React Router v7 | SPA dashboard |
-| MCP Python package | `mcp-package-python/` | Python 3.14, `mcp` SDK | Standalone stdio MCP client for Claude Desktop |
 | MCP Node package | `mcp-package-node/` | Node 24, `@modelcontextprotocol/sdk` | Standalone stdio MCP client for Node environments |
 | Infrastructure | `terraform/`, `helm/` | Terraform, Helm 3 | AWS ECS + Kubernetes deployment |
 
-The backend exposes both a REST API (`/api/*`) and an MCP endpoint (`/mcp`) via Streamable HTTP transport. The MCP mount **must** remain the last `app.mount()` call in `main.py` so it does not shadow `/api/*` routes.
+The backend exposes both a REST API (`/api/*`)
 
 ## Code Style
 
@@ -27,7 +26,6 @@ The backend exposes both a REST API (`/api/*`) and an MCP endpoint (`/mcp`) via 
 - Use single quotes for strings by convention (matching the existing codebase).
 - Route handlers go in `backend/app/api/`. Register new routers in `main.py`.
 - Business logic goes in `backend/app/services/`. Keep route handlers thin.
-- New MCP tools go in `backend/app/mcp_server.py` inside `build_mcp_server()`.
 
 ### Frontend (React / JavaScript)
 
@@ -39,9 +37,8 @@ The backend exposes both a REST API (`/api/*`) and an MCP endpoint (`/mcp`) via 
 
 ### MCP Packages
 
-- The Python MCP package (`mcp-package-python/`) uses only `urllib` for HTTP — no `requests` or `httpx` dependency.
 - The Node MCP package (`mcp-package-node/`) uses native `fetch` — no `axios` or `node-fetch`.
-- Both packages are configured via `BACKEND_URL` and `API_KEY` environment variables at startup (the Python package reads them on import).
+- Package is configured via `BACKEND_URL` and `API_KEY` environment variables at startup.
 
 ## Build & Test
 
@@ -55,11 +52,6 @@ pytest tests/ --cov=app --cov-report=term-missing -v
 cd frontend
 npm ci --legacy-peer-deps
 npm test -- --coverage
-
-# ── MCP Python package ───────────────────────────────────
-cd mcp-package-python
-pip install -e ".[test]"
-pytest tests/ -v
 
 # ── MCP Node package ─────────────────────────────────────
 cd mcp-package-node
@@ -94,7 +86,7 @@ Always run the relevant test suite **before** committing. CI (`.github/workflows
 
 ### Versioning
 
-Semantic versioning across all manifests. The single source of truth is `.version` at the repo root. Never edit version strings in individual files manually — they are synced by `scripts/release/sync_versions.sh` to `backend/app/__init__.py`, `frontend/package.json`, `frontend/package-lock.json`, `mcp-package-python/pyproject.toml`, `mcp-package-node/package.json`, `mcp-package-node/package-lock.json`, and `helm/prompt-manager/Chart.yaml`.
+Semantic versioning across all manifests. The single source of truth is `.version` at the repo root. Never edit version strings in individual files manually — they are synced by `scripts/release/sync_versions.sh` to `backend/app/__init__.py`, `frontend/package.json`, `frontend/package-lock.json`, `mcp-package-node/package.json`, `mcp-package-node/package-lock.json`, and `helm/prompt-manager/Chart.yaml`.
 
 Three versioning workflows coexist:
 
@@ -145,7 +137,6 @@ When in doubt about patterns, read these files first:
 | File | What it demonstrates |
 |------|---------------------|
 | `backend/main.py` | App factory, MCP server mount order, CORS, lifespan |
-| `backend/app/mcp_server.py` | MCP tool definitions, DB session usage, error dict returns |
 | `backend/app/api/prompts.py` | Thin REST route handlers, `Depends(get_db)`, HTTPException |
 | `backend/app/models/schemas.py` | Pydantic v2 schemas, `model_config = {"from_attributes": True}` |
 | `backend/app/services/prompt_service.py` | Business logic, recursive component resolution, circular-ref detection |
@@ -155,7 +146,6 @@ When in doubt about patterns, read these files first:
 
 ## Common Pitfalls
 
-- **MCP mount must be last** — any `app.mount('/mcp', ...)` call before the `/api/*` routers will shadow them. Keep it last in `main.py`.
 - **Never return raw ORM objects** — always wrap SQLAlchemy models in a Pydantic schema before returning from an endpoint.
 - **MCP tools must return error dicts, not raise** — raising an exception tears down the MCP session. Return `{"error": "..."}` for expected failures.
 - **MCP tool DB sessions** — MCP tools open `SessionLocal()` directly (not via FastAPI `Depends`). Tests patch `db_module.SessionLocal` in `conftest.py`; new tools must follow the same open/close pattern or the test DB patch won't apply.
