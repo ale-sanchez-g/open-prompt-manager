@@ -65,13 +65,6 @@ for package_lock in [
 ]:
     sync_package_lock_version(package_lock)
 
-# Python package metadata
-replace_or_fail(
-    root / "mcp-package-python" / "pyproject.toml",
-    r'(?m)^version\s*=\s*"[^"]+"$',
-    f'version = "{version}"',
-)
-
 # Backend package version
 replace_or_fail(
     root / "backend" / "app" / "__init__.py",

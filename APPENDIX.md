@@ -7,7 +7,6 @@ This appendix records the documentation changes made during the repository revie
 ### README.md
 
 - Updated the frontend tech stack to match the current codebase: React 19 and React Router v7.
-- Updated the documented MCP SDK version to `mcp==1.27.1` to match `backend/requirements.txt`.
 - Corrected the Quick Start clone path from the old placeholder repository name to the current `open-prompt-manager` repository.
 - Updated the frontend local development example to use `npm ci --legacy-peer-deps`, which matches the current installation guidance for this Vite-based frontend.
 - Corrected the frontend environment variable from `REACT_APP_API_URL` to `VITE_API_URL`, matching `frontend/src/services/api.js`.

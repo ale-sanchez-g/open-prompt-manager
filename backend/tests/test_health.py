@@ -32,3 +32,10 @@ def test_ready_returns_503_when_db_unavailable(client, monkeypatch):
     response = client.get('/api/ready')
     assert response.status_code == 503
     assert response.json() == {'detail': 'Database not ready'}
+
+
+def test_health_allows_vscode_origin(anon_client):
+    response = anon_client.get('/api/health', headers={'Origin': 'vscode-file://vscode-app'})
+
+    assert response.status_code == 200
+    assert response.headers['access-control-allow-origin'] == 'vscode-file://vscode-app'

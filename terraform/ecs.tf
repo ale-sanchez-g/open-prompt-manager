@@ -56,11 +56,13 @@ resource "aws_ecs_cluster_capacity_providers" "main" {
 # Backend Task Definition & Service
 # ─────────────────────────────────────────────
 locals {
-  backend_image_uri  = var.backend_image != "" ? var.backend_image : "${aws_ecr_repository.backend.repository_url}:latest"
-  frontend_image_uri = var.frontend_image != "" ? var.frontend_image : "${aws_ecr_repository.frontend.repository_url}:latest"
+  backend_image_uri    = var.backend_image != "" ? var.backend_image : "${aws_ecr_repository.backend.repository_url}:latest"
+  frontend_image_uri   = var.frontend_image != "" ? var.frontend_image : "${aws_ecr_repository.frontend.repository_url}:latest"
+  cors_allowed_origins = join(",", distinct(compact(concat(["vscode-file://vscode-app", "http://${aws_lb.main.dns_name}"], [for d in var.domain_names : "https://${d}"], var.domain_name != "" ? ["https://${var.domain_name}"] : []))))
   # "vscode-app" is the netloc VS Code sends in its Origin header (vscode-file://vscode-app).
   # It must be included so the MCP SDK does not reject VS Code client connections with 403.
-  mcp_allowed_hosts = join(",", distinct(compact(concat(["vscode-app", aws_lb.main.dns_name], var.domain_names, var.domain_name != "" ? [var.domain_name] : []))))
+  mcp_allowed_hosts   = join(",", distinct(compact(concat(["vscode-app", aws_lb.main.dns_name], var.domain_names, var.domain_name != "" ? [var.domain_name] : []))))
+  mcp_allowed_origins = "vscode-file://vscode-app"
 }
 
 resource "aws_ecs_task_definition" "backend" {
@@ -88,13 +90,18 @@ resource "aws_ecs_task_definition" "backend" {
       environment = [
         {
           name  = "CORS_ORIGINS"
-          value = "http://${aws_lb.main.dns_name}"
+          value = local.cors_allowed_origins
         },
         {
           # Allow MCP clients connecting through the ALB.  The default only
           # permits localhost, which would cause 403s in production.
           name  = "MCP_ALLOWED_HOSTS"
           value = local.mcp_allowed_hosts
+        },
+        {
+          # VS Code's MCP client sends Origin: vscode-file://vscode-app.
+          name  = "MCP_ALLOWED_ORIGINS"
+          value = local.mcp_allowed_origins
         }
       ]
 

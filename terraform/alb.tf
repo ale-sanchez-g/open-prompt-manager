@@ -107,23 +107,6 @@ resource "aws_lb_listener_rule" "http_backend_api" {
   }
 }
 
-resource "aws_lb_listener_rule" "http_backend_mcp" {
-  count        = var.enable_https ? 0 : 1
-  listener_arn = aws_lb_listener.http[0].arn
-  priority     = 20
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.backend.arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/mcp", "/mcp/*"]
-    }
-  }
-}
-
 # ─────────────────────────────────────────────
 # HTTPS Listener (only created if enable_https = true)
 # /api/* and /auth/* routes go to the backend.
@@ -145,23 +128,6 @@ resource "aws_lb_listener" "https" {
   }
 
   depends_on = [aws_lb_target_group.frontend]
-}
-
-resource "aws_lb_listener_rule" "https_backend_mcp" {
-  count        = var.enable_https ? 1 : 0
-  listener_arn = aws_lb_listener.https[0].arn
-  priority     = 20
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.backend.arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/mcp", "/mcp/*"]
-    }
-  }
 }
 
 resource "aws_lb_listener_rule" "https_backend_api" {

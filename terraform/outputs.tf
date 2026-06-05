@@ -69,11 +69,6 @@ output "application_url" {
   value       = "http://${aws_lb.main.dns_name}"
 }
 
-output "mcp_url" {
-  description = "MCP server endpoint for AI agent connectivity (Model Context Protocol)."
-  value       = "http://${aws_lb.main.dns_name}/mcp"
-}
-
 # ─────────────────────────────────────────────
 # Database Outputs
 # ─────────────────────────────────────────────

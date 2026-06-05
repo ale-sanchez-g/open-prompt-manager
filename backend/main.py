@@ -1,5 +1,4 @@
 import os
-from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -10,7 +9,6 @@ from app.database.base import create_tables
 from app.api.auth import router as auth_router
 from app.api.prompts import router as prompts_router
 from app.api.tags_agents import tags_router, agents_router
-from app.mcp_server import build_mcp_server
 from app import __version__
 from app.services.auth_service import AuthError, TokenValidationError, decode_token
 
@@ -25,18 +23,10 @@ def create_app() -> FastAPI:
     """
     Application factory.
 
-    Creates a fresh FastAPI instance together with its own MCP server.
+    Creates a fresh FastAPI instance.
     Call this once for production (module-level ``app`` below) and once
-    per test run so that each test gets an isolated MCP session manager.
+    per test run.
     """
-    mcp = build_mcp_server()
-
-    @asynccontextmanager
-    async def lifespan(application: FastAPI):
-        """Start the MCP session manager alongside the FastAPI app."""
-        async with mcp.session_manager.run():
-            yield
-
     application = FastAPI(
         title='Open Prompt Manager API',
         description=(
@@ -107,10 +97,12 @@ def create_app() -> FastAPI:
                 'description': 'Liveness / readiness check endpoint.',
             },
         ],
-        lifespan=lifespan,
     )
 
-    cors_origins_env = os.getenv('CORS_ORIGINS', 'http://localhost,http://localhost:3000,http://localhost:80')
+    cors_origins_env = os.getenv(
+        'CORS_ORIGINS',
+        'vscode-file://vscode-app',
+    )
     cors_origins = [o.strip() for o in cors_origins_env.split(',')]
 
     application.add_middleware(
@@ -125,7 +117,7 @@ def create_app() -> FastAPI:
     async def auth_error_handler(_request: Request, exc: AuthError):
         return JSONResponse(status_code=exc.status_code, content={'error': exc.error})
 
-    public_prefixes = ('/api/docs', '/api/redoc', '/mcp')
+    public_prefixes = ('/api/docs', '/api/redoc')
     public_paths = {'/auth/register', '/auth/login', '/auth/refresh', '/auth/logout', '/api/health', '/api/ready', '/api/openapi.json'}
 
     @application.middleware('http')
@@ -184,12 +176,6 @@ def create_app() -> FastAPI:
         except Exception as exc:
             raise HTTPException(status_code=503, detail='Database not ready') from exc
         return {'status': 'ok'}
-
-    # Mount MCP server – AI agents connect via Streamable HTTP transport.
-    # The SDK's default streamable_http_path is /mcp, so the endpoint is
-    # reachable at http://<host>:8000/mcp after mounting at the app root.
-    # This must be the LAST mount so it does not shadow the /api/* routes.
-    application.mount('/', mcp.streamable_http_app())
 
     # Inject BearerAuth security scheme so the Swagger UI "Authorize" button
     # lets users supply a JWT access token for all protected endpoints.

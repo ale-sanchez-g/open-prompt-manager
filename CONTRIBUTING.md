@@ -85,7 +85,6 @@ Services will be available at:
 | Frontend | http://localhost |
 | Backend API | http://localhost:8000/api |
 | API Docs (Swagger) | http://localhost:8000/api/docs |
-| MCP Endpoint | http://localhost:8000/mcp |
 
 ### Option B — Local development servers
 
@@ -110,7 +109,7 @@ Copy and adjust as needed — defaults work for local development out of the box
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATABASE_URL` | `sqlite:///./data/prompts.db` | Database connection string |
-| `CORS_ORIGINS` | `http://localhost,http://localhost:80,http://localhost:3000` | Allowed CORS origins |
+| `CORS_ORIGINS` | `http://localhost,http://localhost:80,http://localhost:3000,vscode-file://vscode-app` | Allowed CORS origins. Include `vscode-file://vscode-app` for VS Code MCP clients. |
 | `MCP_ALLOWED_HOSTS` | `localhost,localhost:8000,127.0.0.1,127.0.0.1:8000,vscode-app` | Hosts allowed to connect to the MCP endpoint. `vscode-app` is required for VS Code MCP clients. |
 
 **Frontend** (`frontend/`):
@@ -173,7 +172,6 @@ open-prompt-manager/
 - **Schemas**: Use Pydantic v2 models for request/response validation — never return raw ORM objects from endpoints.
 - **Database**: Use SQLAlchemy 2.0 style (`select()`, `session.execute()`). Avoid raw SQL strings.
 - **New endpoints**: Add them to the appropriate router in `backend/app/api/`. Register the router in `main.py`.
-- **New MCP tools**: Define them in `backend/app/mcp_server.py` and document them in the README.
 
 ### Frontend (React / JavaScript)
 

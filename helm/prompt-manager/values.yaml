@@ -27,7 +27,6 @@ backend:
     targetMemoryUtilizationPercentage: 80
   env:
     DATABASE_URL: "sqlite:///./data/prompts.db"
-    CORS_ORIGINS: "http://localhost,https://prompt-manager.example.com"
     JWT_SECRET: ""
 
 frontend:

@@ -52,7 +52,7 @@ The application version displayed in the sidebar and landing page header is fetc
 | Database | SQLite (upgradeable to PostgreSQL) |
 | Frontend | React 19, Tailwind CSS, React Router v7, Axios |
 | Infrastructure | Docker, Kubernetes, Helm 3 |
-| AI Connectivity | MCP (Model Context Protocol) via `mcp==1.27.1` |
+| AI Connectivity | MCP (Model Context Protocol) node package |
 
 ## Quick Start
 
@@ -74,7 +74,6 @@ Access:
 - **Dashboard**: http://localhost/dashboard
 - **Backend API**: http://localhost:8000/api
 - **API Docs**: http://localhost:8000/api/docs
-- **MCP Endpoint**: http://localhost:8000/mcp
 
 Set `JWT_SECRET` before starting Docker Compose or local backend development so the backend can sign access and refresh tokens. Terraform generates this secret automatically for ECS deployments, while Helm exposes `backend.env.JWT_SECRET` for cluster-specific secret injection.
 
@@ -146,6 +145,29 @@ The deploy workflow is staged and safer by default:
 - Runs plan-to-file before full apply
 - Stores plan logs under `terraform/.terraform.plans/`
 - Checks ACM certificate status before creating HTTPS listener-dependent resources
+
+### Publish MCP Node package to npm
+
+Use the repository helper script to publish `mcp-package-node` (`open-prompt-manager-mcp`) to npm with preflight checks.
+Versioning is intentionally handled outside this script.
+
+```bash
+# Default publish flow (tests + npm publish)
+./deploy_to_npm.sh
+
+# Validate publish payload without publishing
+./deploy_to_npm.sh --dry-run
+```
+
+What the script does:
+- Validates required tools (`git`, `node`, `npm`) and npm authentication (`npm whoami`)
+- Enforces Node.js 24+ (matches `mcp-package-node` engines)
+- Installs dependencies, runs `mcp-package-node` tests, and runs `npm pack --dry-run`
+- Publishes with `npm publish` (unless `--dry-run`)
+
+Optional flags:
+- `--skip-tests` to skip package tests
+- `--allow-dirty` to allow publishing from a non-clean git working tree
 
 ### GitHub Actions tag-triggered deploy
 
@@ -284,78 +306,6 @@ Circular component references are detected and rejected with HTTP 422.
 | 409 | Conflict — duplicate name (tags, agents) |
 | 422 | Validation error — missing required field or circular component reference |
 
-## MCP Server
-
-Open Prompt Manager exposes an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server so AI coding assistants (GitHub Copilot, Claude Code, etc.) can discover and use prompts programmatically without any custom integration code.
-
-### Endpoint
-
-```
-POST http://localhost:8000/mcp
-```
-
-The server uses the **Streamable HTTP** transport (`stateless_http=True`), which means every request is self-contained — no persistent session is required.
-
-### Available Tools
-
-| Tool | Description |
-|------|-------------|
-| `list_prompts` | List prompts, optionally filtered by a search string. Each result includes `is_latest` |
-| `get_prompt` | Retrieve a single prompt by ID. Includes `is_latest` to indicate whether it is the most recent version |
-| `get_prompt_versions` | Retrieve the full version history for a prompt. Each entry includes `is_latest` |
-| `render_prompt` | Render a prompt, substituting variables and resolving components |
-| `create_prompt` | Create a new prompt |
-| `list_tags` | List all tags |
-| `create_tag` | Create a new tag |
-| `list_agents` | List all registered agents |
-
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MCP_ALLOWED_HOSTS` | `localhost,localhost:8000,127.0.0.1,127.0.0.1:8000,vscode-app` | Comma-separated list of host names allowed to connect to the MCP endpoint (DNS rebinding protection). Add your production domain here. `vscode-app` is included by default to allow VS Code MCP clients (which send `Origin: vscode-file://vscode-app`). |
-
-### Connect from VS Code (GitHub Copilot)
-
-Create or update `.vscode/mcp.json` in your project:
-
-```json
-{
-  "servers": {
-    "open-prompt-manager": {
-      "type": "http",
-      "url": "http://localhost:8000/mcp"
-    }
-  }
-}
-```
-
-Open the **Chat** panel in VS Code, switch to **Agent mode**, and your prompts will be available as context tools.
-
-### Connect from Claude Code
-
-```bash
-claude mcp add --transport http open-prompt-manager http://localhost:8000/mcp
-```
-
-Verify the server is registered:
-
-```bash
-claude mcp list
-```
-
-Claude Code will now be able to call `list_prompts`, `get_prompt`, `render_prompt`, `create_prompt`, `list_tags`, `create_tag`, and `list_agents` as tools during conversations.
-
-### Production Deployment
-
-When running behind a load balancer or reverse proxy, allow the production host:
-
-```bash
-MCP_ALLOWED_HOSTS="localhost,localhost:8000,127.0.0.1,127.0.0.1:8000,vscode-app,prompt-manager.yourdomain.com" docker-compose up -d
-```
-
-The AWS ALB listener rule in `terraform/alb.tf` already routes `/mcp` and `/mcp/*` requests to the backend target group.
-
 ## Prompt Syntax
 
 ### Variables
@@ -431,12 +381,11 @@ open-prompt-manager/
 │   │   │   └── prompt_service.py  # Business logic
 │   │   ├── database/
 │   │   │   └── base.py            # Database configuration
-│   │   └── mcp_server.py          # MCP server (AI agent connectivity)
-│   ├── migrations/
-│   │   └── add_agent_updated_at.py # One-off schema migration for legacy agents tables
-│   ├── main.py
-│   ├── requirements.txt
-│   └── Dockerfile
+│   │   ├── migrations/
+│   │   │   └── add_agent_updated_at.py # One-off schema migration for legacy agents tables
+│   │   ├── main.py
+│   │   ├── requirements.txt
+│   │   └── Dockerfile
 ├── frontend/
 │   ├── src/
 │   │   ├── pages/
@@ -468,7 +417,6 @@ open-prompt-manager/
 │   │   ├── edge-cases/            # Error handling & boundary tests
 │   │   ├── data-integrity/        # Data integrity tests
 │   │   ├── performance/           # Performance tests
-│   │   └── mcp/                   # MCP connectivity tests
 │   ├── playwright.config.ts
 │   └── package.json
 ├── helm/
@@ -520,7 +468,7 @@ helm install prompt-manager ./helm/prompt-manager \
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATABASE_URL` | `sqlite:///./data/prompts.db` | Database connection string |
-| `CORS_ORIGINS` | `http://localhost,http://localhost:3000` | Comma-separated allowed CORS origins |
+| `CORS_ORIGINS` | `http://localhost,http://localhost:3000,vscode-file://vscode-app` | Comma-separated allowed CORS origins. Include `vscode-file://vscode-app` for VS Code MCP clients. |
 | `MCP_ALLOWED_HOSTS` | `localhost,localhost:8000,127.0.0.1,127.0.0.1:8000` | Comma-separated host names allowed to connect to the MCP endpoint |
 
 ### Frontend

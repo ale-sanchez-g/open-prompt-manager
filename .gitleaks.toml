@@ -30,6 +30,5 @@ paths = [
   '''^frontend/src/__tests__/.*$''',
   '''^e2e-test/specs/.*$''',
   '''^mcp-package-node/tests/.*$''',
-  '''^mcp-package-python/tests/.*$''',
   '''^terraform/tests/.*$''',
 ]

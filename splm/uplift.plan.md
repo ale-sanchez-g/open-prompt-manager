@@ -31,7 +31,7 @@ Implement and operationalize all SPLM CI gate components across pre-commit, pre-
 
 ### 3.1 Linting
 - [x] Split linting by stack with matrix jobs for isolated/faster feedback.
-- [x] Acceptance check: lint coverage includes backend, frontend, mcp-package-python, mcp-package-node, and terraform.
+- [x] Acceptance check: lint coverage includes backend, frontend, mcp-package-node, and terraform.
 
 ### 3.2 Secrets Scan
 - [x] Keep existing secret scanning.
