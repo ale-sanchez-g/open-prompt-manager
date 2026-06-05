@@ -34,7 +34,8 @@ fail() {
 }
 
 require_cmd() {
-  command -v "$1" >/dev/null 2>&1 || fail "Missing required command: $1"
+  local cmd="$1"
+  command -v "$cmd" >/dev/null 2>&1 || fail "Missing required command: $cmd"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -72,10 +73,8 @@ require_cmd npm
 
 [[ -d "${PACKAGE_DIR}" ]] || fail "Package directory not found: ${PACKAGE_DIR}"
 
-if [[ "${ALLOW_DIRTY}" == 'false' ]]; then
-  if [[ -n "$(git -C "${ROOT_DIR}" status --porcelain)" ]]; then
-    fail 'Git working tree is not clean. Commit or stash changes first, or use --allow-dirty.'
-  fi
+if [[ "${ALLOW_DIRTY}" == 'false' ]] && [[ -n "$(git -C "${ROOT_DIR}" status --porcelain)" ]]; then
+  fail 'Git working tree is not clean. Commit or stash changes first, or use --allow-dirty.'
 fi
 
 if ! npm whoami >/dev/null 2>&1; then
