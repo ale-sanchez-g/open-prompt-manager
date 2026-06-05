@@ -7,6 +7,7 @@ PACKAGE_DIR="${ROOT_DIR}/mcp-package-node"
 SKIP_TESTS='false'
 DRY_RUN='false'
 ALLOW_DIRTY='false'
+OTP=''
 
 usage() {
   cat <<'EOF'
@@ -18,6 +19,7 @@ Options:
   --skip-tests                Skip npm test before publishing
   --dry-run                   Run all checks and npm pack --dry-run, but do not publish
   --allow-dirty               Allow publishing with uncommitted git changes
+  --otp <code>                One-time password for npm 2FA publish
   --help                      Show this help text
 EOF
 }
@@ -48,6 +50,11 @@ while [[ $# -gt 0 ]]; do
     --allow-dirty)
       ALLOW_DIRTY='true'
       shift
+      ;;
+    --otp)
+      [[ $# -ge 2 ]] || fail '--otp requires a 6-digit code'
+      OTP="$2"
+      shift 2
       ;;
     --help|-h)
       usage
@@ -103,6 +110,10 @@ if [[ "${DRY_RUN}" == 'true' ]]; then
 fi
 
 log 'Publishing package to npm'
-(cd "${PACKAGE_DIR}" && npm publish)
+if [[ -n "${OTP}" ]]; then
+  (cd "${PACKAGE_DIR}" && npm publish --otp "${OTP}")
+else
+  (cd "${PACKAGE_DIR}" && npm publish)
+fi
 
 log "Publish complete: ${PACKAGE_NAME}@${PACKAGE_VERSION}"
