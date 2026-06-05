@@ -101,7 +101,7 @@ def create_app() -> FastAPI:
 
     cors_origins_env = os.getenv(
         'CORS_ORIGINS',
-        'http://localhost,http://localhost:3000,http://localhost:80,vscode-file://vscode-app',
+        'vscode-file://vscode-app',
     )
     cors_origins = [o.strip() for o in cors_origins_env.split(',')]
 
