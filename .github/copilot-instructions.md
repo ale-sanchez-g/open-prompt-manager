@@ -13,7 +13,7 @@ This is a monorepo with five independently testable components:
 | MCP Node package | `mcp-package-node/` | Node 24, `@modelcontextprotocol/sdk` | Standalone stdio MCP client for Node environments |
 | Infrastructure | `terraform/`, `helm/` | Terraform, Helm 3 | AWS ECS + Kubernetes deployment |
 
-The backend exposes both a REST API (`/api/*`)
+The backend exposes a REST API (`/api/*`)
 
 ## Code Style
 
@@ -35,10 +35,10 @@ The backend exposes both a REST API (`/api/*`)
 - Register new routes in `src/App.jsx` and add them to the README route table.
 - Icons come from `lucide-react`.
 
-### MCP Packages
+### MCP Package
 
 - The Node MCP package (`mcp-package-node/`) uses native `fetch` — no `axios` or `node-fetch`.
-- Package is configured via `BACKEND_URL` and `API_KEY` environment variables at startup.
+- `mcp-package-node` is configured via `BACKEND_URL` and `API_KEY` environment variables at startup.
 
 ## Build & Test
 
