@@ -317,7 +317,6 @@ export default function ApiDocs() {
               { label: 'Interactive docs', value: '/api/docs (Swagger UI)', link: '/api/docs' },
               { label: 'ReDoc reference', value: '/api/redoc', link: '/api/redoc' },
               { label: 'OpenAPI JSON', value: '/api/openapi.json', link: '/api/openapi.json' },
-              { label: 'MCP endpoint', value: 'POST /mcp (Streamable HTTP)' },
             ].map((item) => (
               <div key={item.label} className="bg-gray-800 rounded-lg p-3">
                 <p className="text-xs text-gray-500 mb-0.5">{item.label}</p>

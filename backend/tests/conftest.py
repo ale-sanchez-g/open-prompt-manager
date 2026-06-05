@@ -36,7 +36,7 @@ def override_get_db():
 @pytest.fixture
 def app():
     """
-    Create a fresh application (and therefore a fresh MCP session manager)
+    Create a fresh application
     for each test.  This avoids the StreamableHTTPSessionManager one-shot
     constraint that would cause the second test to fail.
     """

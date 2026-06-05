@@ -564,7 +564,6 @@ echo "════════════════════════�
 echo "  Deployment complete!"
 echo "════════════════════════════════════════════════════"
 echo "  Application : ${APP_URL}"
-echo "  MCP server  : ${MCP_URL}"
 if [[ "$ENABLE_HTTPS" == "true" ]]; then
   echo "  Protocol    : HTTPS (TLS 1.2+)"
   if [[ ${#DOMAIN_NAMES[@]} -gt 0 ]]; then
@@ -594,8 +593,4 @@ echo ""
 echo "  Verify health:"
 echo "    curl ${APP_URL}/api/health"
 echo ""
-echo "  Verify MCP:"
-echo "    curl -s -X POST ${MCP_URL} \\"
-echo "      -H 'Content-Type: application/json' \\"
-echo "      -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"test\",\"version\":\"1.0\"}}}'"
-echo ""
+

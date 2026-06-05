@@ -42,7 +42,6 @@ This repository supports manually requested releases through the GitHub Actions 
 - `frontend/package-lock.json`
 - `mcp-package-node/package.json`
 - `mcp-package-node/package-lock.json`
-- `mcp-package-python/pyproject.toml`
 - `helm/prompt-manager/Chart.yaml`
 - `helm/prompt-manager/values.yaml`
 

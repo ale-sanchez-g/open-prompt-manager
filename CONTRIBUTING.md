@@ -85,7 +85,6 @@ Services will be available at:
 | Frontend | http://localhost |
 | Backend API | http://localhost:8000/api |
 | API Docs (Swagger) | http://localhost:8000/api/docs |
-| MCP Endpoint | http://localhost:8000/mcp |
 
 ### Option B — Local development servers
 
@@ -173,7 +172,6 @@ open-prompt-manager/
 - **Schemas**: Use Pydantic v2 models for request/response validation — never return raw ORM objects from endpoints.
 - **Database**: Use SQLAlchemy 2.0 style (`select()`, `session.execute()`). Avoid raw SQL strings.
 - **New endpoints**: Add them to the appropriate router in `backend/app/api/`. Register the router in `main.py`.
-- **New MCP tools**: Define them in `backend/app/mcp_server.py` and document them in the README.
 
 ### Frontend (React / JavaScript)
 
