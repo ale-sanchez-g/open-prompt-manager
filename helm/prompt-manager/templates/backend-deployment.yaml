@@ -38,10 +38,6 @@ spec:
               value: {{ .Values.backend.env.DATABASE_URL | quote }}
             - name: CORS_ORIGINS
               value: {{ .Values.backend.env.CORS_ORIGINS | quote }}
-            - name: MCP_ALLOWED_HOSTS
-              value: {{ .Values.backend.env.MCP_ALLOWED_HOSTS | quote }}
-            - name: MCP_ALLOWED_ORIGINS
-              value: {{ .Values.backend.env.MCP_ALLOWED_ORIGINS | quote }}
             - name: JWT_SECRET
               value: {{ .Values.backend.env.JWT_SECRET | quote }}
           livenessProbe:
