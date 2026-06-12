@@ -21,8 +21,8 @@ import http from 'k6/http';
 // ---------------------------------------------------------------------------
 
 const BASE = __ENV.BASE_URL || 'http://localhost';
-const SETUP_USER_EMAIL = 'k6-ci-perf@opm-ci.io';
-const SETUP_USER_PASSWORD = 'K6CiPerf@2026!';
+const SETUP_USER_EMAIL = 'k6-ci-perf@opm-ci.io'; // This is for TEST on CI only, not a real account — can be safely committed
+const SETUP_USER_PASSWORD = 'K6CiPerf@2026!'; // This is for TEST on CI only, not a real account — can be safely committed
 
 export const options = {
   scenarios: {

@@ -31,4 +31,5 @@ paths = [
   '''^e2e-test/specs/.*$''',
   '''^mcp-package-node/tests/.*$''',
   '''^terraform/tests/.*$''',
+  '''^k6/.*$''',
 ]
