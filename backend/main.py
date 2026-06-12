@@ -169,11 +169,28 @@ def create_app() -> FastAPI:
         '/api/health',
         tags=['health'],
         summary='Health check',
-        description='Fast liveness check that returns the current application status and version. Used by the frontend to display the app version in the sidebar.',
-        response_description='`{ "status": "ok", "version": "<semver>" }`',
+        description=(
+            'Fast liveness check that returns the current application status, version, '
+            'and active runtime configuration. Useful for verifying deployment settings '
+            'without needing shell access. No authentication required.'
+        ),
+        response_description=(
+            '`{ "status": "ok", "version": "<semver>", "config": { '
+            '"rate_limit_enabled": true, "rate_limit_per_minute": 200, '
+            '"rate_limit_auth_per_minute": 60, "cors_origins": ["..."] } }`'
+        ),
     )
     def health_check():
-        return {'status': 'ok', 'version': __version__}
+        return {
+            'status': 'ok',
+            'version': __version__,
+            'config': {
+                'rate_limit_enabled': rate_limit_enabled,
+                'rate_limit_per_minute': rate_limit_per_minute,
+                'rate_limit_auth_per_minute': rate_limit_auth_per_minute,
+                'cors_origins': cors_origins,
+            },
+        }
 
     @application.get(
         '/api/ready',
