@@ -28,6 +28,9 @@ backend:
   env:
     DATABASE_URL: "sqlite:///./data/prompts.db"
     JWT_SECRET: ""
+    RATE_LIMIT_ENABLED: "true"
+    RATE_LIMIT_PER_MINUTE: "200"
+    RATE_LIMIT_AUTH_PER_MINUTE: "60"
 
 frontend:
   replicaCount: 2

@@ -32,6 +32,31 @@ This appendix records the documentation changes made during the repository revie
 
 - Updated the frontend test checklist example from a Jest-specific command to the current frontend test command used by this repository.
 
+---
+
+## Issue #147 — Backend has no throttling (2026-06-12)
+
+### New Documents
+
+**`docs/adr-rate-limiting.md`**
+
+Architecture Decision Record for the IP-based sliding-window rate limiting
+feature.  Documents the chosen algorithm, alternatives considered (slowapi,
+Redis, nginx), default limits, trade-offs, and implementation inventory.
+
+### Updated Documents
+
+**`README.md`**
+
+- Added **Rate Limiting** to the Features list.
+- Added `RATE_LIMIT_ENABLED`, `RATE_LIMIT_PER_MINUTE`, and
+  `RATE_LIMIT_AUTH_PER_MINUTE` to the Backend Environment Variables table.
+- Added a new **Rate Limiting** subsection under Environment Variables
+  documenting the endpoint groups, default limits, HTTP 429 response format
+  (headers and body), and a reference to the ADR.
+
+---
+
 ## Review Scope
 
 The review focused on documentation claims that could be directly verified against code or configuration, including:

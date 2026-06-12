@@ -948,6 +948,10 @@ jobs:
         run: docker compose up -d --build
         env:
           COMPOSE_HTTP_TIMEOUT: "120"
+          # Raise limits well above what the full E2E suite needs so no test
+          # gets a 429 — rate-limiting correctness is validated in performance-test.
+          RATE_LIMIT_PER_MINUTE: "1000"
+          RATE_LIMIT_AUTH_PER_MINUTE: "500"
 
       - name: Wait for backend to be healthy
         run: |
@@ -1023,8 +1027,8 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
       
-      - name: Run Playwright E2E tests
-        run: npm run test:api
+      - name: Run Playwright E2E tests (excluding Rate Limiting)
+        run: npx playwright test specs/ --grep-invert "Rate Limiting"
         working-directory: e2e-test
 
       - name: Upload Playwright report
@@ -1157,5 +1161,274 @@ jobs:
         run: docker compose logs
 
       - name: Stop services
+        if: always()
+        run: docker compose down -v
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Performance test: two isolated phases so the rate-limit E2E tests and the
+  # k6 load test never share the same in-process rate-limit state.
+  #
+  # Phase 1 — rate-limiting correctness (low auth limit, Playwright only).
+  # Phase 2 — k6 load test (default limits; stack is rebuilt from cache so
+  #            setup() auth calls hit a clean bucket).
+  #
+  # Two docker-compose lifecycles are necessary because the Playwright tests
+  # intentionally exhaust the auth bucket; reusing the same stack would cause
+  # k6 setup() to get 429 on /auth/register within the 60-second window.
+  # ─────────────────────────────────────────────────────────────────────────────
+  performance-test:
+    name: Performance Test (k6)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: e2e-smoke
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Generate JWT secret for CI runtime
+        run: |
+          JWT_SECRET="$(openssl rand -hex 32)"
+          if [ "${#JWT_SECRET}" -ne 64 ]; then
+            echo "::error::Generated JWT secret must be exactly 64 characters"
+            exit 1
+          fi
+          echo "JWT_SECRET=$JWT_SECRET" >> "$GITHUB_ENV"
+
+      # ── Install Node / Playwright tooling once, before any stack starts ────
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: e2e-test/package-lock.json
+
+      - name: Install e2e dependencies
+        run: npm ci
+        working-directory: e2e-test
+
+      - name: Get Playwright version
+        id: pw-version-perf
+        run: echo "version=$(node -e "console.log(require('./e2e-test/node_modules/@playwright/test/package.json').version)")" >> $GITHUB_OUTPUT
+
+      - name: Restore Playwright browsers cache
+        uses: actions/cache/restore@v5
+        id: pw-cache-perf
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw-version-perf.outputs.version }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Install Playwright browsers + deps (cache miss)
+        if: steps.pw-cache-perf.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+        working-directory: e2e-test
+
+      - name: Install Playwright system deps only (cache hit)
+        if: steps.pw-cache-perf.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+        working-directory: e2e-test
+
+      - name: Install k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring \
+            --keyring /usr/share/keyrings/k6-archive-keyring.gpg \
+            --keyserver hkp://keyserver.ubuntu.com:80 \
+            --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" \
+            | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update -qq
+          sudo apt-get install -y k6
+
+      # ── Phase 1: Rate-limiting correctness (low auth limit) ───────────────
+
+      - name: "Phase 1: Start services (RATE_LIMIT_AUTH_PER_MINUTE=20)"
+        run: docker compose up -d --build
+        env:
+          COMPOSE_HTTP_TIMEOUT: "120"
+          RATE_LIMIT_AUTH_PER_MINUTE: "20"
+
+      - name: "Phase 1: Wait for backend to be healthy"
+        run: |
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/health || echo "000")
+            echo "Attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "Backend is healthy"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Backend did not become healthy in time"
+          docker compose logs backend
+          exit 1
+
+      - name: "Phase 1: Wait for frontend to be serving"
+        run: |
+          for i in $(seq 1 20); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:80 || echo "000")
+            echo "Attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "Frontend is serving"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Frontend did not become available in time"
+          docker compose logs frontend
+          exit 1
+
+      - name: "Phase 1: Run Rate Limiting E2E tests"
+        run: npx playwright test specs/performance/performance.spec.ts --grep "Rate Limiting Behaviour"
+        working-directory: e2e-test
+
+      - name: "Phase 1: Upload Playwright report"
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: rate-limiting-playwright-report
+          path: e2e-test/playwright-report/
+          retention-days: 7
+
+      - name: "Phase 1: Stop services"
+        if: always()
+        run: docker compose down -v
+
+      # ── Phase 2: k6 load test (high limits — clean bucket, no rate-limit noise) ──
+      # k6 runs 10 concurrent VUs all sharing the nginx-forwarded IP, generating
+      # ~1 500 non-health req/min from one IP.  The default 200 req/min API limit
+      # would rate-limit ~86% of prompts_list calls, crossing the <5% threshold.
+      # Rate-limit correctness is already validated in Phase 1; Phase 2 is purely
+      # about latency SLOs, so we raise the limit well above the observed load.
+
+      - name: "Phase 2: Start services (high rate limit for k6 load test)"
+        run: docker compose up -d --build
+        env:
+          COMPOSE_HTTP_TIMEOUT: "120"
+          RATE_LIMIT_PER_MINUTE: "3000"
+
+      - name: "Phase 2: Wait for backend to be healthy"
+        run: |
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/health || echo "000")
+            echo "Attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "Backend is healthy"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Backend did not become healthy in time"
+          docker compose logs backend
+          exit 1
+
+      - name: "Phase 2: Wait for frontend to be serving"
+        run: |
+          for i in $(seq 1 20); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:80 || echo "000")
+            echo "Attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "Frontend is serving"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Frontend did not become available in time"
+          docker compose logs frontend
+          exit 1
+
+      - name: Run k6 CI performance test (~2 minutes)
+        run: |
+          k6 run \
+            --out json=k6-results.json \
+            --summary-export k6-summary.json \
+            k6/opm-ci.js
+        env:
+          BASE_URL: http://localhost
+
+      - name: Build k6 performance summary
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          from pathlib import Path
+
+          summary_path = Path('k6-summary.json')
+          if not summary_path.exists():
+              print('k6 summary not found — test may have been skipped.')
+              sys.exit(0)
+
+          try:
+              data = json.loads(summary_path.read_text())
+          except Exception as e:
+              print(f'Could not parse k6 summary: {e}')
+              sys.exit(0)
+
+          metrics = data.get('metrics', {})
+
+          def p(metric_name, percentile):
+              m = metrics.get(metric_name, {})
+              v = m.get('values', {})
+              return v.get(f'p({percentile})', v.get(percentile))
+
+          def rate(metric_name):
+              m = metrics.get(metric_name, {})
+              return m.get('values', {}).get('rate')
+
+          lines = [
+              '## k6 Performance Test Summary',
+              '',
+              '| Metric | p(95) | p(99) |',
+              '|---|---:|---:|',
+          ]
+
+          for endpoint in ['health', 'prompts_list', 'prompt_render']:
+              key = f'http_req_duration{{endpoint:{endpoint}}}'
+              p95 = p(key, 95)
+              p99 = p(key, 99)
+              p95_str = f'{p95:.0f} ms' if p95 is not None else 'N/A'
+              p99_str = f'{p99:.0f} ms' if p99 is not None else 'N/A'
+              lines.append(f'| {endpoint} | {p95_str} | {p99_str} |')
+
+          global_p95 = p('http_req_duration', 95)
+          global_p99 = p('http_req_duration', 99)
+          global_fail = rate('http_req_failed')
+          lines.extend([
+              f'| **global** | **{global_p95:.0f} ms** | **{global_p99:.0f} ms** |'
+              if global_p95 is not None else '| global | N/A | N/A |',
+              '',
+              f'- Global error rate: {global_fail * 100:.2f}%' if global_fail is not None else '- Global error rate: N/A',
+              '',
+              '_See the `k6-results` artifact for the full per-request JSON trace._',
+          ])
+
+          summary = '\n'.join(lines) + '\n'
+          Path('k6-performance-summary.md').write_text(summary)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as fh:
+              fh.write(summary)
+          print(summary)
+          PY
+
+      - name: Upload k6 results
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: k6-results
+          path: |
+            k6-results.json
+            k6-summary.json
+            k6-performance-summary.md
+          retention-days: 14
+
+      - name: "Phase 2: Print service logs on failure"
+        if: failure()
+        run: docker compose logs
+
+      - name: "Phase 2: Stop services"
         if: always()
         run: docker compose down -v
