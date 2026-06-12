@@ -10,6 +10,7 @@ from app.api.auth import router as auth_router
 from app.api.prompts import router as prompts_router
 from app.api.tags_agents import tags_router, agents_router
 from app import __version__
+from app.middleware.rate_limit import RateLimitMiddleware
 from app.services.auth_service import AuthError, TokenValidationError, decode_token
 
 # Ensure data directory exists for SQLite
@@ -111,6 +112,19 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=['*'],
         allow_headers=['*'],
+    )
+
+    # Rate limiting — added after CORS so it becomes the outermost middleware
+    # layer and receives every request before auth and routing.
+    rate_limit_enabled = os.getenv('RATE_LIMIT_ENABLED', 'true').lower() not in ('false', '0', 'no')
+    rate_limit_per_minute = int(os.getenv('RATE_LIMIT_PER_MINUTE', '200'))
+    rate_limit_auth_per_minute = int(os.getenv('RATE_LIMIT_AUTH_PER_MINUTE', '60'))
+
+    application.add_middleware(
+        RateLimitMiddleware,
+        enabled=rate_limit_enabled,
+        per_minute=rate_limit_per_minute,
+        auth_per_minute=rate_limit_auth_per_minute,
     )
 
     @application.exception_handler(AuthError)

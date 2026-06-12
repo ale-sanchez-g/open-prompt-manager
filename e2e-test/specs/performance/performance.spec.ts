@@ -110,3 +110,84 @@ test.describe('Performance and Load Tests', () => {
     }
   });
 });
+
+test.describe('Rate Limiting Behaviour', () => {
+  /**
+   * Verifies that the backend rate limiting middleware is active and returns
+   * the correct HTTP 429 response format when a client exceeds the configured
+   * auth request limit.
+   *
+   * The RATE_LIMIT_AUTH_PER_MINUTE env var controls the threshold (default 60).
+   * This suite sends up to AUTH_BURST requests sequentially until a 429 is
+   * received, then validates the response headers and body structure.
+   */
+  const AUTH_BURST = 70; // comfortably above the default 60/minute auth limit
+
+  test('Rate Limiting returns HTTP 429 with correct headers after limit exceeded', async ({ request }) => {
+    let rateLimitResponse: any = null;
+
+    for (let i = 0; i < AUTH_BURST; i++) {
+      // Use invalid credentials — the rate limiter fires before auth so 401
+      // responses still consume quota, and we avoid polluting registered users.
+      const r = await request.post('/auth/login', {
+        data: {
+          email: `rl-probe-${i}-${Date.now()}@opm-test.io`,
+          password: 'NotAValidPassword1!',
+        },
+      });
+
+      if (r.status() === 429) {
+        rateLimitResponse = r;
+        break;
+      }
+
+      // Any status other than 401/404 (credential mismatch) is unexpected
+      expect([401, 404, 429]).toContain(r.status());
+    }
+
+    expect(rateLimitResponse).not.toBeNull();
+
+    const body = await rateLimitResponse.json();
+    expect(body).toHaveProperty('error', 'rate_limit_exceeded');
+    expect(body).toHaveProperty('detail');
+    expect(typeof body.detail).toBe('string');
+
+    const headers = rateLimitResponse.headers();
+    expect(headers['retry-after']).toBeDefined();
+    expect(parseInt(headers['retry-after'])).toBeGreaterThan(0);
+    expect(headers['x-ratelimit-limit']).toBeDefined();
+    expect(parseInt(headers['x-ratelimit-limit'])).toBeGreaterThan(0);
+    expect(headers['x-ratelimit-window']).toBe('60');
+  });
+
+  test('Health endpoint is never rate-limited', async ({ request }) => {
+    // Health is always exempt — 20 rapid calls must all return 200
+    for (let i = 0; i < 20; i++) {
+      const r = await request.get('/api/health');
+      expect(r.status()).toBe(200);
+    }
+  });
+
+  test('Rate limit response body matches the documented error schema', async ({ request }) => {
+    // Send a burst to obtain a 429, then inspect the body schema
+    let response429: any = null;
+
+    for (let i = 0; i < AUTH_BURST && !response429; i++) {
+      const r = await request.post('/auth/login', {
+        data: {
+          email: `schema-probe-${i}-${Date.now()}@opm-test.io`,
+          password: 'Wrong1!',
+        },
+      });
+      if (r.status() === 429) response429 = r;
+    }
+
+    expect(response429).not.toBeNull();
+    const body = await response429.json();
+
+    // Schema: { error: string, detail: string }
+    expect(Object.keys(body).sort()).toEqual(['detail', 'error'].sort());
+    expect(typeof body.error).toBe('string');
+    expect(typeof body.detail).toBe('string');
+  });
+});
