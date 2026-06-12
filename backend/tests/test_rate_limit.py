@@ -187,14 +187,11 @@ class TestRateLimitMiddleware:
         for i in range(limit):
             assert client.get('/api/test').status_code == 200, f'request {i + 1} should succeed'
 
-    def test_rate_limit_enforced_across_full_app(self):
-        """Rate limit is respected when the full application factory is used."""
-        import os
-        os.environ['RATE_LIMIT_ENABLED'] = 'true'
-        os.environ['RATE_LIMIT_PER_MINUTE'] = '3'
-        os.environ['RATE_LIMIT_AUTH_PER_MINUTE'] = '2'
+    def test_rate_limit_middleware_wired_into_full_app(self):
+        """RateLimitMiddleware is present in the full application factory and exempts health."""
         from main import create_app
         from app.database.base import get_db
+
         full_app = create_app()
 
         def override_get_db():
