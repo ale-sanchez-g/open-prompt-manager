@@ -214,3 +214,24 @@ variable "domain_name" {
   type        = string
   default     = ""
 }
+
+# ─────────────────────────────────────────────
+# Rate Limiting
+# ─────────────────────────────────────────────
+variable "rate_limit_enabled" {
+  description = "Enable IP-based sliding-window rate limiting on the backend. Set to false to disable (not recommended for production)."
+  type        = bool
+  default     = true
+}
+
+variable "rate_limit_per_minute" {
+  description = "Maximum number of API requests per minute per client IP (applies to all non-auth, non-health endpoints)."
+  type        = number
+  default     = 200
+}
+
+variable "rate_limit_auth_per_minute" {
+  description = "Maximum number of auth requests per minute per client IP (/auth/* endpoints). Lower than rate_limit_per_minute to limit brute-force login attempts."
+  type        = number
+  default     = 60
+}

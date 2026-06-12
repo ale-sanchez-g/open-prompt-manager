@@ -10,6 +10,7 @@ from app.api.auth import router as auth_router
 from app.api.prompts import router as prompts_router
 from app.api.tags_agents import tags_router, agents_router
 from app import __version__
+from app.middleware.rate_limit import RateLimitMiddleware
 from app.services.auth_service import AuthError, TokenValidationError, decode_token
 
 # Ensure data directory exists for SQLite
@@ -99,6 +100,21 @@ def create_app() -> FastAPI:
         ],
     )
 
+    # Rate limiting
+    rate_limit_enabled = os.getenv('RATE_LIMIT_ENABLED', 'true').lower() not in ('false', '0', 'no')
+    rate_limit_per_minute = int(os.getenv('RATE_LIMIT_PER_MINUTE', '200'))
+    rate_limit_auth_per_minute = int(os.getenv('RATE_LIMIT_AUTH_PER_MINUTE', '60'))
+
+    application.add_middleware(
+        RateLimitMiddleware,
+        enabled=rate_limit_enabled,
+        per_minute=rate_limit_per_minute,
+        auth_per_minute=rate_limit_auth_per_minute,
+    )
+
+    # CORS Add CORSMiddleware LAST — it becomes the outermost layer,
+    # intercepting every request before rate limiting or auth can reject it
+
     cors_origins_env = os.getenv(
         'CORS_ORIGINS',
         'vscode-file://vscode-app',
@@ -112,7 +128,6 @@ def create_app() -> FastAPI:
         allow_methods=['*'],
         allow_headers=['*'],
     )
-
     @application.exception_handler(AuthError)
     async def auth_error_handler(_request: Request, exc: AuthError):
         return JSONResponse(status_code=exc.status_code, content={'error': exc.error})
@@ -155,11 +170,28 @@ def create_app() -> FastAPI:
         '/api/health',
         tags=['health'],
         summary='Health check',
-        description='Fast liveness check that returns the current application status and version. Used by the frontend to display the app version in the sidebar.',
-        response_description='`{ "status": "ok", "version": "<semver>" }`',
+        description=(
+            'Fast liveness check that returns the current application status, version, '
+            'and active runtime configuration. Useful for verifying deployment settings '
+            'without needing shell access. No authentication required.'
+        ),
+        response_description=(
+            '`{ "status": "ok", "version": "<semver>", "config": { '
+            '"rate_limit_enabled": true, "rate_limit_per_minute": 200, '
+            '"rate_limit_auth_per_minute": 60, "cors_origins": ["..."] } }`'
+        ),
     )
     def health_check():
-        return {'status': 'ok', 'version': __version__}
+        return {
+            'status': 'ok',
+            'version': __version__,
+            'config': {
+                'rate_limit_enabled': rate_limit_enabled,
+                'rate_limit_per_minute': rate_limit_per_minute,
+                'rate_limit_auth_per_minute': rate_limit_auth_per_minute,
+                'cors_origins': cors_origins,
+            },
+        }
 
     @application.get(
         '/api/ready',

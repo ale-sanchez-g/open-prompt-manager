@@ -102,6 +102,18 @@ resource "aws_ecs_task_definition" "backend" {
           # VS Code's MCP client sends Origin: vscode-file://vscode-app.
           name  = "MCP_ALLOWED_ORIGINS"
           value = local.mcp_allowed_origins
+        },
+        {
+          name  = "RATE_LIMIT_ENABLED"
+          value = tostring(var.rate_limit_enabled)
+        },
+        {
+          name  = "RATE_LIMIT_PER_MINUTE"
+          value = tostring(var.rate_limit_per_minute)
+        },
+        {
+          name  = "RATE_LIMIT_AUTH_PER_MINUTE"
+          value = tostring(var.rate_limit_auth_per_minute)
         }
       ]
 

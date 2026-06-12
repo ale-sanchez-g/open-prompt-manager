@@ -43,6 +43,7 @@ The application version displayed in the sidebar and landing page header is fetc
 - **Agent Management** — Define agents, associate prompts, track usage, manage status
 - **Variable System** — Typed variables (string, number, boolean, array, object) with validation
 - **JWT Authentication** — Email/password login, refresh-token cookies, route guards, and automatic access-token refresh
+- **Rate Limiting** — Sliding-window IP-based throttling to protect against brute-force and DDoS (60 auth / 200 API requests per minute per IP by default, configurable via environment variables)
 
 ## Tech Stack
 
@@ -470,6 +471,33 @@ helm install prompt-manager ./helm/prompt-manager \
 | `DATABASE_URL` | `sqlite:///./data/prompts.db` | Database connection string |
 | `CORS_ORIGINS` | `http://localhost,http://localhost:3000,vscode-file://vscode-app` | Comma-separated allowed CORS origins. Include `vscode-file://vscode-app` for VS Code MCP clients. |
 | `MCP_ALLOWED_HOSTS` | `localhost,localhost:8000,127.0.0.1,127.0.0.1:8000` | Comma-separated host names allowed to connect to the MCP endpoint |
+| `RATE_LIMIT_ENABLED` | `true` | Set to `false` to disable rate limiting entirely (not recommended for production). |
+| `RATE_LIMIT_PER_MINUTE` | `200` | Maximum API requests per minute per client IP (all non-auth, non-health endpoints). |
+| `RATE_LIMIT_AUTH_PER_MINUTE` | `60` | Maximum auth requests per minute per client IP (`/auth/*` endpoints). Lower limit defends against brute-force login attempts. |
+
+#### Rate Limiting
+
+The backend enforces a sliding-window rate limit per client IP address:
+
+| Endpoint group | Default limit | Configurable via |
+|----------------|--------------|-----------------|
+| `/auth/*` (login, register, refresh, logout) | 60 req/min | `RATE_LIMIT_AUTH_PER_MINUTE` |
+| All other `/api/*` endpoints | 200 req/min | `RATE_LIMIT_PER_MINUTE` |
+| `/api/health`, `/api/ready`, `/api/docs`, `/api/redoc` | Exempt | — |
+
+When a limit is exceeded the API returns:
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 42
+X-RateLimit-Limit: 60
+X-RateLimit-Window: 60
+Content-Type: application/json
+
+{"error": "rate_limit_exceeded", "detail": "Too many requests. Please slow down and try again."}
+```
+
+`X-Forwarded-For` is honoured so that the original client IP is used when the backend sits behind nginx or AWS ALB. See `docs/adr-rate-limiting.md` for the architecture decision record.
 
 ### Frontend
 | Variable | Default | Description |
