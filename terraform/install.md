@@ -333,7 +333,6 @@ Outputs:
 
 alb_dns_name                 = "open-prompt-manager-alb-XXXXXXXXXX.us-east-1.elb.amazonaws.com"
 application_url              = "http://open-prompt-manager-alb-XXXXXXXXXX.us-east-1.elb.amazonaws.com"
-mcp_url                      = "http://open-prompt-manager-alb-XXXXXXXXXX.us-east-1.elb.amazonaws.com/mcp"
 backend_ecr_repository_url   = "XXXXXXXXXXXX.dkr.ecr.us-east-1.amazonaws.com/open-prompt-manager-backend"
 backend_target_group_arn     = "arn:aws:elasticloadbalancing:us-east-1:XXXXXXXXXXXX:targetgroup/open-prompt-manager-backend-tg/XXXXXXXXXXXXXXXX"
 db_endpoint                  = "open-prompt-manager-prod.XXXXXXXXXXXX.us-east-1.rds.amazonaws.com:5432"
@@ -379,17 +378,6 @@ curl "${ALB_URL}/api/health"
 
 # List prompts
 curl "${ALB_URL}/api/prompts/"
-```
-
-Verify the MCP server is reachable:
-
-```bash
-MCP_URL=$(terraform output -raw mcp_url)
-
-# Initialize an MCP session (returns 200 with session details)
-curl -i -X POST "${MCP_URL}" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"curl-test","version":"1.0"}}}'
 ```
 
 ---
@@ -753,26 +741,8 @@ The backend exposes a **Model Context Protocol (MCP)** server at `/mcp`. This le
 | MCP server | Mounted at `/mcp`; runs in stateless HTTP mode — every request is self-contained |
 
 ### Connecting an AI agent
+`
 
-Use the `mcp_url` Terraform output as the server URL in your MCP client configuration:
-
-```bash
-MCP_URL=$(terraform output -raw mcp_url)
-echo "MCP endpoint: ${MCP_URL}"
-# e.g. http://open-prompt-manager-alb-XXXXXXXXXX.us-east-1.elb.amazonaws.com/mcp
-```
-
-**Example: Claude Desktop (`claude_desktop_config.json`)**
-
-```json
-{
-  "mcpServers": {
-    "open-prompt-manager": {
-      "url": "http://<alb-dns-name>/mcp"
-    }
-  }
-}
-```
 
 **Example: VS Code (`settings.json`)**
 
@@ -780,9 +750,14 @@ echo "MCP endpoint: ${MCP_URL}"
 {
   "mcp": {
     "servers": {
-      "open-prompt-manager": {
-        "type": "http",
-        "url": "http://<alb-dns-name>/mcp"
+      "opm": {
+        "type": "stdio",
+        "command": "npx",
+        "args": ["-y", "open-prompt-manager-mcp"],
+        "env": {
+          "BACKEND_URL": "https://example-dx1.com",
+          "API_KEY": "${input:opmDx1ApiKey}"
+        }
       }
     }
   }
