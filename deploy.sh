@@ -557,7 +557,6 @@ terraform apply -auto-approve "${PLAN_FILE}" 2>&1 | tee -a "${PLAN_FILE}.log"
 # Done – print outputs
 # ─────────────────────────────────────────────
 APP_URL=$(terraform output -raw application_url)
-MCP_URL=$(terraform output -raw mcp_url)
 
 echo ""
 echo "════════════════════════════════════════════════════"
