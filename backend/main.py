@@ -100,6 +100,21 @@ def create_app() -> FastAPI:
         ],
     )
 
+    # Rate limiting
+    rate_limit_enabled = os.getenv('RATE_LIMIT_ENABLED', 'true').lower() not in ('false', '0', 'no')
+    rate_limit_per_minute = int(os.getenv('RATE_LIMIT_PER_MINUTE', '200'))
+    rate_limit_auth_per_minute = int(os.getenv('RATE_LIMIT_AUTH_PER_MINUTE', '60'))
+
+    application.add_middleware(
+        RateLimitMiddleware,
+        enabled=rate_limit_enabled,
+        per_minute=rate_limit_per_minute,
+        auth_per_minute=rate_limit_auth_per_minute,
+    )
+
+    # CORS Add CORSMiddleware LAST — it becomes the outermost layer,
+    # intercepting every request before rate limiting or auth can reject it
+
     cors_origins_env = os.getenv(
         'CORS_ORIGINS',
         'vscode-file://vscode-app',
@@ -113,20 +128,6 @@ def create_app() -> FastAPI:
         allow_methods=['*'],
         allow_headers=['*'],
     )
-
-    # Rate limiting — added after CORS so it becomes the outermost middleware
-    # layer and receives every request before auth and routing.
-    rate_limit_enabled = os.getenv('RATE_LIMIT_ENABLED', 'true').lower() not in ('false', '0', 'no')
-    rate_limit_per_minute = int(os.getenv('RATE_LIMIT_PER_MINUTE', '200'))
-    rate_limit_auth_per_minute = int(os.getenv('RATE_LIMIT_AUTH_PER_MINUTE', '60'))
-
-    application.add_middleware(
-        RateLimitMiddleware,
-        enabled=rate_limit_enabled,
-        per_minute=rate_limit_per_minute,
-        auth_per_minute=rate_limit_auth_per_minute,
-    )
-
     @application.exception_handler(AuthError)
     async def auth_error_handler(_request: Request, exc: AuthError):
         return JSONResponse(status_code=exc.status_code, content={'error': exc.error})
