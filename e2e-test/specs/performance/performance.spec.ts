@@ -121,7 +121,7 @@ test.describe('Rate Limiting Behaviour', () => {
    * This suite sends up to AUTH_BURST requests sequentially until a 429 is
    * received, then validates the response headers and body structure.
    */
-  const AUTH_BURST = 70; // comfortably above the default 60/minute auth limit
+  const AUTH_BURST = 25; // above the performance-test CI limit of 20/min; well below e2e-smoke's 500/min
 
   test('Rate Limiting returns HTTP 429 with correct headers after limit exceeded', async ({ request }) => {
     let rateLimitResponse: any = null;
