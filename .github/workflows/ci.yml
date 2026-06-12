@@ -1299,12 +1299,18 @@ jobs:
         if: always()
         run: docker compose down -v
 
-      # ── Phase 2: k6 load test (default limits — clean rate-limit bucket) ──
+      # ── Phase 2: k6 load test (high limits — clean bucket, no rate-limit noise) ──
+      # k6 runs 10 concurrent VUs all sharing the nginx-forwarded IP, generating
+      # ~1 500 non-health req/min from one IP.  The default 200 req/min API limit
+      # would rate-limit ~86% of prompts_list calls, crossing the <5% threshold.
+      # Rate-limit correctness is already validated in Phase 1; Phase 2 is purely
+      # about latency SLOs, so we raise the limit well above the observed load.
 
-      - name: "Phase 2: Start services (default rate limits)"
+      - name: "Phase 2: Start services (high rate limit for k6 load test)"
         run: docker compose up -d --build
         env:
           COMPOSE_HTTP_TIMEOUT: "120"
+          RATE_LIMIT_PER_MINUTE: "3000"
 
       - name: "Phase 2: Wait for backend to be healthy"
         run: |
