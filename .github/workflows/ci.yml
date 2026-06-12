@@ -1165,14 +1165,21 @@ jobs:
         run: docker compose down -v
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # Performance test: k6 load test against docker-compose for an adequate
-  # duration (2 minutes sustained load) to validate latency SLOs and confirm
-  # that rate limiting responds correctly under concurrent traffic.
+  # Performance test: two isolated phases so the rate-limit E2E tests and the
+  # k6 load test never share the same in-process rate-limit state.
+  #
+  # Phase 1 — rate-limiting correctness (low auth limit, Playwright only).
+  # Phase 2 — k6 load test (default limits; stack is rebuilt from cache so
+  #            setup() auth calls hit a clean bucket).
+  #
+  # Two docker-compose lifecycles are necessary because the Playwright tests
+  # intentionally exhaust the auth bucket; reusing the same stack would cause
+  # k6 setup() to get 429 on /auth/register within the 60-second window.
   # ─────────────────────────────────────────────────────────────────────────────
   performance-test:
     name: Performance Test (k6)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     needs: e2e-smoke
     permissions:
       contents: read
@@ -1190,43 +1197,7 @@ jobs:
           fi
           echo "JWT_SECRET=$JWT_SECRET" >> "$GITHUB_ENV"
 
-      - name: Start services
-        run: docker compose up -d --build
-        env:
-          COMPOSE_HTTP_TIMEOUT: "120"
-          # Low auth limit so the Playwright rate-limiting E2E tests can trigger
-          # HTTP 429 with a modest burst (AUTH_BURST=25 > this limit of 20).
-          RATE_LIMIT_AUTH_PER_MINUTE: "20"
-
-      - name: Wait for backend to be healthy
-        run: |
-          for i in $(seq 1 30); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/health || echo "000")
-            echo "Attempt $i: HTTP $STATUS"
-            if [ "$STATUS" = "200" ]; then
-              echo "Backend is healthy"
-              exit 0
-            fi
-            sleep 3
-          done
-          echo "Backend did not become healthy in time"
-          docker compose logs backend
-          exit 1
-
-      - name: Wait for frontend to be serving
-        run: |
-          for i in $(seq 1 20); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:80 || echo "000")
-            echo "Attempt $i: HTTP $STATUS"
-            if [ "$STATUS" = "200" ]; then
-              echo "Frontend is serving"
-              exit 0
-            fi
-            sleep 3
-          done
-          echo "Frontend did not become available in time"
-          docker compose logs frontend
-          exit 1
+      # ── Install Node / Playwright tooling once, before any stack starts ────
 
       - name: Set up Node 24
         uses: actions/setup-node@v6
@@ -1262,18 +1233,6 @@ jobs:
         run: npx playwright install-deps chromium
         working-directory: e2e-test
 
-      - name: Run Rate Limiting E2E tests
-        run: npx playwright test specs/performance/performance.spec.ts --grep "Rate Limiting Behaviour"
-        working-directory: e2e-test
-
-      - name: Upload Rate Limiting Playwright report
-        uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: rate-limiting-playwright-report
-          path: e2e-test/playwright-report/
-          retention-days: 7
-
       - name: Install k6
         run: |
           sudo gpg -k
@@ -1285,6 +1244,97 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/k6.list
           sudo apt-get update -qq
           sudo apt-get install -y k6
+
+      # ── Phase 1: Rate-limiting correctness (low auth limit) ───────────────
+
+      - name: "Phase 1: Start services (RATE_LIMIT_AUTH_PER_MINUTE=20)"
+        run: docker compose up -d --build
+        env:
+          COMPOSE_HTTP_TIMEOUT: "120"
+          RATE_LIMIT_AUTH_PER_MINUTE: "20"
+
+      - name: "Phase 1: Wait for backend to be healthy"
+        run: |
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/health || echo "000")
+            echo "Attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "Backend is healthy"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Backend did not become healthy in time"
+          docker compose logs backend
+          exit 1
+
+      - name: "Phase 1: Wait for frontend to be serving"
+        run: |
+          for i in $(seq 1 20); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:80 || echo "000")
+            echo "Attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "Frontend is serving"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Frontend did not become available in time"
+          docker compose logs frontend
+          exit 1
+
+      - name: "Phase 1: Run Rate Limiting E2E tests"
+        run: npx playwright test specs/performance/performance.spec.ts --grep "Rate Limiting Behaviour"
+        working-directory: e2e-test
+
+      - name: "Phase 1: Upload Playwright report"
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: rate-limiting-playwright-report
+          path: e2e-test/playwright-report/
+          retention-days: 7
+
+      - name: "Phase 1: Stop services"
+        if: always()
+        run: docker compose down -v
+
+      # ── Phase 2: k6 load test (default limits — clean rate-limit bucket) ──
+
+      - name: "Phase 2: Start services (default rate limits)"
+        run: docker compose up -d --build
+        env:
+          COMPOSE_HTTP_TIMEOUT: "120"
+
+      - name: "Phase 2: Wait for backend to be healthy"
+        run: |
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/health || echo "000")
+            echo "Attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "Backend is healthy"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Backend did not become healthy in time"
+          docker compose logs backend
+          exit 1
+
+      - name: "Phase 2: Wait for frontend to be serving"
+        run: |
+          for i in $(seq 1 20); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:80 || echo "000")
+            echo "Attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "Frontend is serving"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Frontend did not become available in time"
+          docker compose logs frontend
+          exit 1
 
       - name: Run k6 CI performance test (~2 minutes)
         run: |
@@ -1369,10 +1419,10 @@ jobs:
             k6-performance-summary.md
           retention-days: 14
 
-      - name: Print service logs on failure
+      - name: "Phase 2: Print service logs on failure"
         if: failure()
         run: docker compose logs
 
-      - name: Stop services
+      - name: "Phase 2: Stop services"
         if: always()
         run: docker compose down -v
