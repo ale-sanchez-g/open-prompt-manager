@@ -6,7 +6,7 @@
     "ajv": "^8.20.0",
     "axios": "^1.17.0",
     "eslint-plugin-react-hooks": "^7.1.0",
-    "lucide-react": "^1.17.0",
+    "lucide-react": "^1.21.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.17.0"
