@@ -4,12 +4,12 @@
   "private": true,
   "dependencies": {
     "ajv": "^8.20.0",
-    "axios": "^1.17.0",
+    "axios": "^1.18.0",
     "eslint-plugin-react-hooks": "^7.1.0",
-    "lucide-react": "^1.17.0",
+    "lucide-react": "^1.21.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-router-dom": "^7.17.0"
+    "react-router-dom": "^7.18.0"
   },
   "devDependencies": {
     "@stryker-mutator/core": "^9.6.1",
@@ -19,7 +19,7 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.5.2",
     "@vitejs/plugin-react": "^6.0.2",
-    "@vitest/coverage-v8": "^4.1.8",
+    "@vitest/coverage-v8": "^4.1.9",
     "@vitest/ui": "^4.1.2",
     "autoprefixer": "^10.5.0",
     "jsdom": "^29.1.1",
