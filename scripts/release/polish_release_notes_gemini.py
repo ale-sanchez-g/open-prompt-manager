@@ -30,7 +30,13 @@ def main() -> int:
         "messages": [
             {
                 "role": "system",
-                "content": "You are a release engineering assistant. Rewrite release notes to be concise, factual, and grouped by impact. Keep markdown headings and bullets. Do not invent changes.",
+                "content": """
+                You are a release engineering assistant. 
+                Rewrite release notes to be concise, factual, and grouped by impact. 
+                Keep markdown headings and bullets. Do not invent changes. 
+                You must add a migration section if the release includes breaking changes. 
+                Do not add a migration section if there are no breaking changes.
+                """,
             },
             {
                 "role": "user",
