@@ -103,6 +103,21 @@ def validate_role(role: str) -> bool:
     return role in VALID_ROLES
 
 
+def get_bootstrap_admin_emails() -> set[str]:
+    """Return the set of emails configured to always receive the admin role.
+
+    Read from the ``ADMIN_EMAILS`` environment variable (comma-separated).
+    Provides a deterministic way to designate administrators at registration
+    time, independent of who happens to register first.
+    """
+    configured = os.getenv('ADMIN_EMAILS', '')
+    return {normalize_email(email) for email in configured.split(',') if email.strip()}
+
+
+def is_bootstrap_admin(email: str) -> bool:
+    return normalize_email(email) in get_bootstrap_admin_emails()
+
+
 def count_users(db: Session) -> int:
     return db.execute(select(func.count()).select_from(User)).scalar_one()
 

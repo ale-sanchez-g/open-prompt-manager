@@ -44,7 +44,7 @@ The application version displayed in the sidebar and landing page header is fetc
 - **Agent Management** — Define agents, associate prompts, track usage, manage status
 - **Variable System** — Typed variables (string, number, boolean, array, object) with validation
 - **JWT Authentication** — Email/password login, refresh-token cookies, route guards, and automatic access-token refresh
-- **Role-Based Access Control** — `admin` and `user` roles carried in the access token. The first registered account becomes an admin; admins get a dedicated user-management panel to add, update, and remove users and roles
+- **Role-Based Access Control** — `admin` and `user` roles carried in the access token. The first registered account becomes an admin (additional admins can be bootstrapped via `ADMIN_EMAILS`); admins get a dedicated user-management panel to add, update, and remove users and roles
 - **Rate Limiting** — Sliding-window IP-based throttling to protect against brute-force and DDoS (60 auth / 200 API requests per minute per IP by default, configurable via environment variables)
 
 ## Tech Stack
@@ -490,6 +490,8 @@ helm install prompt-manager ./helm/prompt-manager \
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATABASE_URL` | `sqlite:///./data/prompts.db` | Database connection string |
+| `JWT_SECRET` | _(required)_ | Secret used to sign access and refresh tokens. Must be set before the backend starts. |
+| `ADMIN_EMAILS` | _(empty)_ | Comma-separated list of emails that are always assigned the `admin` role at registration. Provides a deterministic way to bootstrap administrators independent of registration order. The very first registered account is always made an admin regardless of this setting. |
 | `CORS_ORIGINS` | `http://localhost,http://localhost:3000,vscode-file://vscode-app` | Comma-separated allowed CORS origins. Include `vscode-file://vscode-app` for VS Code MCP clients. |
 | `MCP_ALLOWED_HOSTS` | `localhost,localhost:8000,127.0.0.1,127.0.0.1:8000` | Comma-separated host names allowed to connect to the MCP endpoint |
 | `RATE_LIMIT_ENABLED` | `true` | Set to `false` to disable rate limiting entirely (not recommended for production). |

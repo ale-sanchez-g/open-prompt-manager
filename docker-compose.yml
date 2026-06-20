@@ -11,6 +11,7 @@ services:
       - DATABASE_URL=sqlite:///./data/prompts.db
       - CORS_ORIGINS=http://localhost,http://localhost:3000,http://localhost:80,vscode-file://vscode-app
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - ADMIN_EMAILS=${ADMIN_EMAILS:-e2e-admin@opm-test.io}
       - RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED:-true}
       - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-200}
       - RATE_LIMIT_AUTH_PER_MINUTE=${RATE_LIMIT_AUTH_PER_MINUTE:-60}

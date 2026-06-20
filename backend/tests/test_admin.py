@@ -228,6 +228,33 @@ def test_admin_cannot_delete_self(anon_client):
     assert response.json() == {'error': 'Admins cannot delete their own account'}
 
 
+def test_admin_emails_env_grants_admin_to_non_first_user(anon_client, monkeypatch):
+    # First user is admin via the first-user rule.
+    _register(anon_client, 'first@opm.io')
+
+    # A later user whose email is in ADMIN_EMAILS is also promoted to admin.
+    monkeypatch.setenv('ADMIN_EMAILS', 'Bootstrap-Admin@opm.io, other@opm.io')
+    _register(anon_client, 'bootstrap-admin@opm.io')
+    token = _login(anon_client, 'bootstrap-admin@opm.io')
+
+    me = anon_client.get('/auth/me', headers=_auth(token))
+    assert me.status_code == 200
+    assert me.json()['role'] == 'admin'
+
+    # And the bootstrapped admin can reach admin-only endpoints.
+    assert anon_client.get('/api/admin/users', headers=_auth(token)).status_code == 200
+
+
+def test_user_not_in_admin_emails_remains_standard_user(anon_client, monkeypatch):
+    _register(anon_client, 'first@opm.io')
+    monkeypatch.setenv('ADMIN_EMAILS', 'someone-else@opm.io')
+    _register(anon_client, 'member@opm.io')
+    token = _login(anon_client, 'member@opm.io')
+
+    me = anon_client.get('/auth/me', headers=_auth(token))
+    assert me.json()['role'] == 'user'
+
+
 def test_non_admin_cannot_create_user(anon_client):
     _register(anon_client, 'admin@opm.io')
     _register(anon_client, 'member@opm.io')

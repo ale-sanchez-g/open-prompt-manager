@@ -10,7 +10,7 @@ export default defineConfig({
     ['junit', { outputFile: 'test-results/junit.xml' }],
   ],
   use: {
-    baseURL: 'http://localhost',
+    baseURL: process.env.E2E_BASE_URL || 'http://localhost',
     extraHTTPHeaders: {
       'Content-Type': 'application/json',
     },
