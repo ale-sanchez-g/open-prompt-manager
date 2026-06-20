@@ -68,6 +68,25 @@ the additive, idempotent schema change, the "promote the first account to admin"
 behaviour, local Docker and AWS ECS/RDS rollout steps, verification queries, and
 the validation checklist.
 
+### Deployment / DB Schema Upgrade
+
+**`deploy.sh`** — Added Step 8, which upgrades the RDS schema during deployment.
+After Terraform rolls out the new backend image it runs the migration modules
+(`add_agent_updated_at`, `add_user_role`) as one-off ECS tasks and forces a
+fresh backend deployment so the running tasks always execute against the
+migrated schema.
+
+**`scripts/migration/run_aws_migration.sh`** (new) — Reusable runner generalised
+from the proven MIG-001 ECS run-task logic. Accepts one or more migration module
+names, runs each as a one-off Fargate task using the backend task definition
+(same image, `DATABASE_URL` secret, and private networking), waits for
+completion, and fails on any non-zero exit code. Optional `FORCE_NEW_DEPLOYMENT`
+rolls the service afterwards.
+
+**`scripts/migration/2026-jun-20-aws-mig-002.sh`** (new) — Dated convenience
+wrapper that invokes the runner for `migrations.add_user_role`, mirroring the
+existing MIG-001 wrapper.
+
 ### Updated Documents
 
 **`README.md`**

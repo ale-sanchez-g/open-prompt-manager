@@ -98,32 +98,35 @@ cd frontend && npm ci --legacy-peer-deps && npm start
 
 Use the deployment script from the repository root for AWS infrastructure, images, and application rollout.
 
-### Important schema upgrade note
+### Database schema upgrades
 
-If you are upgrading an environment that already has data in the `agents` table, you must run the `agents.updated_at` migration before or immediately after deploying backend code that expects that column.
+`Base.metadata.create_all()` only creates missing tables — it never alters existing ones — so additive columns introduced by new backend code (for example `agents.updated_at` or `users.role`) must be applied to existing databases by a migration.
 
-This is required because the backend ORM now reads `agents.updated_at` when serializing agent data. Existing databases created before this change do not get the new column automatically from `Base.metadata.create_all()`.
+**`./deploy.sh` runs these migrations automatically.** After Terraform rolls out the new backend image, Step 8 of the deploy script runs every migration module as a one-off ECS task against RDS (via `scripts/migration/run_aws_migration.sh`) and then forces a fresh backend deployment so the running tasks always execute against the upgraded schema. The migration modules are idempotent, so this is safe to run on every deploy.
+
+To run migrations manually (or against a non-`deploy.sh` environment):
 
 Local Docker migration:
 
 ```bash
 cd backend
-python -m migrations.add_agent_updated_at
+python -m migrations.add_agent_updated_at   # MIG-001: agents.updated_at
+python -m migrations.add_user_role          # MIG-002: users.role
 ```
 
-AWS ECS migration:
+AWS ECS migration — run any migration module(s) as a one-off task with the reusable runner:
 
 ```bash
-AWS_REGION=us-east-1 ./scripts/migration/2026-apr-09-aws-mig-001.sh
+AWS_REGION=us-east-1 ./scripts/migration/run_aws_migration.sh migrations.add_user_role
+
+# Or use the dated convenience wrappers:
+AWS_REGION=us-east-1 ./scripts/migration/2026-apr-09-aws-mig-001.sh   # agents.updated_at
+AWS_REGION=us-east-1 ./scripts/migration/2026-jun-20-aws-mig-002.sh   # users.role
 ```
 
-Optional forced backend refresh after the migration:
+Add `FORCE_NEW_DEPLOYMENT=true` to roll the backend service after the migration completes.
 
-```bash
-AWS_REGION=us-east-1 FORCE_NEW_DEPLOYMENT=true ./scripts/migration/2026-apr-09-aws-mig-001.sh
-```
-
-Detailed rollout guidance is documented in `migration/2026-apr-09-mig-001.md`.
+Detailed rollout guidance is documented in `migration/2026-apr-09-mig-001.md` and `migration/2026-jun-20-mig-002.md`.
 
 ### Deploy examples
 
@@ -449,10 +452,13 @@ open-prompt-manager/
 ├── docker-compose.yml
 ├── Makefile
 ├── migration/
-│   └── 2026-apr-09-mig-001.md     # Migration runbook and rollout notes
+│   ├── 2026-apr-09-mig-001.md     # MIG-001 runbook (agents.updated_at)
+│   └── 2026-jun-20-mig-002.md     # MIG-002 runbook (users.role)
 ├── scripts/
 │   └── migration/
-│       └── 2026-apr-09-aws-mig-001.sh # Run the agent migration as a one-off ECS task
+│       ├── run_aws_migration.sh        # Reusable: run any migration module(s) as one-off ECS tasks
+│       ├── 2026-apr-09-aws-mig-001.sh  # Wrapper: agents.updated_at migration
+│       └── 2026-jun-20-aws-mig-002.sh  # Wrapper: users.role migration
 └── README.md
 ```
 
