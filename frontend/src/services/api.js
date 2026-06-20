@@ -111,12 +111,25 @@ export const authApi = {
   me: () => api.get('/auth/me'),
 };
 
+// User identifiers are server-generated opaque strings (e.g. `usr_<hex>`).
+// Validate against a strict allow-list before interpolating into a request
+// URL so that untrusted input can never alter the request path.
+const SAFE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+function assertSafeId(id) {
+  const value = String(id);
+  if (!SAFE_ID_PATTERN.test(value)) {
+    throw new Error('Invalid identifier');
+  }
+  return value;
+}
+
 // ── Admin (user & role management) ──────────────────────────────────────────────
 export const adminApi = {
   listUsers: () => api.get('/api/admin/users'),
   createUser: (data) => api.post('/api/admin/users', data),
-  updateUser: (id, data) => api.patch(`/api/admin/users/${encodeURIComponent(id)}`, data),
-  deleteUser: (id) => api.delete(`/api/admin/users/${encodeURIComponent(id)}`),
+  updateUser: (id, data) => api.patch(`/api/admin/users/${assertSafeId(id)}`, data),
+  deleteUser: (id) => api.delete(`/api/admin/users/${assertSafeId(id)}`),
 };
 
 // ── Prompts ───────────────────────────────────────────────────────────────────
