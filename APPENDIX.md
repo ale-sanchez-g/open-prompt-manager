@@ -57,6 +57,36 @@ Redis, nginx), default limits, trade-offs, and implementation inventory.
 
 ---
 
+## Issue #279 — Admin panel for managing users and roles (2026-06-20)
+
+### New Documents
+
+**`migration/2026-jun-20-mig-002.md`**
+
+One-off migration guide (MIG-002) for adding the `users.role` column. Documents
+the additive, idempotent schema change, the "promote the first account to admin"
+behaviour, local Docker and AWS ECS/RDS rollout steps, verification queries, and
+the validation checklist.
+
+### Updated Documents
+
+**`README.md`**
+
+- Added the `/admin` frontend route (admin-only User Management page) to the
+  Frontend Routes table.
+- Added **Role-Based Access Control** to the Features list and noted that the
+  first registered account becomes an admin.
+- Documented `GET /auth/me` and the new **Admin (user & role management)**
+  endpoint group (`GET/POST /api/admin/users`, `PATCH/DELETE
+  /api/admin/users/{id}`), including the `403 admin_required` behaviour for
+  non-admins.
+- Refreshed the backend and frontend project-structure trees to include
+  `app/api/auth.py`, `app/api/admin.py`, `app/api/dependencies.py`,
+  `app/services/auth_service.py`, `migrations/add_user_role.py`, and the
+  frontend `UserManagement.jsx` page.
+
+---
+
 ## Review Scope
 
 The review focused on documentation claims that could be directly verified against code or configuration, including:

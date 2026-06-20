@@ -33,6 +33,7 @@ The application version displayed in the sidebar and landing page header is fetc
 | `/agents` | Agents Management | Create and manage AI agents |
 | `/agents/:id` | Agent Detail | View agent details and execution stats |
 | `/api-docs` | API Documentation | Interactive API schema reference, user journeys, and endpoint guide |
+| `/admin` | User Management | **Admin only** — add, update, and remove users and roles |
 
 ## Features
 
@@ -43,6 +44,7 @@ The application version displayed in the sidebar and landing page header is fetc
 - **Agent Management** — Define agents, associate prompts, track usage, manage status
 - **Variable System** — Typed variables (string, number, boolean, array, object) with validation
 - **JWT Authentication** — Email/password login, refresh-token cookies, route guards, and automatic access-token refresh
+- **Role-Based Access Control** — `admin` and `user` roles carried in the access token. The first registered account becomes an admin; admins get a dedicated user-management panel to add, update, and remove users and roles
 - **Rate Limiting** — Sliding-window IP-based throttling to protect against brute-force and DDoS (60 auth / 200 API requests per minute per IP by default, configurable via environment variables)
 
 ## Tech Stack
@@ -277,10 +279,22 @@ Full interactive documentation is available at runtime:
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/auth/register` | Register a user account with email + password complexity validation |
-| POST | `/auth/login` | Issue a 15-minute access token and set the refresh token cookie |
+| POST | `/auth/register` | Register a user account with email + password complexity validation. The first account to register becomes an `admin`; all later accounts are standard `user`s |
+| POST | `/auth/login` | Issue a 15-minute access token (carrying the user's `role`) and set the refresh token cookie |
 | POST | `/auth/refresh` | Exchange a valid refresh-token cookie for a new access token |
 | POST | `/auth/logout` | Revoke the current refresh token and clear the cookie |
+| GET | `/auth/me` | Return the authenticated user's `id`, `email`, and `role` |
+
+### Admin (user & role management)
+
+Every endpoint below requires a bearer access token belonging to an `admin` user. Non-admins receive `403 {"error": "admin_required"}`.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/admin/users` | List all users with their roles |
+| POST | `/api/admin/users` | Create a user with a chosen role (`admin` or `user`) |
+| PATCH | `/api/admin/users/{id}` | Update a user's `role` and/or `password`. Admins cannot demote themselves |
+| DELETE | `/api/admin/users/{id}` | Delete a user. Admins cannot delete their own account |
 
 ### Health
 
@@ -373,17 +387,23 @@ open-prompt-manager/
 ├── backend/
 │   ├── app/
 │   │   ├── models/
+│   │   │   ├── auth.py            # User, role, and refresh-token models
 │   │   │   ├── prompt.py          # SQLAlchemy models
 │   │   │   └── schemas.py         # Pydantic schemas
 │   │   ├── api/
+│   │   │   ├── auth.py            # Register, login, refresh, logout, me endpoints
+│   │   │   ├── admin.py           # Admin-only user & role management endpoints
+│   │   │   ├── dependencies.py    # Shared auth dependencies (get_current_user, require_admin)
 │   │   │   ├── prompts.py         # Prompt endpoints
 │   │   │   └── tags_agents.py     # Tags and Agents endpoints
 │   │   ├── services/
+│   │   │   ├── auth_service.py    # Auth, JWT, and user/role business logic
 │   │   │   └── prompt_service.py  # Business logic
 │   │   ├── database/
 │   │   │   └── base.py            # Database configuration
 │   │   ├── migrations/
-│   │   │   └── add_agent_updated_at.py # One-off schema migration for legacy agents tables
+│   │   │   ├── add_agent_updated_at.py # One-off schema migration for legacy agents tables
+│   │   │   └── add_user_role.py   # One-off schema migration adding users.role
 │   │   ├── main.py
 │   │   ├── requirements.txt
 │   │   └── Dockerfile
@@ -400,7 +420,8 @@ open-prompt-manager/
 │   │   │   ├── TagsManagement.jsx
 │   │   │   ├── AgentsManagement.jsx
 │   │   │   ├── AgentDetail.jsx
-│   │   │   └── ApiDocs.jsx
+│   │   │   ├── ApiDocs.jsx
+│   │   │   └── UserManagement.jsx  # Admin-only user & role management page
 │   │   ├── services/
 │   │   │   └── api.js
 │   │   ├── App.jsx

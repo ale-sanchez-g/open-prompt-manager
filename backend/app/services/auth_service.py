@@ -7,7 +7,7 @@ from typing import Any
 import bcrypt
 import jwt
 from jwt import ExpiredSignatureError, InvalidTokenError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.auth import RefreshToken, User
@@ -19,6 +19,11 @@ REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60
 DEFAULT_BCRYPT_ROUNDS = 12
 MIN_BCRYPT_ROUNDS = 4
 MAX_BCRYPT_ROUNDS = 31
+
+ROLE_ADMIN = 'admin'
+ROLE_USER = 'user'
+VALID_ROLES = (ROLE_ADMIN, ROLE_USER)
+DEFAULT_ROLE = ROLE_USER
 
 
 def utcnow() -> datetime:
@@ -94,8 +99,16 @@ def verify_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
 
 
-def create_user(db: Session, email: str, password: str) -> User:
-    user = User(email=normalize_email(email), password_hash=hash_password(password))
+def validate_role(role: str) -> bool:
+    return role in VALID_ROLES
+
+
+def count_users(db: Session) -> int:
+    return db.execute(select(func.count()).select_from(User)).scalar_one()
+
+
+def create_user(db: Session, email: str, password: str, role: str = DEFAULT_ROLE) -> User:
+    user = User(email=normalize_email(email), password_hash=hash_password(password), role=role)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -105,6 +118,33 @@ def create_user(db: Session, email: str, password: str) -> User:
 def get_user_by_email(db: Session, email: str) -> User | None:
     normalized_email = normalize_email(email)
     return db.execute(select(User).where(User.email == normalized_email)).scalar_one_or_none()
+
+
+def get_user_by_id(db: Session, user_id: str) -> User | None:
+    return db.execute(select(User).where(User.id == user_id)).scalar_one_or_none()
+
+
+def list_users(db: Session) -> list[User]:
+    return list(db.execute(select(User).order_by(User.created_at)).scalars().all())
+
+
+def update_user_role(db: Session, user: User, role: str) -> User:
+    user.role = role
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def update_user_password(db: Session, user: User, password: str) -> User:
+    user.password_hash = hash_password(password)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def delete_user(db: Session, user: User) -> None:
+    db.delete(user)
+    db.commit()
 
 
 def authenticate_user(db: Session, email: str, password: str) -> User | None:
@@ -119,6 +159,7 @@ def _build_token_payload(user: User, expires_in: int, token_type: str, token_id:
     payload: dict[str, Any] = {
         'sub': user.id,
         'email': user.email,
+        'role': user.role or DEFAULT_ROLE,
         'iat': int(now.timestamp()),
         'exp': int((now + timedelta(seconds=expires_in)).timestamp()),
         'type': token_type,

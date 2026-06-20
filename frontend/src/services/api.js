@@ -102,6 +102,15 @@ export const authApi = {
   login: (data) => api.post('/auth/login', data),
   refresh: () => api.post('/auth/refresh'),
   logout: () => api.post('/auth/logout'),
+  me: () => api.get('/auth/me'),
+};
+
+// ── Admin (user & role management) ──────────────────────────────────────────────
+export const adminApi = {
+  listUsers: () => api.get('/api/admin/users'),
+  createUser: (data) => api.post('/api/admin/users', data),
+  updateUser: (id, data) => api.patch(`/api/admin/users/${id}`, data),
+  deleteUser: (id) => api.delete(`/api/admin/users/${id}`),
 };
 
 // ── Prompts ───────────────────────────────────────────────────────────────────

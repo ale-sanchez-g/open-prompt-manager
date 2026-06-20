@@ -24,6 +24,47 @@ class TokenResponse(BaseModel):
     expires_in: int = Field(900, description='Access token lifetime in seconds.', examples=[900])
 
 
+# User / role management schemas
+class UserResponse(BaseModel):
+    id: str = Field(..., description='Server-generated user identifier.', examples=['usr_abc123'])
+    email: str = Field(..., description='Email address that identifies the user.', examples=['user@opm.io'])
+    role: str = Field(..., description='Access role. One of: admin, user.', examples=['admin'])
+    created_at: datetime = Field(..., description='UTC timestamp when the account was created.')
+
+    model_config = {'from_attributes': True}
+
+
+class MeResponse(BaseModel):
+    id: str = Field(..., description='Server-generated user identifier.', examples=['usr_abc123'])
+    email: str = Field(..., description='Email address of the authenticated user.', examples=['user@opm.io'])
+    role: str = Field(..., description='Access role of the authenticated user. One of: admin, user.', examples=['admin'])
+
+    model_config = {'from_attributes': True}
+
+
+class UserCreate(BaseModel):
+    email: str = Field(..., description='Email address for the new account.', examples=['teammate@opm.io'])
+    password: str = Field(..., description='Initial password. Must meet complexity requirements.', examples=['Str0ng!Pass'])
+    role: str = Field('user', description='Access role to assign. One of: admin, user.', examples=['user'])
+
+    model_config = {
+        'json_schema_extra': {
+            'example': {'email': 'teammate@opm.io', 'password': 'Str0ng!Pass', 'role': 'user'},
+        }
+    }
+
+
+class UserUpdate(BaseModel):
+    role: Optional[str] = Field(None, description='New access role. One of: admin, user.', examples=['admin'])
+    password: Optional[str] = Field(None, description='Replacement password. Must meet complexity requirements.', examples=['N3w!Password'])
+
+    model_config = {
+        'json_schema_extra': {
+            'example': {'role': 'admin'},
+        }
+    }
+
+
 
 # Tag schemas
 class TagBase(BaseModel):
