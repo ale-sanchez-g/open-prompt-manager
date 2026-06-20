@@ -82,7 +82,7 @@ describe('UserManagement', () => {
   });
 
   it('deletes a user after confirmation', async () => {
-    confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+    confirmSpy = jest.spyOn(globalThis, 'confirm').mockReturnValue(true);
     renderPage();
     await screen.findByText('member@opm.io');
 

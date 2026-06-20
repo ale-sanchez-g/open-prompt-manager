@@ -115,8 +115,8 @@ export const authApi = {
 export const adminApi = {
   listUsers: () => api.get('/api/admin/users'),
   createUser: (data) => api.post('/api/admin/users', data),
-  updateUser: (id, data) => api.patch(`/api/admin/users/${id}`, data),
-  deleteUser: (id) => api.delete(`/api/admin/users/${id}`),
+  updateUser: (id, data) => api.patch(`/api/admin/users/${encodeURIComponent(id)}`, data),
+  deleteUser: (id) => api.delete(`/api/admin/users/${encodeURIComponent(id)}`),
 };
 
 // ── Prompts ───────────────────────────────────────────────────────────────────

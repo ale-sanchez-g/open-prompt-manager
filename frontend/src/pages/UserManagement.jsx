@@ -52,7 +52,7 @@ export default function UserManagement() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this user? This cannot be undone.')) return;
+    if (!globalThis.confirm('Delete this user? This cannot be undone.')) return;
     try {
       await adminApi.deleteUser(id);
       fetchUsers();
@@ -76,30 +76,31 @@ export default function UserManagement() {
         )}
         <form onSubmit={handleCreate} className="flex flex-wrap gap-3 items-end">
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Email</label>
+            <label htmlFor="new-user-email" className="block text-xs text-gray-400 mb-1">Email</label>
             <input
+              id="new-user-email"
               required
               type="email"
-              aria-label="Email"
               className="bg-gray-700 text-white px-3 py-2 rounded-lg text-sm border border-gray-600 focus:outline-none focus:border-blue-500 w-56"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Password</label>
+            <label htmlFor="new-user-password" className="block text-xs text-gray-400 mb-1">Password</label>
             <input
+              id="new-user-password"
               required
               type="password"
-              aria-label="Password"
               className="bg-gray-700 text-white px-3 py-2 rounded-lg text-sm border border-gray-600 focus:outline-none focus:border-blue-500 w-48"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Role</label>
+            <label htmlFor="new-user-role" className="block text-xs text-gray-400 mb-1">Role</label>
             <select
+              id="new-user-role"
               aria-label="New user role"
               className="bg-gray-700 text-white px-3 py-2 rounded-lg text-sm border border-gray-600 focus:outline-none focus:border-blue-500"
               value={form.role}

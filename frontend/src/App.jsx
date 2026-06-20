@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
 import { BrowserRouter as Router, Navigate, Routes, Route, NavLink, Link } from 'react-router-dom';
 import { BookOpen, Bot, FileText, LayoutDashboard, LogOut, ShieldCheck, Tag } from 'lucide-react';
 
@@ -49,6 +50,8 @@ export function ProtectedRoute({ children }) {
   return isAuthenticated ? children : <Navigate to="/login" replace />;
 }
 
+ProtectedRoute.propTypes = { children: PropTypes.node.isRequired };
+
 export function PublicOnlyRoute({ children }) {
   const { isAuthenticated, isReady } = useAuth();
 
@@ -58,6 +61,8 @@ export function PublicOnlyRoute({ children }) {
 
   return isAuthenticated ? <Navigate to="/dashboard" replace /> : children;
 }
+
+PublicOnlyRoute.propTypes = { children: PropTypes.node.isRequired };
 
 export function AdminRoute({ children }) {
   const { isAuthenticated, isReady, isAdmin } = useAuth();
@@ -72,6 +77,8 @@ export function AdminRoute({ children }) {
 
   return isAdmin ? children : <Navigate to="/dashboard" replace />;
 }
+
+AdminRoute.propTypes = { children: PropTypes.node.isRequired };
 
 export function AppLayout() {
   const { logout, isAdmin } = useAuth();

@@ -6,16 +6,16 @@ constants = {
     'DESCRIPTION_MESSAGE': 'Server-generated user identifier.',
     'REGISTER_USER_ID_EXAMPLE': 'usr_abc123',
     'EXAMPLE_EMAIL': 'user@opm.io',
-    'EXAMPLE_PASSWORD': 'Str0ng!Pass', # Note: these are just examples and should not be used in production
+    'EXAMPLE_PASS': 'Str0ng!Pass', # Note: these are just examples and should not be used in production
 }
 
 class AuthRequest(BaseModel):
     email: str = Field(..., description='Email address used to identify the user account.', examples=[constants['EXAMPLE_EMAIL']])
-    password: str = Field(..., description='Plaintext password submitted for registration or login.', examples=[constants['EXAMPLE_PASSWORD']])
+    password: str = Field(..., description='Plaintext password submitted for registration or login.', examples=[constants['EXAMPLE_PASS']])
 
     model_config = {
         'json_schema_extra': {
-            'example': {'email': constants['EXAMPLE_EMAIL'], 'password': constants['EXAMPLE_PASSWORD']},
+            'example': {'email': constants['EXAMPLE_EMAIL'], 'password': constants['EXAMPLE_PASS']},
         }
     }
 
@@ -50,19 +50,19 @@ class MeResponse(BaseModel):
 
 class UserCreate(BaseModel):
     email: str = Field(..., description='Email address for the new account.', examples=[constants['EXAMPLE_EMAIL']])
-    password: str = Field(..., description='Initial password. Must meet complexity requirements.', examples=[constants['EXAMPLE_PASSWORD']])
+    password: str = Field(..., description='Initial password. Must meet complexity requirements.', examples=[constants['EXAMPLE_PASS']])
     role: str = Field('user', description='Access role to assign. One of: admin, user.', examples=['user'])
 
     model_config = {
         'json_schema_extra': {
-            'example': {'email': constants['EXAMPLE_EMAIL'], 'password': constants['EXAMPLE_PASSWORD'], 'role': 'user'},
+            'example': {'email': constants['EXAMPLE_EMAIL'], 'password': constants['EXAMPLE_PASS'], 'role': 'user'},
         }
     }
 
 
 class UserUpdate(BaseModel):
     role: Optional[str] = Field(None, description='New access role. One of: admin, user.', examples=['admin'])
-    password: Optional[str] = Field(None, description='Replacement password. Must meet complexity requirements.', examples=[constants['EXAMPLE_PASSWORD']])
+    password: Optional[str] = Field(None, description='Replacement password. Must meet complexity requirements.', examples=[constants['EXAMPLE_PASS']])
 
     model_config = {
         'json_schema_extra': {

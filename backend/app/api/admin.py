@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -31,7 +33,7 @@ router = APIRouter(prefix='/api/admin', tags=['admin'])
     response_description='Array of user accounts ordered by creation time.',
     responses={401: {'description': 'Authentication required.'}, 403: {'description': 'Admin role required.'}},
 )
-def admin_list_users(_admin: User = Depends(require_admin), db: Session = Depends(get_db)) -> list[User]:
+def admin_list_users(_admin: Annotated[User, Depends(require_admin)], db: Annotated[Session, Depends(get_db)]) -> list[User]:
     return list_users(db)
 
 
@@ -54,8 +56,8 @@ def admin_list_users(_admin: User = Depends(require_admin), db: Session = Depend
 )
 def admin_create_user(
     payload: UserCreate,
-    _admin: User = Depends(require_admin),
-    db: Session = Depends(get_db),
+    _admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
 ) -> User:
     normalized_email = normalize_email(payload.email)
     if not validate_email(normalized_email):
@@ -89,8 +91,8 @@ def admin_create_user(
 def admin_update_user(
     user_id: str,
     payload: UserUpdate,
-    admin: User = Depends(require_admin),
-    db: Session = Depends(get_db),
+    admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
 ) -> User:
     user = get_user_by_id(db, user_id)
     if user is None:
@@ -129,8 +131,8 @@ def admin_update_user(
 )
 def admin_delete_user(
     user_id: str,
-    admin: User = Depends(require_admin),
-    db: Session = Depends(get_db),
+    admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
 ) -> None:
     user = get_user_by_id(db, user_id)
     if user is None:
