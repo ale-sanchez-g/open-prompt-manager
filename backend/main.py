@@ -7,6 +7,7 @@ from sqlalchemy import text
 import app.database.base as db_module
 from app.database.base import create_tables
 from app.api.auth import router as auth_router
+from app.api.admin import router as admin_router
 from app.api.prompts import router as prompts_router
 from app.api.tags_agents import tags_router, agents_router
 from app import __version__
@@ -72,7 +73,14 @@ def create_app() -> FastAPI:
         openapi_tags=[
             {
                 'name': 'auth',
-                'description': 'Registration, login, refresh, and logout endpoints for JWT authentication.',
+                'description': 'Registration, login, refresh, logout, and current-user endpoints for JWT authentication.',
+            },
+            {
+                'name': 'admin',
+                'description': (
+                    'Administrative endpoints for managing users and roles. '
+                    'Restricted to accounts with the admin role.'
+                ),
             },
             {
                 'name': 'prompts',
@@ -156,12 +164,15 @@ def create_app() -> FastAPI:
         except TokenValidationError as exc:
             return JSONResponse(status_code=401, content={'error': exc.error})
 
+        user_role = payload.get('role', 'user')
         request.state.user_id = payload['sub']
         request.state.user_email = payload['email']
-        request.state.auth_user = {'sub': payload['sub'], 'email': payload['email']}
+        request.state.user_role = user_role
+        request.state.auth_user = {'sub': payload['sub'], 'email': payload['email'], 'role': user_role}
         return await call_next(request)
 
     application.include_router(auth_router)
+    application.include_router(admin_router)
     application.include_router(prompts_router)
     application.include_router(tags_router)
     application.include_router(agents_router)

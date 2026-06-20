@@ -2,9 +2,14 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
-import { AuthProvider } from '../context/AuthContext';
+import { AuthProvider, useAuth } from '../context/AuthContext';
 import { ProtectedRoute } from '../App';
 import * as apiService from '../services/api';
+
+function RoleProbe() {
+  const { isAdmin, user } = useAuth();
+  return <div>{`role:${user?.role || 'none'}:admin:${String(isAdmin)}`}</div>;
+}
 
 jest.mock('../services/api', () => ({
   authApi: {
@@ -12,6 +17,7 @@ jest.mock('../services/api', () => ({
     login: jest.fn(),
     register: jest.fn(),
     logout: jest.fn(),
+    me: jest.fn(),
   },
   getAccessToken: jest.fn(() => null),
   setAccessToken: jest.fn(),
@@ -28,6 +34,7 @@ describe('AuthProvider', () => {
     apiService.authApi.refresh.mockResolvedValue({
       data: { access_token: 'fresh-token', token_type: 'Bearer', expires_in: 900 },
     });
+    apiService.authApi.me.mockResolvedValue({ data: { id: 'usr_1', email: 'user@opm.io', role: 'user' } });
 
     render(
       <MemoryRouter initialEntries={['/dashboard']}>
@@ -61,5 +68,22 @@ describe('AuthProvider', () => {
 
     expect(await screen.findByText('Login')).toBeInTheDocument();
     expect(apiService.clearAccessToken).toHaveBeenCalled();
+  });
+
+  it('exposes the role and isAdmin flag loaded from the me endpoint', async () => {
+    apiService.authApi.refresh.mockResolvedValue({
+      data: { access_token: 'fresh-token', token_type: 'Bearer', expires_in: 900 },
+    });
+    apiService.authApi.me.mockResolvedValue({ data: { id: 'usr_1', email: 'admin@opm.io', role: 'admin' } });
+
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <RoleProbe />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('role:admin:admin:true')).toBeInTheDocument();
   });
 });

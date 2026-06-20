@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
 import { BrowserRouter as Router, Navigate, Routes, Route, NavLink, Link } from 'react-router-dom';
-import { BookOpen, Bot, FileText, LayoutDashboard, LogOut, Tag } from 'lucide-react';
+import { BookOpen, Bot, FileText, LayoutDashboard, LogOut, ShieldCheck, Tag } from 'lucide-react';
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LandingPage from './pages/LandingPage';
@@ -14,6 +15,7 @@ import TagsManagement from './pages/TagsManagement';
 import AgentsManagement from './pages/AgentsManagement';
 import AgentDetail from './pages/AgentDetail';
 import ApiDocs from './pages/ApiDocs';
+import UserManagement from './pages/UserManagement';
 import { healthApi } from './services/api';
 
 function NavItem({ to, icon: Icon, label }) {
@@ -48,6 +50,8 @@ export function ProtectedRoute({ children }) {
   return isAuthenticated ? children : <Navigate to="/login" replace />;
 }
 
+ProtectedRoute.propTypes = { children: PropTypes.node.isRequired };
+
 export function PublicOnlyRoute({ children }) {
   const { isAuthenticated, isReady } = useAuth();
 
@@ -58,8 +62,26 @@ export function PublicOnlyRoute({ children }) {
   return isAuthenticated ? <Navigate to="/dashboard" replace /> : children;
 }
 
+PublicOnlyRoute.propTypes = { children: PropTypes.node.isRequired };
+
+export function AdminRoute({ children }) {
+  const { isAuthenticated, isReady, isAdmin } = useAuth();
+
+  if (!isReady) {
+    return <AuthGate>Restoring your session...</AuthGate>;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return isAdmin ? children : <Navigate to="/dashboard" replace />;
+}
+
+AdminRoute.propTypes = { children: PropTypes.node.isRequired };
+
 export function AppLayout() {
-  const { logout } = useAuth();
+  const { logout, isAdmin } = useAuth();
   const [appVersion, setAppVersion] = useState('Loading...');
 
   useEffect(() => {
@@ -90,6 +112,7 @@ export function AppLayout() {
         <NavItem to="/tags" icon={Tag} label="Tags" />
         <NavItem to="/agents" icon={Bot} label="Agents" />
         <NavItem to="/api-docs" icon={BookOpen} label="API Docs" />
+        {isAdmin && <NavItem to="/admin" icon={ShieldCheck} label="Admin" />}
         <button
           type="button"
           onClick={logout}
@@ -111,6 +134,7 @@ export function AppLayout() {
           <Route path="/agents" element={<AgentsManagement />} />
           <Route path="/agents/:id" element={<AgentDetail />} />
           <Route path="/api-docs" element={<ApiDocs />} />
+          <Route path="/admin" element={<AdminRoute><UserManagement /></AdminRoute>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </main>

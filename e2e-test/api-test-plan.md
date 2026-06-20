@@ -585,3 +585,70 @@ Steps covered:
 1. Create a reusable component prompt
 2. Create a parent prompt referencing the component via `{{component:<id>}}`
 3. Render the parent — verify component content is inlined and components_resolved is populated
+
+---
+
+### 10. Admin & RBAC Tests
+
+**Seed:** `e2e-test/seed.spec.ts`
+
+Role-based access control. Two roles exist: `admin` and `user`. The role is
+embedded in the JWT access token and enforced on the `/api/admin/*` endpoints.
+The first registered account becomes an admin; emails listed in the
+`ADMIN_EMAILS` environment variable are always granted the admin role at
+registration. The E2E stack configures `ADMIN_EMAILS=e2e-admin@opm-test.io`
+(see `docker-compose.yml`) so the suite has a deterministic admin.
+
+#### 10.1. Admin API — Identity & Role Claims
+
+**File:** `e2e-test/specs/admin/admin-api.spec.ts`
+
+**Steps:**
+  1. GET /auth/me with a valid token
+    - expect: 200 with `id`, `email`, and `role` fields
+  2. GET /auth/me without a token
+    - expect: 401 `{ "error": "missing_token" }`
+  3. Decode the login access token
+    - expect: payload contains a `role` claim (`admin` or `user`)
+  4. Register/login the `ADMIN_EMAILS` address
+    - expect: GET /auth/me reports `role: admin`
+
+#### 10.2. Admin API — Access Control (non-admin)
+
+**File:** `e2e-test/specs/admin/admin-api.spec.ts`
+
+**Steps:**
+  1. Standard user calls GET /api/admin/users
+    - expect: 403 `{ "error": "admin_required" }`
+  2. Standard user calls POST /api/admin/users
+    - expect: 403 `{ "error": "admin_required" }`
+  3. Any admin endpoint without a token
+    - expect: 401 `{ "error": "missing_token" }`
+
+#### 10.3. Admin API — User & Role Management (admin)
+
+**File:** `e2e-test/specs/admin/admin-api.spec.ts`
+
+**Steps:**
+  1. GET /api/admin/users — expect: 200 array including the admin with `role: admin`
+  2. POST /api/admin/users with a chosen role — expect: 201; created standard user is denied admin endpoints (403)
+  3. POST duplicate email — expect: 409 already registered
+  4. POST invalid role — expect: 422 `Invalid role`
+  5. PATCH role to `admin` — expect: 200; promoted user can now reach admin endpoints
+  6. PATCH password — expect: 200; old password rejected (401), new accepted (200)
+  7. PATCH a missing user — expect: 404 `User not found`
+  8. DELETE a user — expect: 204; user no longer listed
+  9. DELETE own account — expect: 400 (admins cannot delete themselves)
+  10. PATCH own role to `user` — expect: 400 (admins cannot demote themselves)
+
+#### 10.4. Admin UI — Access Control & User Management
+
+**File:** `e2e-test/specs/admin/admin-ui.spec.ts`
+
+**Steps:**
+  1. Unauthenticated navigation to /admin — expect: redirect to /login
+  2. Standard user after login — expect: no Admin nav link is rendered
+  3. Standard user navigating to /admin — expect: redirect to /dashboard (AdminRoute guard)
+  4. Admin after login — expect: Admin nav link visible; clicking it opens the User Management page listing users
+  5. Admin creates a user via the Add User form — expect: the new user appears in the list
+  6. Admin's own row — expect: role selector and delete button are disabled (cannot self-demote or self-delete)

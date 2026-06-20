@@ -247,6 +247,7 @@ export default function ApiDocs() {
     { id: 'schemas', label: 'Schemas' },
     { id: 'journeys', label: 'User Journeys' },
     { id: 'auth-api', label: 'Authentication' },
+    { id: 'admin-api', label: 'Admin API' },
     { id: 'prompts-api', label: 'Prompts API' },
     { id: 'tags-api', label: 'Tags API' },
     { id: 'agents-api', label: 'Agents API' },
@@ -680,6 +681,87 @@ Authorization: Bearer eyJ...`}
             description="Revokes the current refresh token (if present) and clears the httpOnly cookie, ending the authenticated session."
             responses={[
               { status: 204, description: 'Session ended. No content returned.' },
+            ]}
+          />
+          <Endpoint
+            method="GET"
+            path="/auth/me"
+            summary="Get the current user"
+            description="Returns the authenticated user's id, email, and role. Requires a Bearer access token. Clients use this to decide which role-gated features and pages to show."
+            responses={[
+              { status: 200, description: 'MeResponse — { "id": "usr_abc123", "email": "you@example.com", "role": "admin" }' },
+              { status: 401, description: 'Authentication required or token invalid.' },
+            ]}
+          />
+        </Section>
+
+        {/* ── Admin API ── */}
+        <Section title="Admin API" id="admin-api">
+          <p className="text-gray-400 text-sm mb-4">
+            User and role management. Every endpoint requires a Bearer access token belonging to an{' '}
+            <code className="bg-gray-800 text-blue-300 px-1 rounded text-xs">admin</code> user. The first account to
+            register becomes an admin automatically. Non-admins receive{' '}
+            <code className="bg-gray-800 text-blue-300 px-1 rounded text-xs">403 {'{'}"error": "admin_required"{'}'}</code>.
+          </p>
+          <Endpoint
+            method="GET"
+            path="/api/admin/users"
+            summary="List all users"
+            description="Returns every registered user with their role, ordered by creation time."
+            responses={[
+              { status: 200, description: 'Array of UserResponse — { id, email, role, created_at }.' },
+              { status: 401, description: 'Authentication required.' },
+              { status: 403, description: 'Admin role required.' },
+            ]}
+          />
+          <Endpoint
+            method="POST"
+            path="/api/admin/users"
+            summary="Create a user"
+            description="Creates a user with the requested role. Passwords must meet the same complexity rules as self-registration."
+            requestBody={`{
+  "email": "teammate@example.com",
+  "password": "Str0ng!Pass",
+  "role": "user"
+}`}
+            responses={[
+              { status: 201, description: 'UserResponse — the created user.' },
+              { status: 401, description: 'Authentication required.' },
+              { status: 403, description: 'Admin role required.' },
+              { status: 409, description: 'Email already registered.' },
+              { status: 422, description: 'Email, password, or role validation failed.' },
+            ]}
+          />
+          <Endpoint
+            method="PATCH"
+            path="/api/admin/users/{user_id}"
+            summary="Update a user"
+            description="Updates a user's role and/or password. Admins cannot remove their own admin role, which keeps at least one administrator in the system."
+            params={[{ name: 'user_id', in: 'path', type: 'string', required: true, description: 'User ID (e.g. usr_abc123).' }]}
+            requestBody={`{
+  "role": "admin"
+}`}
+            responses={[
+              { status: 200, description: 'UserResponse — the updated user.' },
+              { status: 400, description: 'Admins cannot demote themselves.' },
+              { status: 401, description: 'Authentication required.' },
+              { status: 403, description: 'Admin role required.' },
+              { status: 404, description: 'User not found.' },
+              { status: 422, description: 'Password or role validation failed.' },
+            ]}
+          />
+          <Endpoint
+            method="DELETE"
+            path="/api/admin/users/{user_id}"
+            summary="Delete a user"
+            description="Permanently deletes a user account and revokes their refresh tokens. Admins cannot delete their own account."
+            params={[{ name: 'user_id', in: 'path', type: 'string', required: true, description: 'User ID (e.g. usr_abc123).' }]}
+            responses={[
+              { status: 204, description: 'User deleted. No content returned.' },
+              { status: 400, description: 'Admins cannot delete their own account.' },
+              { status: 401, description: 'Authentication required.' },
+              { status: 403, description: 'Admin role required.' },
+              { status: 404, description: 'User not found.' },
             ]}
           />
         </Section>

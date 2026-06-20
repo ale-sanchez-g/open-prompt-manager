@@ -52,6 +52,35 @@ describe('API service structure', () => {
     await promptsApi.list();
   });
 
+  it('attaches the access token to /auth/me (a token-protected auth route)', async () => {
+    setAccessToken('access-token');
+    api.defaults.adapter = async (config) => {
+      expect(config.url).toBe('/auth/me');
+      expect(getAuthorizationHeader(config)).toBe('Bearer access-token');
+      return buildResponse(config, 200, { id: 'usr_1', email: 'a@opm.io', role: 'admin' });
+    };
+
+    const response = await authApi.me();
+    expect(response.data.role).toBe('admin');
+  });
+
+  it('does not attach the access token to credential auth routes', async () => {
+    setAccessToken('access-token');
+    const seen = {};
+    api.defaults.adapter = async (config) => {
+      seen[config.url] = getAuthorizationHeader(config);
+      return buildResponse(config, 200, {});
+    };
+
+    await authApi.login({ email: 'a@opm.io', password: 'secret1234' });
+    await authApi.refresh();
+    await authApi.logout();
+
+    expect(seen['/auth/login']).toBeUndefined();
+    expect(seen['/auth/refresh']).toBeUndefined();
+    expect(seen['/auth/logout']).toBeUndefined();
+  });
+
   it('refreshes an expired token and retries the original request', async () => {
     let refreshCalls = 0;
     setAccessToken('expired-token');

@@ -554,6 +554,29 @@ log "Step 7 – Applying Terraform configuration..."
 terraform apply -auto-approve "${PLAN_FILE}" 2>&1 | tee -a "${PLAN_FILE}.log"
 
 # ─────────────────────────────────────────────
+# 8. Upgrade the database schema
+# Run idempotent, additive migrations as one-off ECS tasks against RDS using
+# the backend task definition that Terraform just rolled out (which contains
+# the latest migration modules, DATABASE_URL secret, and private networking).
+# Safe to run on every deploy: each migration no-ops when already applied.
+# FORCE_NEW_DEPLOYMENT replaces backend tasks once the schema is upgraded so the
+# steady-state tasks always run against a migrated database.
+# ─────────────────────────────────────────────
+log "Step 8 – Upgrading database schema (running migrations)..."
+MIGRATION_CLUSTER_NAME="$(terraform output -raw ecs_cluster_name)"
+if PROJECT_NAME="${PROJECT_NAME}" \
+   AWS_REGION="${AWS_REGION}" \
+   CLUSTER_NAME="${MIGRATION_CLUSTER_NAME}" \
+   FORCE_NEW_DEPLOYMENT=true \
+   "${SCRIPT_DIR}/scripts/migration/run_aws_migration.sh" \
+     migrations.add_agent_updated_at \
+     migrations.add_user_role; then
+  ok "Database schema is up to date."
+else
+  fail "Database migration failed. The infrastructure is deployed but the schema upgrade did not complete. Inspect CloudWatch logs (/ecs/${PROJECT_NAME}/backend) and re-run: AWS_REGION=${AWS_REGION} ${SCRIPT_DIR}/scripts/migration/run_aws_migration.sh migrations.add_user_role"
+fi
+
+# ─────────────────────────────────────────────
 # Done – print outputs
 # ─────────────────────────────────────────────
 APP_URL=$(terraform output -raw application_url)

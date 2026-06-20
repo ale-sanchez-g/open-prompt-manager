@@ -33,6 +33,7 @@ The application version displayed in the sidebar and landing page header is fetc
 | `/agents` | Agents Management | Create and manage AI agents |
 | `/agents/:id` | Agent Detail | View agent details and execution stats |
 | `/api-docs` | API Documentation | Interactive API schema reference, user journeys, and endpoint guide |
+| `/admin` | User Management | **Admin only** — add, update, and remove users and roles |
 
 ## Features
 
@@ -43,6 +44,7 @@ The application version displayed in the sidebar and landing page header is fetc
 - **Agent Management** — Define agents, associate prompts, track usage, manage status
 - **Variable System** — Typed variables (string, number, boolean, array, object) with validation
 - **JWT Authentication** — Email/password login, refresh-token cookies, route guards, and automatic access-token refresh
+- **Role-Based Access Control** — `admin` and `user` roles carried in the access token. The first registered account becomes an admin (additional admins can be bootstrapped via `ADMIN_EMAILS`); admins get a dedicated user-management panel to add, update, and remove users and roles
 - **Rate Limiting** — Sliding-window IP-based throttling to protect against brute-force and DDoS (60 auth / 200 API requests per minute per IP by default, configurable via environment variables)
 
 ## Tech Stack
@@ -96,32 +98,35 @@ cd frontend && npm ci --legacy-peer-deps && npm start
 
 Use the deployment script from the repository root for AWS infrastructure, images, and application rollout.
 
-### Important schema upgrade note
+### Database schema upgrades
 
-If you are upgrading an environment that already has data in the `agents` table, you must run the `agents.updated_at` migration before or immediately after deploying backend code that expects that column.
+`Base.metadata.create_all()` only creates missing tables — it never alters existing ones — so additive columns introduced by new backend code (for example `agents.updated_at` or `users.role`) must be applied to existing databases by a migration.
 
-This is required because the backend ORM now reads `agents.updated_at` when serializing agent data. Existing databases created before this change do not get the new column automatically from `Base.metadata.create_all()`.
+**`./deploy.sh` runs these migrations automatically.** After Terraform rolls out the new backend image, Step 8 of the deploy script runs every migration module as a one-off ECS task against RDS (via `scripts/migration/run_aws_migration.sh`) and then forces a fresh backend deployment so the running tasks always execute against the upgraded schema. The migration modules are idempotent, so this is safe to run on every deploy.
+
+To run migrations manually (or against a non-`deploy.sh` environment):
 
 Local Docker migration:
 
 ```bash
 cd backend
-python -m migrations.add_agent_updated_at
+python -m migrations.add_agent_updated_at   # MIG-001: agents.updated_at
+python -m migrations.add_user_role          # MIG-002: users.role
 ```
 
-AWS ECS migration:
+AWS ECS migration — run any migration module(s) as a one-off task with the reusable runner:
 
 ```bash
-AWS_REGION=us-east-1 ./scripts/migration/2026-apr-09-aws-mig-001.sh
+AWS_REGION=us-east-1 ./scripts/migration/run_aws_migration.sh migrations.add_user_role
+
+# Or use the dated convenience wrappers:
+AWS_REGION=us-east-1 ./scripts/migration/2026-apr-09-aws-mig-001.sh   # agents.updated_at
+AWS_REGION=us-east-1 ./scripts/migration/2026-jun-20-aws-mig-002.sh   # users.role
 ```
 
-Optional forced backend refresh after the migration:
+Add `FORCE_NEW_DEPLOYMENT=true` to roll the backend service after the migration completes.
 
-```bash
-AWS_REGION=us-east-1 FORCE_NEW_DEPLOYMENT=true ./scripts/migration/2026-apr-09-aws-mig-001.sh
-```
-
-Detailed rollout guidance is documented in `migration/2026-apr-09-mig-001.md`.
+Detailed rollout guidance is documented in `migration/2026-apr-09-mig-001.md` and `migration/2026-jun-20-mig-002.md`.
 
 ### Deploy examples
 
@@ -277,10 +282,22 @@ Full interactive documentation is available at runtime:
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/auth/register` | Register a user account with email + password complexity validation |
-| POST | `/auth/login` | Issue a 15-minute access token and set the refresh token cookie |
+| POST | `/auth/register` | Register a user account with email + password complexity validation. The first account to register becomes an `admin`; all later accounts are standard `user`s |
+| POST | `/auth/login` | Issue a 15-minute access token (carrying the user's `role`) and set the refresh token cookie |
 | POST | `/auth/refresh` | Exchange a valid refresh-token cookie for a new access token |
 | POST | `/auth/logout` | Revoke the current refresh token and clear the cookie |
+| GET | `/auth/me` | Return the authenticated user's `id`, `email`, and `role` |
+
+### Admin (user & role management)
+
+Every endpoint below requires a bearer access token belonging to an `admin` user. Non-admins receive `403 {"error": "admin_required"}`.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/admin/users` | List all users with their roles |
+| POST | `/api/admin/users` | Create a user with a chosen role (`admin` or `user`) |
+| PATCH | `/api/admin/users/{id}` | Update a user's `role` and/or `password`. Admins cannot demote themselves |
+| DELETE | `/api/admin/users/{id}` | Delete a user. Admins cannot delete their own account |
 
 ### Health
 
@@ -373,17 +390,23 @@ open-prompt-manager/
 ├── backend/
 │   ├── app/
 │   │   ├── models/
+│   │   │   ├── auth.py            # User, role, and refresh-token models
 │   │   │   ├── prompt.py          # SQLAlchemy models
 │   │   │   └── schemas.py         # Pydantic schemas
 │   │   ├── api/
+│   │   │   ├── auth.py            # Register, login, refresh, logout, me endpoints
+│   │   │   ├── admin.py           # Admin-only user & role management endpoints
+│   │   │   ├── dependencies.py    # Shared auth dependencies (get_current_user, require_admin)
 │   │   │   ├── prompts.py         # Prompt endpoints
 │   │   │   └── tags_agents.py     # Tags and Agents endpoints
 │   │   ├── services/
+│   │   │   ├── auth_service.py    # Auth, JWT, and user/role business logic
 │   │   │   └── prompt_service.py  # Business logic
 │   │   ├── database/
 │   │   │   └── base.py            # Database configuration
 │   │   ├── migrations/
-│   │   │   └── add_agent_updated_at.py # One-off schema migration for legacy agents tables
+│   │   │   ├── add_agent_updated_at.py # One-off schema migration for legacy agents tables
+│   │   │   └── add_user_role.py   # One-off schema migration adding users.role
 │   │   ├── main.py
 │   │   ├── requirements.txt
 │   │   └── Dockerfile
@@ -400,7 +423,8 @@ open-prompt-manager/
 │   │   │   ├── TagsManagement.jsx
 │   │   │   ├── AgentsManagement.jsx
 │   │   │   ├── AgentDetail.jsx
-│   │   │   └── ApiDocs.jsx
+│   │   │   ├── ApiDocs.jsx
+│   │   │   └── UserManagement.jsx  # Admin-only user & role management page
 │   │   ├── services/
 │   │   │   └── api.js
 │   │   ├── App.jsx
@@ -428,10 +452,13 @@ open-prompt-manager/
 ├── docker-compose.yml
 ├── Makefile
 ├── migration/
-│   └── 2026-apr-09-mig-001.md     # Migration runbook and rollout notes
+│   ├── 2026-apr-09-mig-001.md     # MIG-001 runbook (agents.updated_at)
+│   └── 2026-jun-20-mig-002.md     # MIG-002 runbook (users.role)
 ├── scripts/
 │   └── migration/
-│       └── 2026-apr-09-aws-mig-001.sh # Run the agent migration as a one-off ECS task
+│       ├── run_aws_migration.sh        # Reusable: run any migration module(s) as one-off ECS tasks
+│       ├── 2026-apr-09-aws-mig-001.sh  # Wrapper: agents.updated_at migration
+│       └── 2026-jun-20-aws-mig-002.sh  # Wrapper: users.role migration
 └── README.md
 ```
 
@@ -469,6 +496,8 @@ helm install prompt-manager ./helm/prompt-manager \
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATABASE_URL` | `sqlite:///./data/prompts.db` | Database connection string |
+| `JWT_SECRET` | _(required)_ | Secret used to sign access and refresh tokens. Must be set before the backend starts. |
+| `ADMIN_EMAILS` | _(empty)_ | Comma-separated list of emails that are always assigned the `admin` role at registration. Provides a deterministic way to bootstrap administrators independent of registration order. The very first registered account is always made an admin regardless of this setting. |
 | `CORS_ORIGINS` | `http://localhost,http://localhost:3000,vscode-file://vscode-app` | Comma-separated allowed CORS origins. Include `vscode-file://vscode-app` for VS Code MCP clients. |
 | `MCP_ALLOWED_HOSTS` | `localhost,localhost:8000,127.0.0.1,127.0.0.1:8000` | Comma-separated host names allowed to connect to the MCP endpoint |
 | `RATE_LIMIT_ENABLED` | `true` | Set to `false` to disable rate limiting entirely (not recommended for production). |

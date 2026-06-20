@@ -1,15 +1,22 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from app.api.dependencies import get_current_user
 from app.database.base import get_db
-from app.models.schemas import AuthRequest, RegisterResponse, TokenResponse
+from app.models.auth import User
+from app.models.schemas import AuthRequest, MeResponse, RegisterResponse, TokenResponse
 from app.services.auth_service import (
     ACCESS_TOKEN_TTL_SECONDS,
     AuthError,
     REFRESH_COOKIE_NAME,
+    ROLE_ADMIN,
+    ROLE_USER,
     TokenValidationError,
     authenticate_user,
+    count_users,
     create_access_token,
     create_refresh_token,
     create_user,
@@ -18,6 +25,7 @@ from app.services.auth_service import (
     get_cookie_secure,
     get_refresh_token_record,
     get_user_by_email,
+    is_bootstrap_admin,
     normalize_email,
     revoke_refresh_token_from_cookie,
     validate_email,
@@ -35,7 +43,10 @@ router = APIRouter(prefix='/auth', tags=['auth'])
     description=(
         'Creates a new user account with an email address and a bcrypt-hashed password. '
         'Passwords must be at least 10 characters long and contain uppercase, lowercase, numeric, '
-        'and special characters. Registration does not issue JWTs.'
+        'and special characters. The very first account to register becomes an admin so the '
+        'instance has an initial administrator, as does any email listed in the ADMIN_EMAILS '
+        'configuration; every other account is a standard user. '
+        'Registration does not issue JWTs.'
     ),
     response_description='The newly created user identifier.',
     responses={409: {'description': 'Email already registered.'}, 422: {'description': 'Password or email validation failed.'}},
@@ -48,7 +59,9 @@ def register(payload: AuthRequest, db: Session = Depends(get_db)) -> RegisterRes
         raise AuthError(status_code=422, error='Password does not meet complexity requirements')
     if get_user_by_email(db, normalized_email) is not None:
         raise AuthError(status_code=409, error='Email already registered')
-    user = create_user(db, normalized_email, payload.password)
+    is_admin = count_users(db) == 0 or is_bootstrap_admin(normalized_email)
+    role = ROLE_ADMIN if is_admin else ROLE_USER
+    user = create_user(db, normalized_email, payload.password, role=role)
     return RegisterResponse(id=user.id)
 
 
@@ -126,3 +139,17 @@ def logout(request: Request, db: Session = Depends(get_db)) -> Response:
     response = Response(status_code=204)
     response.delete_cookie(key=REFRESH_COOKIE_NAME, path='/', secure=get_cookie_secure(request), httponly=True, samesite='strict')
     return response
+
+
+@router.get(
+    '/me',
+    summary='Get the current user',
+    description=(
+        'Returns the authenticated user identified by the bearer access token, including their role. '
+        'Used by clients to decide which role-gated features and pages to show.'
+    ),
+    response_description='Identity and role of the authenticated user.',
+    responses={401: {'description': 'Authentication required or token invalid.'}},
+)
+def me(current_user: Annotated[User, Depends(get_current_user)]) -> MeResponse:
+    return MeResponse.model_validate(current_user)

@@ -2,26 +2,73 @@ from datetime import datetime
 from typing import Any, Optional
 from pydantic import BaseModel, Field
 
+constants = {
+    'DESCRIPTION_MESSAGE': 'Server-generated user identifier.',
+    'REGISTER_USER_ID_EXAMPLE': 'usr_abc123',
+    'EXAMPLE_EMAIL': 'user@opm.io',
+    'EXAMPLE_PASS': 'Str0ng!Pass', # Note: these are just examples and should not be used in production
+}
 
 class AuthRequest(BaseModel):
-    email: str = Field(..., description='Email address used to identify the user account.', examples=['user@opm.io'])
-    password: str = Field(..., description='Plaintext password submitted for registration or login.', examples=['Str0ng!Pass'])
+    email: str = Field(..., description='Email address used to identify the user account.', examples=[constants['EXAMPLE_EMAIL']])
+    password: str = Field(..., description='Plaintext password submitted for registration or login.', examples=[constants['EXAMPLE_PASS']])
 
     model_config = {
         'json_schema_extra': {
-            'example': {'email': 'user@opm.io', 'password': 'Str0ng!Pass'},
+            'example': {'email': constants['EXAMPLE_EMAIL'], 'password': constants['EXAMPLE_PASS']},
         }
     }
 
 
 class RegisterResponse(BaseModel):
-    id: str = Field(..., description='Server-generated user identifier.', examples=['usr_abc123'])
+    id: str = Field(..., description=constants['DESCRIPTION_MESSAGE'], examples=[constants['REGISTER_USER_ID_EXAMPLE']])
 
 
 class TokenResponse(BaseModel):
     access_token: str = Field(..., description='JWT access token that must be sent in the Authorization header.')
     token_type: str = Field('Bearer', description='Authentication scheme for the access token.', examples=['Bearer'])
     expires_in: int = Field(900, description='Access token lifetime in seconds.', examples=[900])
+
+
+# User / role management schemas
+class UserResponse(BaseModel):
+    id: str = Field(..., description=constants['DESCRIPTION_MESSAGE'], examples=[constants['REGISTER_USER_ID_EXAMPLE']])
+    email: str = Field(..., description='Email address that identifies the user.', examples=[constants['EXAMPLE_EMAIL']])
+    role: str = Field(..., description='Access role. One of: admin, user.', examples=['admin'])
+    created_at: datetime = Field(..., description='UTC timestamp when the account was created.')
+
+    model_config = {'from_attributes': True}
+
+
+class MeResponse(BaseModel):
+    id: str = Field(..., description=constants['DESCRIPTION_MESSAGE'], examples=[constants['REGISTER_USER_ID_EXAMPLE']])
+    email: str = Field(..., description='Email address of the authenticated user.', examples=[constants['EXAMPLE_EMAIL']])
+    role: str = Field(..., description='Access role of the authenticated user. One of: admin, user.', examples=['admin'])
+
+    model_config = {'from_attributes': True}
+
+
+class UserCreate(BaseModel):
+    email: str = Field(..., description='Email address for the new account.', examples=[constants['EXAMPLE_EMAIL']])
+    password: str = Field(..., description='Initial password. Must meet complexity requirements.', examples=[constants['EXAMPLE_PASS']])
+    role: str = Field('user', description='Access role to assign. One of: admin, user.', examples=['user'])
+
+    model_config = {
+        'json_schema_extra': {
+            'example': {'email': constants['EXAMPLE_EMAIL'], 'password': constants['EXAMPLE_PASS'], 'role': 'user'},
+        }
+    }
+
+
+class UserUpdate(BaseModel):
+    role: Optional[str] = Field(None, description='New access role. One of: admin, user.', examples=['admin'])
+    password: Optional[str] = Field(None, description='Replacement password. Must meet complexity requirements.', examples=[constants['EXAMPLE_PASS']])
+
+    model_config = {
+        'json_schema_extra': {
+            'example': {'role': 'admin'},
+        }
+    }
 
 
 

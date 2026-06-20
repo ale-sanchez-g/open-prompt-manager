@@ -17,6 +17,7 @@ class User(Base):
     id = Column(String(32), primary_key=True, default=lambda: f'usr_{uuid4().hex[:12]}')
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
+    role = Column(String(20), nullable=False, default='user', server_default='user')
     created_at = Column(DateTime, default=_utcnow)
 
     refresh_tokens = relationship('RefreshToken', back_populates='user', cascade='all, delete-orphan')

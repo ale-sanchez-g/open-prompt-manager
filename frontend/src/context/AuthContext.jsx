@@ -10,14 +10,29 @@ import {
 
 const AuthContext = createContext(null);
 
+async function loadCurrentUser() {
+  if (typeof authApi.me !== 'function') {
+    return null;
+  }
+  try {
+    const response = await authApi.me();
+    return response.data;
+  } catch (error) {
+    console.error('Failed to load current user:', error);
+    return null;
+  }
+}
+
 export function AuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(Boolean(getAccessToken()));
   const [isReady, setIsReady] = useState(false);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
     const unsubscribe = subscribeToAuthFailures(() => {
       clearAccessToken();
       setIsAuthenticated(false);
+      setUser(null);
     });
 
     return unsubscribe;
@@ -27,11 +42,16 @@ export function AuthProvider({ children }) {
     let isMounted = true;
 
     authApi.refresh()
-      .then((response) => {
+      .then(async (response) => {
         if (!isMounted) {
           return;
         }
         setAccessToken(response.data.access_token);
+        const currentUser = await loadCurrentUser();
+        if (!isMounted) {
+          return;
+        }
+        setUser(currentUser);
         setIsAuthenticated(true);
       })
       .catch(() => {
@@ -40,6 +60,7 @@ export function AuthProvider({ children }) {
         }
         clearAccessToken();
         setIsAuthenticated(false);
+        setUser(null);
       })
       .finally(() => {
         if (isMounted) {
@@ -55,6 +76,8 @@ export function AuthProvider({ children }) {
   const login = async (credentials) => {
     const response = await authApi.login(credentials);
     setAccessToken(response.data.access_token);
+    const currentUser = await loadCurrentUser();
+    setUser(currentUser);
     setIsAuthenticated(true);
     return response;
   };
@@ -65,6 +88,7 @@ export function AuthProvider({ children }) {
     } finally {
       clearAccessToken();
       setIsAuthenticated(false);
+      setUser(null);
     }
   };
 
@@ -72,11 +96,13 @@ export function AuthProvider({ children }) {
     () => ({
       isAuthenticated,
       isReady,
+      user,
+      isAdmin: user?.role === 'admin',
       login,
       logout,
       register: authApi.register,
     }),
-    [isAuthenticated, isReady],
+    [isAuthenticated, isReady, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
