@@ -14,8 +14,14 @@ function notifyAuthFailure() {
   authFailureListeners.forEach((listener) => listener());
 }
 
+// Credential endpoints that must NOT carry the access token: registration and
+// login take credentials in the body, while refresh and logout rely on the
+// httpOnly refresh-token cookie. Other /auth routes (e.g. /auth/me) are
+// token-protected and must receive the Authorization header like /api routes.
+const TOKEN_FREE_AUTH_PATHS = ['/auth/register', '/auth/login', '/auth/refresh', '/auth/logout'];
+
 function isAuthPath(url = '') {
-  return url.startsWith('/auth/');
+  return TOKEN_FREE_AUTH_PATHS.some((path) => url.startsWith(path));
 }
 
 export function getAccessToken() {
