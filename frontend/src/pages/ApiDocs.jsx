@@ -698,10 +698,10 @@ Authorization: Bearer eyJ...`}
         {/* ── Admin API ── */}
         <Section title="Admin API" id="admin-api">
           <p className="text-gray-400 text-sm mb-4">
-            User and role management. Every endpoint requires a Bearer access token belonging to an
-            <code className="bg-gray-800 text-blue-300 px-1 rounded text-xs"> admin</code> user. The first account to
-            register becomes an admin automatically. Non-admins receive
-            <code className="bg-gray-800 text-blue-300 px-1 rounded text-xs"> 403 {'{'}"error": "admin_required"{'}'}</code>.
+            User and role management. Every endpoint requires a Bearer access token belonging to an{' '}
+            <code className="bg-gray-800 text-blue-300 px-1 rounded text-xs">admin</code> user. The first account to
+            register becomes an admin automatically. Non-admins receive{' '}
+            <code className="bg-gray-800 text-blue-300 px-1 rounded text-xs">403 {'{'}"error": "admin_required"{'}'}</code>.
           </p>
           <Endpoint
             method="GET"

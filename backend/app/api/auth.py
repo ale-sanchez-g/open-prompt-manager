@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
@@ -141,7 +143,6 @@ def logout(request: Request, db: Session = Depends(get_db)) -> Response:
 
 @router.get(
     '/me',
-    response_model=MeResponse,
     summary='Get the current user',
     description=(
         'Returns the authenticated user identified by the bearer access token, including their role. '
@@ -150,5 +151,5 @@ def logout(request: Request, db: Session = Depends(get_db)) -> Response:
     response_description='Identity and role of the authenticated user.',
     responses={401: {'description': 'Authentication required or token invalid.'}},
 )
-def me(current_user: User = Depends(get_current_user)) -> MeResponse:
+def me(current_user: Annotated[User, Depends(get_current_user)]) -> MeResponse:
     return MeResponse.model_validate(current_user)

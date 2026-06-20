@@ -18,6 +18,7 @@ async function loadCurrentUser() {
     const response = await authApi.me();
     return response.data;
   } catch (error) {
+    console.error('Failed to load current user:', error);
     return null;
   }
 }
