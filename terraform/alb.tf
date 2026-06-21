@@ -12,11 +12,20 @@ resource "aws_lb" "main" {
   enable_deletion_protection = false
   drop_invalid_header_fields = true
 
+  access_logs {
+    enabled = true
+    bucket  = aws_s3_bucket.alb_logs.id
+    prefix  = var.project_name
+  }
+
   tags = {
     Name        = "${var.project_name}-alb"
     Project     = var.project_name
     Environment = var.environment
   }
+
+  # The bucket policy must exist before the ALB validates log delivery.
+  depends_on = [aws_s3_bucket_policy.alb_logs]
 }
 
 # ─────────────────────────────────────────────
