@@ -14,6 +14,60 @@ resource "aws_vpc" "main" {
 }
 
 # ─────────────────────────────────────────────
+# Default Security Group
+# Explicitly manage the VPC's default security
+# group and revoke all ingress/egress rules so
+# nothing inadvertently relies on it. Workloads
+# use the purpose-built security groups defined
+# in security_groups.tf instead.
+# ─────────────────────────────────────────────
+resource "aws_default_security_group" "default" {
+  vpc_id = aws_vpc.main.id
+
+  # No ingress or egress rules: declaring the resource with no
+  # rule blocks instructs Terraform to remove all default rules,
+  # leaving the default security group fully locked down.
+
+  tags = {
+    Name        = "${var.project_name}-default-sg"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+# ─────────────────────────────────────────────
+# VPC Flow Logs
+# Capture all network traffic metadata for the
+# VPC and deliver it to CloudWatch Logs for
+# visibility, auditing, and troubleshooting.
+# ─────────────────────────────────────────────
+resource "aws_cloudwatch_log_group" "flow_log" {
+  name              = "/aws/vpc-flow-log/${var.project_name}"
+  retention_in_days = var.cloudwatch_log_retention_in_days
+
+  tags = {
+    Name        = "${var.project_name}-flow-log"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_flow_log" "main" {
+  vpc_id          = aws_vpc.main.id
+  traffic_type    = "ALL"
+  iam_role_arn    = aws_iam_role.flow_log.arn
+  log_destination = aws_cloudwatch_log_group.flow_log.arn
+
+  log_destination_type = "cloud-watch-logs"
+
+  tags = {
+    Name        = "${var.project_name}-flow-log"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+# ─────────────────────────────────────────────
 # Internet Gateway
 # ─────────────────────────────────────────────
 resource "aws_internet_gateway" "main" {

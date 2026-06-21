@@ -242,3 +242,54 @@ run "private_route_table_association_count" {
     error_message = "Must have one private route table association per private subnet."
   }
 }
+
+# ─────────────────────────────────────────────
+# Default Security Group
+# ─────────────────────────────────────────────
+# The default security group is explicitly managed (declared with no
+# ingress/egress rule blocks, which revokes all default rules). The rule
+# sets are computed and unknown at plan time, so the test asserts that the
+# resource is managed and bound to the project rather than the rule counts.
+run "default_security_group_is_explicitly_managed" {
+  command = plan
+
+  assert {
+    condition     = aws_default_security_group.default.tags["Project"] == var.project_name
+    error_message = "Default security group must be explicitly managed with a 'Project' tag."
+  }
+
+  assert {
+    condition     = aws_default_security_group.default.tags["Environment"] == var.environment
+    error_message = "Default security group must be explicitly managed with an 'Environment' tag."
+  }
+}
+
+# ─────────────────────────────────────────────
+# VPC Flow Logs
+# ─────────────────────────────────────────────
+run "flow_log_captures_all_traffic" {
+  command = plan
+
+  assert {
+    condition     = aws_flow_log.main.traffic_type == "ALL"
+    error_message = "VPC flow log must capture ALL traffic."
+  }
+}
+
+run "flow_log_uses_cloudwatch_destination" {
+  command = plan
+
+  assert {
+    condition     = aws_flow_log.main.log_destination_type == "cloud-watch-logs"
+    error_message = "VPC flow log must use a CloudWatch Logs destination."
+  }
+}
+
+run "flow_log_group_has_retention" {
+  command = plan
+
+  assert {
+    condition     = aws_cloudwatch_log_group.flow_log.retention_in_days == var.cloudwatch_log_retention_in_days
+    error_message = "Flow log group retention must match var.cloudwatch_log_retention_in_days."
+  }
+}

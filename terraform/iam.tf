@@ -27,6 +27,18 @@ data "aws_iam_policy_document" "rds_monitoring_assume_role" {
   }
 }
 
+data "aws_iam_policy_document" "flow_log_assume_role" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["vpc-flow-logs.amazonaws.com"]
+    }
+  }
+}
+
 resource "aws_iam_role" "ecs_task_execution" {
   name               = "${var.project_name}-ecs-task-execution-role"
   assume_role_policy = data.aws_iam_policy_document.ecs_task_assume_role.json
@@ -96,4 +108,45 @@ resource "aws_iam_role" "rds_enhanced_monitoring" {
 resource "aws_iam_role_policy_attachment" "rds_enhanced_monitoring" {
   role       = aws_iam_role.rds_enhanced_monitoring.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
+}
+
+# ─────────────────────────────────────────────
+# VPC Flow Log Delivery Role
+# Allows the VPC Flow Logs service to publish
+# network traffic records to the CloudWatch Log
+# Group defined in vpc.tf.
+# ─────────────────────────────────────────────
+resource "aws_iam_role" "flow_log" {
+  name               = "${var.project_name}-${var.environment}-vpc-flow-log-role"
+  assume_role_policy = data.aws_iam_policy_document.flow_log_assume_role.json
+
+  tags = {
+    Name        = "${var.project_name}-vpc-flow-log-role"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_iam_role_policy" "flow_log" {
+  name = "${var.project_name}-vpc-flow-log-policy"
+  role = aws_iam_role.flow_log.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams"
+        ]
+        Resource = [
+          aws_cloudwatch_log_group.flow_log.arn,
+          "${aws_cloudwatch_log_group.flow_log.arn}:*"
+        ]
+      }
+    ]
+  })
 }
