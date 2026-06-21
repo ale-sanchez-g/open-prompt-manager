@@ -68,6 +68,15 @@ run "alb_log_bucket_is_encrypted" {
   }
 }
 
+run "alb_log_bucket_has_access_logging" {
+  command = plan
+
+  assert {
+    condition     = aws_s3_bucket_logging.alb_logs.target_prefix == "s3-access-logs/"
+    error_message = "ALB log bucket must have server access logging enabled to the 's3-access-logs/' prefix."
+  }
+}
+
 run "alb_log_bucket_has_lifecycle" {
   command = plan
 

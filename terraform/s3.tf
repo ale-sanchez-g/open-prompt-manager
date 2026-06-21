@@ -42,6 +42,17 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "alb_logs" {
   }
 }
 
+# Server access logging for the bucket itself. Logs are written to a
+# dedicated prefix within the same bucket so the log sink is self-auditing
+# without requiring an additional bucket (which would only shift the same
+# requirement onto it).
+resource "aws_s3_bucket_logging" "alb_logs" {
+  bucket = aws_s3_bucket.alb_logs.id
+
+  target_bucket = aws_s3_bucket.alb_logs.id
+  target_prefix = "s3-access-logs/"
+}
+
 resource "aws_s3_bucket_lifecycle_configuration" "alb_logs" {
   bucket = aws_s3_bucket.alb_logs.id
 
@@ -121,6 +132,27 @@ data "aws_iam_policy_document" "alb_logs" {
     principals {
       type        = "Service"
       identifiers = ["delivery.logs.amazonaws.com"]
+    }
+  }
+
+  # S3 server access logging delivery (ACLs are disabled on new buckets, so
+  # the logging service writes via the bucket policy instead of an ACL).
+  statement {
+    sid    = "AllowS3ServerAccessLogging"
+    effect = "Allow"
+
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.alb_logs.arn}/s3-access-logs/*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["logging.s3.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
     }
   }
 }

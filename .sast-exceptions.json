@@ -124,12 +124,6 @@
       "justification": "The ALB access-log bucket uses SSE-S3 (AES256) because ELB access-log delivery does not support SSE-KMS buckets. Risk accepted: logs are server-side encrypted at rest; KMS is not an option for this delivery channel."
     },
     {
-      "id": "CKV_AWS_18",
-      "owner": "github-agents",
-      "expires": "2026-06-30",
-      "justification": "The ALB access-log bucket is itself a log sink; enabling S3 server access logging on it would require an additional bucket and provides little added value. Planned: evaluate a central access-logging bucket if required by audit policy."
-    },
-    {
       "id": "CKV_AWS_144",
       "owner": "github-agents",
       "expires": "2026-06-30",
