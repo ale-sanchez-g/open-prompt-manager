@@ -12,7 +12,7 @@
 #   AWS_REGION=ap-southeast-2 ./set_user_role.sh <email> [role]
 #
 # Examples:
-#   AWS_REGION=ap-southeast-2 ./set_user_role.sh sisalex@hotmail.com admin
+#   AWS_REGION=ap-southeast-2 ./set_user_role.sh admin@opm.io admin
 #   AWS_REGION=ap-southeast-2 ./set_user_role.sh someone@opm.io user
 #
 # Environment variables:
@@ -52,8 +52,14 @@ for required_command in aws python3; do
 done
 
 describe_service() {
-	aws ecs describe-services --region "$AWS_REGION" --cluster "$CLUSTER_NAME" \
-		--services "$SERVICE_NAME" --query "$1" --output text
+	local service_attribute_query="$1"
+
+	aws ecs describe-services \
+		--region "$AWS_REGION" \
+		--cluster "$CLUSTER_NAME" \
+		--services "$SERVICE_NAME" \
+		--query "$service_attribute_query" \
+		--output text
 }
 
 echo "Inspecting ECS backend service configuration..."
