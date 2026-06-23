@@ -65,6 +65,26 @@ run "rds_performance_insights_enabled" {
   }
 }
 
+run "secrets_use_cmk_encryption" {
+  command = plan
+
+  # Computed key ARNs are unknown at plan time, so verify the wiring via the
+  # configuration source (consistent with the ecs.tf JWT_SECRET wiring test).
+  assert {
+    condition     = strcontains(file("${path.module}/rds.tf"), "kms_key_id              = aws_kms_key.secrets.arn")
+    error_message = "Secrets Manager secrets must be encrypted with the customer-managed secrets CMK (aws_kms_key.secrets)."
+  }
+}
+
+run "secrets_kms_key_rotation_enabled" {
+  command = plan
+
+  assert {
+    condition     = aws_kms_key.secrets.enable_key_rotation == true
+    error_message = "Secrets Manager CMK must have automatic key rotation enabled."
+  }
+}
+
 run "jwt_secret_override_uses_provided_value" {
   command = plan
 

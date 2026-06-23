@@ -23,6 +23,7 @@ resource "aws_secretsmanager_secret" "jwt_secret" {
   name                    = "${var.project_name}/${var.environment}/jwt-secret"
   description             = "JWT_SECRET for the ${var.project_name} backend service"
   recovery_window_in_days = 7
+  kms_key_id              = aws_kms_key.secrets.arn
 
   tags = {
     Name        = "${var.project_name}-jwt-secret"
@@ -46,6 +47,7 @@ resource "aws_secretsmanager_secret" "db_url" {
   name                    = "${var.project_name}/${var.environment}/database-url"
   description             = "PostgreSQL DATABASE_URL for the ${var.project_name} backend service"
   recovery_window_in_days = 7
+  kms_key_id              = aws_kms_key.secrets.arn
 
   tags = {
     Name        = "${var.project_name}-db-url-secret"

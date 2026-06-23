@@ -70,10 +70,13 @@ Internet
 | **Security Groups** | Four security groups: `alb-sg` (HTTP/HTTPS from `0.0.0.0/0`), `frontend-sg` (port 80 from ALB only), `backend-sg` (port 8000 from ALB only), `rds-sg` (port 5432 from backend SG only). |
 | **ACM Certificate** | Optional TLS certificate created via `certificate.tf` with DNS validation. Automatically adds `www.` SAN for apex domains. Can be provided externally via `acm_certificate_arn`. |
 | **ECS Fargate** | Serverless container runtime. Runs backend (512 CPU / 1024 MB, 2 tasks) and frontend (256 CPU / 512 MB, 2 tasks) in private subnets. Cluster has Container Insights enabled and supports both `FARGATE` and `FARGATE_SPOT`. |
-| **ECR** | Private container image registry with lifecycle policies for backend and frontend Docker images. |
+| **ECR** | Private container image registry with lifecycle policies for backend and frontend Docker images. Image layers are encrypted at rest with a dedicated customer-managed KMS key (`alias/<project>-ecr`). |
 | **RDS PostgreSQL 16** | `db.t4g.micro` with 20 GiB gp3 storage, encrypted at rest, in the private subnets. Multi-AZ disabled by default (enable via `db_multi_az = true`). |
-| **Secrets Manager** | Stores the auto-generated PostgreSQL `DATABASE_URL` at `<project>/<env>/database-url`. Injected into the backend ECS container at task start — never a plain-text env var. |
+| **Secrets Manager** | Stores the auto-generated PostgreSQL `DATABASE_URL` at `<project>/<env>/database-url` and the `JWT_SECRET`, both encrypted with a dedicated customer-managed KMS key (`alias/<project>-secrets`). Injected into the backend ECS container at task start — never a plain-text env var. |
+| **KMS** | Customer-managed keys (with automatic rotation) for CloudWatch Logs, Secrets Manager, and ECR image encryption. |
 | **CloudWatch Logs** | Log groups `/ecs/<project>/backend` and `/ecs/<project>/frontend` with configurable retention (`cloudwatch_log_retention_in_days`, default 365). RDS exports `postgresql` and `upgrade` logs to CloudWatch. |
+
+> **Upgrade note — ECR KMS encryption.** Switching the ECR repositories to customer-managed KMS encryption changes their encryption configuration, which **forces replacement of the repositories** on the next `terraform apply`. New deployments are unaffected. For existing environments, the stored images are removed when the repositories are replaced (`force_delete = true` is set), so re-push the backend and frontend images after applying — the deploy script's ECR bootstrap and image-push steps handle this automatically.
 
 ---
 
