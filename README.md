@@ -187,7 +187,7 @@ Optional flags:
 
 Required repository configuration:
 
-- Secret: `AWS_DEPLOY_ROLE_ARN` (IAM role trusted by GitHub OIDC)
+- Secret: `AWS_DEPLOY_ROLE_ARN` (IAM role trusted by GitHub OIDC). The role needs `kms:Decrypt` on the `alias/<project>-secrets` key so re-deploys can read the existing `JWT_SECRET`. See [`terraform/install.md`](terraform/install.md#prerequisites) for the full permission list.
 - Optional variables: `AWS_REGION`, `PROJECT_NAME`, `ENVIRONMENT` (defaults: `ap-southeast-2`, `open-prompt-manager`, `prod`)
 
 ### Domain Registration Script (Route 53 Domains)

@@ -91,8 +91,9 @@ Before you begin, ensure you have the following installed and configured:
 | [Docker](https://docs.docker.com/get-docker/) | 24.x | See official docs |
 
 You also need:
-- An **AWS account** with permissions to create VPCs, ECS, ECR, IAM, ALB, and CloudWatch resources.
+- An **AWS account** with permissions to create VPCs, ECS, ECR, IAM, KMS, Secrets Manager, ALB, and CloudWatch resources.
 - AWS credentials configured locally (`aws configure` or environment variables).
+- **`kms:Decrypt` on the secrets CMK for the deploy principal.** The deploy script reads the existing `JWT_SECRET` from Secrets Manager on every run. Because that secret is encrypted with the customer-managed `alias/<project>-secrets` key, the principal running `deploy.sh` (or the GitHub OIDC `AWS_DEPLOY_ROLE_ARN`) must be able to decrypt with that key. Admin/broad credentials already satisfy this; tightly-scoped deploy roles must add `kms:Decrypt` on the key to their IAM policy. (First-time deploys are unaffected — the secret is read before it is migrated to the CMK.)
 
 ---
 
