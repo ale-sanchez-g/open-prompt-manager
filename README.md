@@ -98,6 +98,8 @@ cd frontend && npm ci --legacy-peer-deps && npm start
 
 Use the deployment script from the repository root for AWS infrastructure, images, and application rollout.
 
+> **Upgrade note (existing deployments):** the ECR repositories are encrypted with a customer-managed KMS key. Switching an existing environment to KMS encryption forces replacement of the ECR repositories, which removes their stored images (`force_delete` is set). Re-push the backend and frontend images after applying — `./deploy.sh` does this automatically. New deployments are unaffected. See [`terraform/install.md`](terraform/install.md) for details.
+
 ### Database schema upgrades
 
 `Base.metadata.create_all()` only creates missing tables — it never alters existing ones — so additive columns introduced by new backend code (for example `agents.updated_at` or `users.role`) must be applied to existing databases by a migration.
