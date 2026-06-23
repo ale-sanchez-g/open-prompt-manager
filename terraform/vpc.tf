@@ -44,6 +44,7 @@ resource "aws_default_security_group" "default" {
 resource "aws_cloudwatch_log_group" "flow_log" {
   name              = "/aws/vpc-flow-log/${var.project_name}"
   retention_in_days = var.cloudwatch_log_retention_in_days
+  kms_key_id        = aws_kms_key.logs.arn
 
   tags = {
     Name        = "${var.project_name}-flow-log"

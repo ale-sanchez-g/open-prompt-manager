@@ -4,6 +4,7 @@
 resource "aws_cloudwatch_log_group" "backend" {
   name              = "/ecs/${var.project_name}/backend"
   retention_in_days = var.cloudwatch_log_retention_in_days
+  kms_key_id        = aws_kms_key.logs.arn
 
   tags = {
     Name        = "${var.project_name}-backend-logs"
@@ -15,6 +16,7 @@ resource "aws_cloudwatch_log_group" "backend" {
 resource "aws_cloudwatch_log_group" "frontend" {
   name              = "/ecs/${var.project_name}/frontend"
   retention_in_days = var.cloudwatch_log_retention_in_days
+  kms_key_id        = aws_kms_key.logs.arn
 
   tags = {
     Name        = "${var.project_name}-frontend-logs"
