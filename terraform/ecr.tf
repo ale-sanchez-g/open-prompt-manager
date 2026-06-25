@@ -6,6 +6,11 @@ resource "aws_ecr_repository" "backend" {
   image_tag_mutability = "MUTABLE"
   force_delete         = true
 
+  encryption_configuration {
+    encryption_type = "KMS"
+    kms_key         = aws_kms_key.ecr.arn
+  }
+
   image_scanning_configuration {
     scan_on_push = true
   }
@@ -45,6 +50,11 @@ resource "aws_ecr_repository" "frontend" {
   name                 = "${var.project_name}-frontend"
   image_tag_mutability = "MUTABLE"
   force_delete         = true
+
+  encryption_configuration {
+    encryption_type = "KMS"
+    kms_key         = aws_kms_key.ecr.arn
+  }
 
   image_scanning_configuration {
     scan_on_push = true

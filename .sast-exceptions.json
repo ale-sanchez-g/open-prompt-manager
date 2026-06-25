@@ -28,18 +28,6 @@
       "justification": "Public subnets assign public IPs by design for ALB and NAT gateway placement. Risk accepted: no EC2 instances are launched in public subnets; only managed AWS resources (ALB, NAT GW) use them."
     },
     {
-      "id": "CKV_AWS_136",
-      "owner": "github-agents",
-      "expires": "2026-06-30",
-      "justification": "ECR repositories use default AES-256 encryption. Planned: add KMS CMK encryption for ECR to enable key rotation and audit via CloudTrail."
-    },
-    {
-      "id": "CKV_AWS_149",
-      "owner": "github-agents",
-      "expires": "2026-06-30",
-      "justification": "Secrets Manager secret uses default AWS-managed encryption. Planned: add KMS CMK for Secrets Manager to enable key rotation and audit."
-    },
-    {
       "id": "CKV_AWS_150",
       "owner": "github-agents",
       "expires": "2026-06-30",
