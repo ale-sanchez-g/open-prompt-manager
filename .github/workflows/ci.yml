@@ -53,7 +53,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Python 3.14
         if: matrix.setup == 'python'
@@ -91,7 +91,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Python 3.14
         uses: actions/setup-python@v6
@@ -234,7 +234,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v4
@@ -269,7 +269,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Node 24
         uses: actions/setup-node@v6
@@ -302,7 +302,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Python 3.14
         uses: actions/setup-python@v6
@@ -349,7 +349,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Python 3.14
         uses: actions/setup-python@v6
@@ -490,7 +490,7 @@ jobs:
             report_path: backend/pip-audit-report.json
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Python 3.14
         uses: actions/setup-python@v6
@@ -573,7 +573,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Node 24
         uses: actions/setup-node@v6
@@ -610,7 +610,7 @@ jobs:
 
     steps:
       - name: Checkout code (for complexity scan)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Download backend coverage artifact
         uses: actions/download-artifact@v8
@@ -858,7 +858,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Node 24
         uses: actions/setup-node@v6
@@ -895,7 +895,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -933,7 +933,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Generate JWT secret for CI runtime
         run: |
@@ -999,7 +999,7 @@ jobs:
         run: echo "version=$(node -e "console.log(require('./e2e-test/node_modules/@playwright/test/package.json').version)")" >> $GITHUB_OUTPUT
 
       - name: Restore Playwright browsers cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
@@ -1022,7 +1022,7 @@ jobs:
           github.event_name == 'push' &&
           github.ref == 'refs/heads/main' &&
           steps.playwright-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
@@ -1186,7 +1186,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Generate JWT secret for CI runtime
         run: |
@@ -1215,7 +1215,7 @@ jobs:
         run: echo "version=$(node -e "console.log(require('./e2e-test/node_modules/@playwright/test/package.json').version)")" >> $GITHUB_OUTPUT
 
       - name: Restore Playwright browsers cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         id: pw-cache-perf
         with:
           path: ~/.cache/ms-playwright
