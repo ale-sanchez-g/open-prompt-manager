@@ -60,6 +60,46 @@ function renderDetail(id = '4') {
   );
 }
 
+// ── Delete flow (inline confirmation, no window.confirm) ─────────────────────
+
+describe('PromptDetail — delete', () => {
+  it('shows inline Confirm/Cancel and does not delete on first Delete click', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm');
+    renderDetail('4');
+    await screen.findByRole('heading', { name: 'Sales Pitch Generator' });
+
+    fireEvent.click(screen.getByTestId('delete-prompt'));
+
+    expect(screen.getByTestId('delete-prompt-confirm')).toBeInTheDocument();
+    expect(screen.getByText('Delete this prompt?')).toBeInTheDocument();
+    expect(promptsApi.delete).not.toHaveBeenCalled();
+    // The native browser dialog must never be used.
+    expect(confirmSpy).not.toHaveBeenCalled();
+  });
+
+  it('deletes the prompt and navigates to the list when confirmed', async () => {
+    renderDetail('4');
+    await screen.findByRole('heading', { name: 'Sales Pitch Generator' });
+
+    fireEvent.click(screen.getByTestId('delete-prompt'));
+    fireEvent.click(screen.getByTestId('delete-prompt-confirm'));
+
+    await waitFor(() => expect(promptsApi.delete).toHaveBeenCalledWith('4'));
+    expect(await screen.findByText('Prompts List')).toBeInTheDocument();
+  });
+
+  it('does not delete when the confirmation is cancelled', async () => {
+    renderDetail('4');
+    await screen.findByRole('heading', { name: 'Sales Pitch Generator' });
+
+    fireEvent.click(screen.getByTestId('delete-prompt'));
+    fireEvent.click(screen.getByTestId('delete-prompt-cancel'));
+
+    expect(promptsApi.delete).not.toHaveBeenCalled();
+    expect(screen.getByTestId('delete-prompt')).toBeInTheDocument();
+  });
+});
+
 // ── computeLineDiff logic (via UI) ───────────────────────────────────────────
 
 describe('PromptDetail — version diff', () => {

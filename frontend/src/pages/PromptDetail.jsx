@@ -4,6 +4,7 @@ import {
   ArrowLeft, Edit, Trash2, Copy, Play, Star, Activity, Clock, GitBranch, ArrowLeftRight, X, Puzzle
 } from 'lucide-react';
 import { promptsApi } from '../services/api';
+import ConfirmButton from '../components/ConfirmButton';
 
 // Compute a line-level unified diff between two text strings.
 // Returns an array of { type: 'unchanged'|'removed'|'added', text: string }.
@@ -129,7 +130,6 @@ export default function PromptDetail() {
   }, [prompt?.id, prompt?.content]);
 
   const handleDelete = async () => {
-    if (!window.confirm('Delete this prompt?')) return;
     await promptsApi.delete(id);
     navigate('/prompts');
   };
@@ -193,9 +193,18 @@ export default function PromptDetail() {
           <Link to={`/prompts/${id}/edit`} className="flex items-center gap-1 text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition-colors">
             <Edit size={14} /> Edit
           </Link>
-          <button onClick={handleDelete} className="flex items-center gap-1 text-sm bg-red-700 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition-colors">
-            <Trash2 size={14} /> Delete
-          </button>
+          <ConfirmButton
+            onConfirm={handleDelete}
+            idleLabel="Delete"
+            confirmLabel="Delete"
+            cancelLabel="Cancel"
+            busyLabel="Deleting…"
+            promptLabel="Delete this prompt?"
+            icon={<Trash2 size={14} />}
+            variant="danger"
+            title="Delete prompt"
+            testId="delete-prompt"
+          />
         </div>
       </div>
 
