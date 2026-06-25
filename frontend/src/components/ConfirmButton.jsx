@@ -111,11 +111,14 @@ export default function ConfirmButton({
     : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-400 text-white';
 
   return (
-    <div
+    // A native <fieldset> groups the prompt and its actions — its implicit ARIA
+    // role is "group", so we get the grouping semantics without adding an
+    // explicit role="group" to a <div>. Default fieldset chrome (border, margin,
+    // min-inline-size) is reset so the container styling below applies cleanly.
+    <fieldset
       ref={containerRef}
-      role="group"
       aria-label={promptLabel}
-      className={`inline-flex items-center gap-3 rounded-lg py-1.5 pl-3 pr-2 ${containerClasses}`}
+      className={`m-0 inline-flex min-w-0 items-center gap-3 rounded-lg py-1.5 pl-3 pr-2 ${containerClasses}`}
     >
       <span
         className={`flex items-center gap-1.5 text-sm font-medium ${promptClasses}`}
@@ -148,7 +151,7 @@ export default function ConfirmButton({
           {busy ? busyLabel : confirmLabel}
         </button>
       </div>
-    </div>
+    </fieldset>
   );
 }
 
