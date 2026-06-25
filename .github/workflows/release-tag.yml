@@ -44,7 +44,7 @@ jobs:
           echo "new_version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.merge_commit_sha }}
           fetch-depth: 0
