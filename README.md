@@ -46,6 +46,7 @@ The application version displayed in the sidebar and landing page header is fetc
 - **JWT Authentication** — Email/password login, refresh-token cookies, route guards, and automatic access-token refresh
 - **Role-Based Access Control** — `admin` and `user` roles carried in the access token. The first registered account becomes an admin (additional admins can be bootstrapped via `ADMIN_EMAILS`); admins get a dedicated user-management panel to add, update, and remove users and roles
 - **Rate Limiting** — Sliding-window IP-based throttling to protect against brute-force and DDoS (60 auth / 200 API requests per minute per IP by default, configurable via environment variables)
+- **Safe Deletes** — Destructive actions use an accessible inline confirmation (Confirm/Cancel in place) instead of disruptive browser pop-ups; `Esc` or clicking away cancels
 
 ## Tech Stack
 

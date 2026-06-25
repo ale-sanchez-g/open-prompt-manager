@@ -138,6 +138,7 @@ open-prompt-manager/
 ├── frontend/
 │   ├── src/
 │   │   ├── pages/         # React page components
+│   │   ├── components/    # Reusable UI primitives (e.g. ConfirmButton)
 │   │   ├── services/      # Axios API client
 │   │   └── __tests__/     # Vitest + React Testing Library test suite
 │   └── package.json
@@ -179,6 +180,8 @@ open-prompt-manager/
 - **CSS**: Use Tailwind CSS utility classes. Avoid custom CSS unless absolutely necessary.
 - **API calls**: Go through `src/services/api.js`. Do not call `fetch`/`axios` directly from components.
 - **Routing**: Add new pages to `src/App.jsx` and document the route in the README.
+- **Shared components**: Reusable UI primitives live in `src/components/`. Prefer composing these over duplicating markup across pages.
+- **No native dialogs**: Do **not** use `window.confirm`, `window.alert`, or `window.prompt`. They are unstyled, inaccessible, and unreliable in some browsers/automation contexts. For destructive actions use the inline `ConfirmButton` component (`src/components/ConfirmButton.jsx`), which confirms in place — no popup, no modal overlay.
 
 ### Git
 
