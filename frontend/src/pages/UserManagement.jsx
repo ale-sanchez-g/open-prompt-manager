@@ -3,6 +3,7 @@ import { Plus, ShieldCheck, Trash2, User as UserIcon } from 'lucide-react';
 
 import { adminApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import ConfirmButton from '../components/ConfirmButton';
 
 const ROLES = ['user', 'admin'];
 
@@ -52,7 +53,6 @@ export default function UserManagement() {
   };
 
   const handleDelete = async (id) => {
-    if (!globalThis.confirm('Delete this user? This cannot be undone.')) return;
     try {
       await adminApi.deleteUser(id);
       fetchUsers();
@@ -158,15 +158,19 @@ export default function UserManagement() {
                         <option key={r} value={r}>{r}</option>
                       ))}
                     </select>
-                    <button
-                      type="button"
-                      aria-label={`Delete ${u.email}`}
+                    <ConfirmButton
+                      onConfirm={() => handleDelete(u.id)}
+                      ariaLabel={`Delete ${u.email}`}
+                      promptLabel="Delete this user? This cannot be undone."
+                      confirmLabel="Delete"
+                      busyLabel="Deleting…"
+                      icon={<Trash2 size={16} />}
+                      variant="danger"
                       disabled={isSelf}
-                      onClick={() => handleDelete(u.id)}
                       className="text-gray-500 hover:text-red-400 disabled:opacity-30 disabled:hover:text-gray-500 transition-colors"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                      title="Delete user"
+                      testId={`delete-user-${u.id}`}
+                    />
                   </div>
                 </div>
               );
