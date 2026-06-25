@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
+import { AlertTriangle } from 'lucide-react';
 
 /**
  * ConfirmButton — an inline, in-place confirmation control.
@@ -95,41 +96,58 @@ export default function ConfirmButton({
     );
   }
 
-  const confirmClasses =
-    variant === 'danger'
-      ? 'bg-red-600 hover:bg-red-500 text-white'
-      : 'bg-blue-600 hover:bg-blue-700 text-white';
+  const isDanger = variant === 'danger';
+
+  // The confirming state is a visually distinct inline group (not a popup or
+  // modal). Both options are unambiguous, fully-labelled buttons — never an
+  // icon-only or toggle-like control — so the destructive choice never relies
+  // on colour alone (≈4.5% of users are colour-blind).
+  const containerClasses = isDanger
+    ? 'border border-red-500/50 bg-red-950/40'
+    : 'border border-gray-600 bg-gray-800';
+  const promptClasses = isDanger ? 'text-red-100' : 'text-gray-200';
+  const confirmClasses = isDanger
+    ? 'bg-red-600 hover:bg-red-500 focus:ring-red-400 text-white'
+    : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-400 text-white';
 
   return (
     <div
       ref={containerRef}
       role="group"
       aria-label={promptLabel}
-      className="flex items-center gap-2"
+      className={`inline-flex items-center gap-3 rounded-lg py-1.5 pl-3 pr-2 ${containerClasses}`}
     >
-      <span className="text-sm text-gray-300" aria-live="polite">
+      <span
+        className={`flex items-center gap-1.5 text-sm font-medium ${promptClasses}`}
+        aria-live="polite"
+      >
+        {isDanger && <AlertTriangle size={15} className="text-red-400 shrink-0" aria-hidden="true" />}
         {promptLabel}
       </span>
-      <button
-        type="button"
-        onClick={() => setConfirming(false)}
-        disabled={busy}
-        className="flex items-center gap-1 text-sm bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white px-3 py-2 rounded-lg transition-colors"
-        data-testid={testId ? `${testId}-cancel` : undefined}
-      >
-        {cancelLabel}
-      </button>
-      <button
-        type="button"
-        ref={confirmRef}
-        onClick={handleConfirm}
-        disabled={busy}
-        className={`flex items-center gap-1 text-sm disabled:opacity-50 px-3 py-2 rounded-lg transition-colors ${confirmClasses}`}
-        data-testid={testId ? `${testId}-confirm` : undefined}
-      >
-        {icon}
-        {busy ? busyLabel : confirmLabel}
-      </button>
+      <div className="flex items-center gap-2">
+        {/* Safe exit first, clearly styled as a button (not a toggle). */}
+        <button
+          type="button"
+          onClick={() => setConfirming(false)}
+          disabled={busy}
+          className="text-sm font-medium border border-gray-500 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400"
+          data-testid={testId ? `${testId}-cancel` : undefined}
+        >
+          {cancelLabel}
+        </button>
+        {/* Destructive action names what it does — never a bare "Confirm". */}
+        <button
+          type="button"
+          ref={confirmRef}
+          onClick={handleConfirm}
+          disabled={busy}
+          className={`flex items-center gap-1.5 text-sm font-medium disabled:opacity-50 px-3 py-1.5 rounded-md transition-colors focus:outline-none focus:ring-2 ${confirmClasses}`}
+          data-testid={testId ? `${testId}-confirm` : undefined}
+        >
+          {icon}
+          {busy ? busyLabel : confirmLabel}
+        </button>
+      </div>
     </div>
   );
 }

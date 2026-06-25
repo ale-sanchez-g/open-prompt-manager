@@ -102,4 +102,16 @@ describe('ConfirmButton', () => {
     fireEvent.click(screen.getByTestId('confirm'));
     expect(screen.getByRole('group', { name: 'Delete this item?' })).toBeInTheDocument();
   });
+
+  it('renders both options as text-labelled buttons (never icon-only / toggle-like)', () => {
+    renderButton({ confirmLabel: 'Delete', cancelLabel: 'Cancel' });
+    fireEvent.click(screen.getByTestId('confirm'));
+
+    // Best practice: the action lives in the button text, so the choice does
+    // not rely on colour alone and never looks like a toggle switch.
+    expect(screen.getByTestId('confirm-confirm')).toHaveTextContent('Delete');
+    expect(screen.getByTestId('confirm-cancel')).toHaveTextContent('Cancel');
+    expect(screen.getByRole('button', { name: /delete/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
+  });
 });

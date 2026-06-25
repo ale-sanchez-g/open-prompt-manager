@@ -196,7 +196,8 @@ export default function PromptDetail() {
           <ConfirmButton
             onConfirm={handleDelete}
             idleLabel="Delete"
-            confirmLabel="Confirm"
+            confirmLabel="Delete"
+            cancelLabel="Cancel"
             busyLabel="Deleting…"
             promptLabel="Delete this prompt?"
             icon={<Trash2 size={14} />}
