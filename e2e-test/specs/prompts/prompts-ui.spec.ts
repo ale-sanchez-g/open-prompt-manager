@@ -139,6 +139,28 @@ test.describe('Prompt UI — inline delete confirmation', () => {
     const getResp = await request.get(`/api/prompts/${promptId}`, { headers: authHeaders(accessToken) });
     expect(getResp.status()).toBe(404);
   });
+
+  // Issue #306: the inline delete confirmation overflowed the cramped list
+  // tile on smaller screens. Delete was removed from the list — the tile only
+  // links to the detail page (where the confirmation has room to render).
+  test('Prompt list tiles expose no delete control', async ({ page, request }) => {
+    const name = uid('list-no-delete');
+    const promptId = await createPrompt(request, accessToken, name);
+
+    await page.goto('/prompts');
+    const tile = page.getByRole('heading', { name });
+    await expect(tile).toBeVisible();
+
+    // No delete trigger or inline confirmation exists on the list tile.
+    await expect(page.getByTestId(`delete-prompt-${promptId}`)).toHaveCount(0);
+    await expect(page.getByText('Delete this prompt?')).toHaveCount(0);
+
+    // Delete remains available on the detail page.
+    await page.goto(`/prompts/${promptId}`);
+    await expect(page.getByTestId('delete-prompt')).toBeVisible();
+
+    await request.delete(`/api/prompts/${promptId}`, { headers: authHeaders(accessToken) });
+  });
 });
 
 test.describe('Tags UI — inline delete confirmation (icon-only trigger)', () => {
