@@ -2,7 +2,8 @@ name: Security Checks
 
 on:
   push:
-    branches: ["**"]
+    branches:
+      - 'release/*'
   pull_request:
     branches: ["**"]
 
