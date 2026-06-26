@@ -98,7 +98,7 @@ export default function PromptList() {
             <div
               key={p.id}
               onClick={() => navigate(`/prompts/${p.id}`)}
-              className="bg-gray-800 rounded-xl p-5 cursor-pointer hover:bg-gray-750 hover:ring-1 hover:ring-blue-500 transition-all"
+              className="bg-gray-800 rounded-xl p-5 cursor-pointer hover:bg-gray-750 hover:ring-1 hover:ring-blue-500 transition-all flex flex-col h-full"
             >
               <div className="flex items-start justify-between mb-2">
                 <h3 className="font-semibold text-white truncate pr-2">{p.name}</h3>
@@ -121,7 +121,7 @@ export default function PromptList() {
                 </div>
               )}
 
-              <div className="flex items-center justify-between text-xs text-gray-500">
+              <div className="flex items-center justify-between text-xs text-gray-500 mt-auto">
                 <div className="flex items-center gap-3">
                   <span className="flex items-center gap-1">
                     <Star size={12} className="text-yellow-400" />
