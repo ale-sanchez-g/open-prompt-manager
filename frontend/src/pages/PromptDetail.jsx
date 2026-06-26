@@ -83,7 +83,7 @@ export default function PromptDetail() {
   };
 
   useEffect(() => {
-    promptsApi.get(id).then((r) => {
+    void promptsApi.get(id).then((r) => {
       setPrompt(r.data);
       // Init variable inputs with defaults
       const defaults = {};
@@ -93,7 +93,7 @@ export default function PromptDetail() {
       setVariables(defaults);
     }).catch(console.error);
 
-    promptsApi.getVersions(id).then((r) => setVersions(r.data)).catch(console.error);
+    void promptsApi.getVersions(id).then((r) => setVersions(r.data)).catch(console.error);
   }, [id]);
 
   useEffect(() => {
@@ -107,7 +107,7 @@ export default function PromptDetail() {
       ),
     ];
     if (ids.length === 0) return;
-    Promise.all(ids.map((cid) => promptsApi.get(cid)))
+    void Promise.all(ids.map((cid) => promptsApi.get(cid)))
       .then((results) => {
         const comps = results.map((r) => r.data);
         setComponentPrompts(comps);
