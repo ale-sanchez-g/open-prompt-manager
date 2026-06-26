@@ -13,8 +13,6 @@ const mockUsers = [
   { id: 'usr_member', email: 'member@opm.io', role: 'user', created_at: '2026-02-01T00:00:00' },
 ];
 
-let confirmSpy;
-
 beforeEach(() => {
   authContext.useAuth.mockReturnValue({ user: { id: 'usr_admin', email: 'admin@opm.io', role: 'admin' } });
   adminApi.listUsers.mockResolvedValue({ data: mockUsers });
@@ -25,10 +23,6 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.clearAllMocks();
-  if (confirmSpy) {
-    confirmSpy.mockRestore();
-    confirmSpy = undefined;
-  }
 });
 
 function renderPage() {
@@ -81,12 +75,12 @@ describe('UserManagement', () => {
     });
   });
 
-  it('deletes a user after confirmation', async () => {
-    confirmSpy = jest.spyOn(globalThis, 'confirm').mockReturnValue(true);
+  it('deletes a user after inline confirmation', async () => {
     renderPage();
     await screen.findByText('member@opm.io');
 
     fireEvent.click(screen.getByLabelText('Delete member@opm.io'));
+    fireEvent.click(screen.getByTestId('delete-user-usr_member-confirm'));
 
     await waitFor(() => {
       expect(adminApi.deleteUser).toHaveBeenCalledWith('usr_member');

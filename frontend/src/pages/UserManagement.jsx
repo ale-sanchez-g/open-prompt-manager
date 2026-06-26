@@ -3,6 +3,7 @@ import { Plus, ShieldCheck, Trash2, User as UserIcon } from 'lucide-react';
 
 import { adminApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import ConfirmButton from '../components/ConfirmButton';
 
 const ROLES = ['user', 'admin'];
 
@@ -24,7 +25,7 @@ export default function UserManagement() {
       .catch((err) => setListError(err.response?.data?.error || 'Failed to load users'));
 
   useEffect(() => {
-    fetchUsers();
+    fetchUsers().catch(console.error);
   }, []);
 
   const handleCreate = async (e) => {
@@ -34,7 +35,7 @@ export default function UserManagement() {
     try {
       await adminApi.createUser(form);
       setForm({ email: '', password: '', role: 'user' });
-      fetchUsers();
+      await fetchUsers();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create user');
     } finally {
@@ -45,17 +46,16 @@ export default function UserManagement() {
   const handleRoleChange = async (id, role) => {
     try {
       await adminApi.updateUser(id, { role });
-      fetchUsers();
+      await fetchUsers();
     } catch (err) {
       setListError(err.response?.data?.error || 'Failed to update role');
     }
   };
 
   const handleDelete = async (id) => {
-    if (!globalThis.confirm('Delete this user? This cannot be undone.')) return;
     try {
       await adminApi.deleteUser(id);
-      fetchUsers();
+      await fetchUsers();
     } catch (err) {
       setListError(err.response?.data?.error || 'Failed to delete user');
     }
@@ -74,7 +74,7 @@ export default function UserManagement() {
         {error && (
           <div className="mb-3 text-red-400 text-sm bg-red-900/30 px-3 py-2 rounded-lg">{error}</div>
         )}
-        <form onSubmit={handleCreate} className="flex flex-wrap gap-3 items-end">
+        <form onSubmit={(e) => { void handleCreate(e); }} className="flex flex-wrap gap-3 items-end">
           <div>
             <label htmlFor="new-user-email" className="block text-xs text-gray-400 mb-1">Email</label>
             <input
@@ -152,21 +152,25 @@ export default function UserManagement() {
                       className="bg-gray-800 text-white px-2 py-1 rounded-lg text-sm border border-gray-600 focus:outline-none focus:border-blue-500 disabled:opacity-50"
                       value={u.role}
                       disabled={isSelf}
-                      onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                      onChange={(e) => { void handleRoleChange(u.id, e.target.value); }}
                     >
                       {ROLES.map((r) => (
                         <option key={r} value={r}>{r}</option>
                       ))}
                     </select>
-                    <button
-                      type="button"
-                      aria-label={`Delete ${u.email}`}
+                    <ConfirmButton
+                      onConfirm={() => handleDelete(u.id)}
+                      ariaLabel={`Delete ${u.email}`}
+                      promptLabel="Delete this user? This cannot be undone."
+                      confirmLabel="Delete"
+                      busyLabel="Deleting…"
+                      icon={<Trash2 size={16} />}
+                      variant="danger"
                       disabled={isSelf}
-                      onClick={() => handleDelete(u.id)}
                       className="text-gray-500 hover:text-red-400 disabled:opacity-30 disabled:hover:text-gray-500 transition-colors"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                      title="Delete user"
+                      testId={`delete-user-${u.id}`}
+                    />
                   </div>
                 </div>
               );

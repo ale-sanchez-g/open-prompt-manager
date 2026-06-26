@@ -138,7 +138,7 @@ open-prompt-manager/
 ├── frontend/
 │   ├── src/
 │   │   ├── pages/         # React page components
-│   │   ├── components/    # Reusable UI primitives (e.g. ConfirmButton)
+│   │   ├── components/    # Reusable UI primitives (Button, Badge, Modal, ConfirmButton)
 │   │   ├── services/      # Axios API client
 │   │   └── __tests__/     # Vitest + React Testing Library test suite
 │   └── package.json
@@ -180,8 +180,20 @@ open-prompt-manager/
 - **CSS**: Use Tailwind CSS utility classes. Avoid custom CSS unless absolutely necessary.
 - **API calls**: Go through `src/services/api.js`. Do not call `fetch`/`axios` directly from components.
 - **Routing**: Add new pages to `src/App.jsx` and document the route in the README.
-- **Shared components**: Reusable UI primitives live in `src/components/`. Prefer composing these over duplicating markup across pages.
-- **No native dialogs**: Do **not** use `window.confirm`, `window.alert`, or `window.prompt`. They are unstyled, inaccessible, and unreliable in some browsers/automation contexts. For destructive actions use the inline `ConfirmButton` component (`src/components/ConfirmButton.jsx`), which confirms in place — no popup, no modal overlay.
+- **Shared components**: Reusable UI primitives live in `src/components/`. Prefer composing these over duplicating markup across pages (see the component library below).
+- **No native dialogs**: Do **not** use `window.confirm`, `window.alert`, or `window.prompt`. They are unstyled, inaccessible, and unreliable in some browsers/automation contexts. For destructive actions use the inline `ConfirmButton`, which confirms in place — no popup, no modal overlay. This rule is enforced by a guard test (`src/__tests__/no-native-dialogs.test.js`) that fails CI if a native dialog call is reintroduced.
+- **Default props**: This project targets React 19, which ignores the legacy `Component.defaultProps` on function components. Use destructured default parameters instead (e.g. `function Button({ variant = 'primary' })`).
+
+#### Component library (`src/components/`)
+
+Compose these primitives instead of re-implementing markup. Each has unit tests under `src/__tests__/`.
+
+| Component | Use for |
+|-----------|---------|
+| `Button` | Standard actions. Props: `variant` (`primary`/`secondary`/`danger`/`success`/`ghost`), `size` (`sm`/`md`/`lg`), `icon`. Defaults to `type="button"`. |
+| `Badge` | Status pills, version/category chips. Use `tone` for semantic colours or `Badge.statusTone(status)`; pass `className`/`style` for custom colours (e.g. tag colours). |
+| `Modal` | Overlay dialogs with richer content (e.g. the version diff). Accessible (`role="dialog"`, `aria-modal`), closes on the × button or `Escape`. Not for simple confirmations. |
+| `ConfirmButton` | Inline confirmation for destructive actions — replaces `window.confirm`. Supports a labelled or icon-only trigger (`ariaLabel`), `disabled`, async `onConfirm`, and stops click propagation so it works inside clickable rows. |
 
 ### Git
 

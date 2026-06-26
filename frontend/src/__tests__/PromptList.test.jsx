@@ -73,16 +73,33 @@ describe('PromptList', () => {
     });
   });
 
-  it('confirms before deleting a prompt', async () => {
-    jest.spyOn(window, 'confirm').mockReturnValue(false);
+  it('shows inline confirmation before deleting and does not delete yet', async () => {
     renderPage();
     await screen.findByText('Alpha Prompt');
 
-    const buttons = screen.getAllByRole('button');
-    const deleteBtn = buttons.find((b) => b.title === 'Delete');
-    if (deleteBtn) fireEvent.click(deleteBtn);
+    fireEvent.click(screen.getByTestId('delete-prompt-1'));
 
-    expect(window.confirm).toHaveBeenCalled();
+    expect(screen.getByTestId('delete-prompt-1-confirm')).toBeInTheDocument();
     expect(promptsApi.delete).not.toHaveBeenCalled();
+  });
+
+  it('deletes the prompt when the inline confirmation is confirmed', async () => {
+    renderPage();
+    await screen.findByText('Alpha Prompt');
+
+    fireEvent.click(screen.getByTestId('delete-prompt-1'));
+    fireEvent.click(screen.getByTestId('delete-prompt-1-confirm'));
+
+    await waitFor(() => expect(promptsApi.delete).toHaveBeenCalledWith(1));
+  });
+
+  it('does not navigate to the prompt when opening its delete confirmation', async () => {
+    renderPage();
+    await screen.findByText('Alpha Prompt');
+
+    // Clicking delete inside the clickable card must not bubble to the card's
+    // navigate handler (no crash / no navigation side effects).
+    fireEvent.click(screen.getByTestId('delete-prompt-1'));
+    expect(screen.getByTestId('delete-prompt-1-cancel')).toBeInTheDocument();
   });
 });

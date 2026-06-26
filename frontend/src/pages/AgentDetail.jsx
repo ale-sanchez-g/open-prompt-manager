@@ -4,14 +4,10 @@ import {
   ArrowLeft, Edit, Trash2, Activity, Clock, Check, X, FileText, RefreshCw,
 } from 'lucide-react';
 import { agentsApi } from '../services/api';
+import ConfirmButton from '../components/ConfirmButton';
+import Badge from '../components/Badge';
 
 const STATUS_OPTIONS = ['active', 'inactive', 'deprecated'];
-
-const statusStyle = {
-  active: 'bg-green-900 text-green-300',
-  inactive: 'bg-gray-700 text-gray-400',
-  deprecated: 'bg-red-900 text-red-300',
-};
 
 function MetricBadge({ label, value }) {
   return (
@@ -54,11 +50,10 @@ export default function AgentDetail() {
   }, [id]);
 
   useEffect(() => {
-    loadAgent();
+    loadAgent().catch(console.error);
   }, [loadAgent]);
 
   const handleDelete = async () => {
-    if (!window.confirm('Delete this agent?')) return;
     setError('');
     try {
       await agentsApi.delete(id);
@@ -97,7 +92,7 @@ export default function AgentDetail() {
               <div className="flex flex-wrap gap-3">
                 <button
                   type="button"
-                  onClick={loadAgent}
+                  onClick={() => { loadAgent().catch(console.error); }}
                   className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                 >
                   <RefreshCw size={14} /> Try again
@@ -138,9 +133,7 @@ export default function AgentDetail() {
           </button>
           <div className="flex items-center gap-3 flex-wrap">
             <h2 className="text-2xl font-bold text-white">{agent.name}</h2>
-            <span className={`text-xs px-2 py-0.5 rounded-full ${statusStyle[agent.status] || statusStyle.inactive}`}>
-              {agent.status}
-            </span>
+            <Badge tone={Badge.statusTone(agent.status)}>{agent.status}</Badge>
             {agent.type && (
               <span className="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded">
                 {agent.type}
@@ -155,12 +148,18 @@ export default function AgentDetail() {
           >
             <Edit size={14} /> Edit
           </button>
-          <button
-            onClick={handleDelete}
-            className="flex items-center gap-1 text-sm bg-red-700 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition-colors"
-          >
-            <Trash2 size={14} /> Delete
-          </button>
+          <ConfirmButton
+            onConfirm={handleDelete}
+            idleLabel="Delete"
+            confirmLabel="Delete"
+            cancelLabel="Cancel"
+            busyLabel="Deleting…"
+            promptLabel="Delete this agent?"
+            icon={<Trash2 size={14} />}
+            variant="danger"
+            title="Delete agent"
+            testId="delete-agent"
+          />
         </div>
       </div>
 
@@ -172,7 +171,7 @@ export default function AgentDetail() {
       {editing && (
         <div className="bg-gray-800 rounded-xl p-5 border border-blue-600">
           <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">Edit Agent</h3>
-          <form onSubmit={handleSave} className="grid grid-cols-2 gap-3">
+          <form onSubmit={(e) => { void handleSave(e); }} className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-400 mb-1">Name *</label>
               <input

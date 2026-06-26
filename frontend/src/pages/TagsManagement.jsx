@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { tagsApi } from '../services/api';
+import ConfirmButton from '../components/ConfirmButton';
+import Button from '../components/Button';
 
 const PRESET_COLORS = [
   '#3B82F6', '#8B5CF6', '#10B981', '#F59E0B',
@@ -15,7 +17,7 @@ export default function TagsManagement() {
 
   const fetchTags = () => tagsApi.list().then((r) => setTags(r.data)).catch(console.error);
 
-  useEffect(() => { fetchTags(); }, []);
+  useEffect(() => { fetchTags().catch(console.error); }, []);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -24,7 +26,7 @@ export default function TagsManagement() {
     try {
       await tagsApi.create(form);
       setForm({ name: '', color: '#3B82F6' });
-      fetchTags();
+      await fetchTags();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to create tag');
     } finally {
@@ -33,9 +35,8 @@ export default function TagsManagement() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this tag?')) return;
     await tagsApi.delete(id);
-    fetchTags();
+    await fetchTags();
   };
 
   return (
@@ -48,7 +49,7 @@ export default function TagsManagement() {
         {error && (
           <div className="mb-3 text-red-400 text-sm bg-red-900/30 px-3 py-2 rounded-lg">{error}</div>
         )}
-        <form onSubmit={handleCreate} className="flex flex-wrap gap-3 items-end">
+        <form onSubmit={(e) => { void handleCreate(e); }} className="flex flex-wrap gap-3 items-end">
           <div>
             <label className="block text-xs text-gray-400 mb-1">Name</label>
             <input
@@ -82,13 +83,9 @@ export default function TagsManagement() {
               </div>
             </div>
           </div>
-          <button
-            type="submit"
-            disabled={saving}
-            className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-          >
-            <Plus size={14} /> {saving ? 'Creating...' : 'Create'}
-          </button>
+          <Button type="submit" disabled={saving} icon={<Plus size={14} />}>
+            {saving ? 'Creating...' : 'Create'}
+          </Button>
         </form>
       </div>
 
@@ -108,12 +105,18 @@ export default function TagsManagement() {
                   <span className="text-white font-medium">{t.name}</span>
                   <code className="text-xs text-gray-400">{t.color}</code>
                 </div>
-                <button
-                  onClick={() => handleDelete(t.id)}
+                <ConfirmButton
+                  onConfirm={() => handleDelete(t.id)}
+                  ariaLabel={`Delete tag ${t.name}`}
+                  promptLabel="Delete this tag?"
+                  confirmLabel="Delete"
+                  busyLabel="Deleting…"
+                  icon={<Trash2 size={16} />}
+                  variant="danger"
                   className="text-gray-500 hover:text-red-400 transition-colors"
-                >
-                  <Trash2 size={16} />
-                </button>
+                  title="Delete tag"
+                  testId={`delete-tag-${t.id}`}
+                />
               </div>
             ))}
           </div>
