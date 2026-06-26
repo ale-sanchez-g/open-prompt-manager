@@ -17,7 +17,7 @@ export default function TagsManagement() {
 
   const fetchTags = () => tagsApi.list().then((r) => setTags(r.data)).catch(console.error);
 
-  useEffect(() => { fetchTags(); }, []);
+  useEffect(() => { void fetchTags(); }, []);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -26,7 +26,7 @@ export default function TagsManagement() {
     try {
       await tagsApi.create(form);
       setForm({ name: '', color: '#3B82F6' });
-      fetchTags();
+      void fetchTags();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to create tag');
     } finally {
@@ -36,7 +36,7 @@ export default function TagsManagement() {
 
   const handleDelete = async (id) => {
     await tagsApi.delete(id);
-    fetchTags();
+    void fetchTags();
   };
 
   return (
@@ -49,7 +49,7 @@ export default function TagsManagement() {
         {error && (
           <div className="mb-3 text-red-400 text-sm bg-red-900/30 px-3 py-2 rounded-lg">{error}</div>
         )}
-        <form onSubmit={handleCreate} className="flex flex-wrap gap-3 items-end">
+        <form onSubmit={(e) => { void handleCreate(e); }} className="flex flex-wrap gap-3 items-end">
           <div>
             <label className="block text-xs text-gray-400 mb-1">Name</label>
             <input

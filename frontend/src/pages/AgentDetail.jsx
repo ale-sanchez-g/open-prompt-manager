@@ -50,7 +50,7 @@ export default function AgentDetail() {
   }, [id]);
 
   useEffect(() => {
-    loadAgent();
+    void loadAgent();
   }, [loadAgent]);
 
   const handleDelete = async () => {
@@ -92,7 +92,7 @@ export default function AgentDetail() {
               <div className="flex flex-wrap gap-3">
                 <button
                   type="button"
-                  onClick={loadAgent}
+                  onClick={() => { void loadAgent(); }}
                   className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                 >
                   <RefreshCw size={14} /> Try again
@@ -171,7 +171,7 @@ export default function AgentDetail() {
       {editing && (
         <div className="bg-gray-800 rounded-xl p-5 border border-blue-600">
           <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">Edit Agent</h3>
-          <form onSubmit={handleSave} className="grid grid-cols-2 gap-3">
+          <form onSubmit={(e) => { void handleSave(e); }} className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-400 mb-1">Name *</label>
               <input

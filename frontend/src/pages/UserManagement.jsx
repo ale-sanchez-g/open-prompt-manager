@@ -25,7 +25,7 @@ export default function UserManagement() {
       .catch((err) => setListError(err.response?.data?.error || 'Failed to load users'));
 
   useEffect(() => {
-    fetchUsers();
+    void fetchUsers();
   }, []);
 
   const handleCreate = async (e) => {
@@ -35,7 +35,7 @@ export default function UserManagement() {
     try {
       await adminApi.createUser(form);
       setForm({ email: '', password: '', role: 'user' });
-      fetchUsers();
+      void fetchUsers();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create user');
     } finally {
@@ -46,7 +46,7 @@ export default function UserManagement() {
   const handleRoleChange = async (id, role) => {
     try {
       await adminApi.updateUser(id, { role });
-      fetchUsers();
+      void fetchUsers();
     } catch (err) {
       setListError(err.response?.data?.error || 'Failed to update role');
     }
@@ -55,7 +55,7 @@ export default function UserManagement() {
   const handleDelete = async (id) => {
     try {
       await adminApi.deleteUser(id);
-      fetchUsers();
+      void fetchUsers();
     } catch (err) {
       setListError(err.response?.data?.error || 'Failed to delete user');
     }
@@ -74,7 +74,7 @@ export default function UserManagement() {
         {error && (
           <div className="mb-3 text-red-400 text-sm bg-red-900/30 px-3 py-2 rounded-lg">{error}</div>
         )}
-        <form onSubmit={handleCreate} className="flex flex-wrap gap-3 items-end">
+        <form onSubmit={(e) => { void handleCreate(e); }} className="flex flex-wrap gap-3 items-end">
           <div>
             <label htmlFor="new-user-email" className="block text-xs text-gray-400 mb-1">Email</label>
             <input
@@ -152,7 +152,7 @@ export default function UserManagement() {
                       className="bg-gray-800 text-white px-2 py-1 rounded-lg text-sm border border-gray-600 focus:outline-none focus:border-blue-500 disabled:opacity-50"
                       value={u.role}
                       disabled={isSelf}
-                      onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                      onChange={(e) => { void handleRoleChange(u.id, e.target.value); }}
                     >
                       {ROLES.map((r) => (
                         <option key={r} value={r}>{r}</option>

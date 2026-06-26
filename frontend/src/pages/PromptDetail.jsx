@@ -151,7 +151,7 @@ export default function PromptDetail() {
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(prompt.content);
+    void navigator.clipboard.writeText(prompt.content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -287,7 +287,7 @@ export default function PromptDetail() {
             ) : (
               <p className="text-gray-500 text-sm mb-4">No variables defined.</p>
             )}
-            <Button variant="success" onClick={handleRender} disabled={rendering} icon={<Play size={14} />}>
+            <Button variant="success" onClick={() => { void handleRender(); }} disabled={rendering} icon={<Play size={14} />}>
               {rendering ? 'Rendering...' : 'Render'}
             </Button>
             {renderError && (
@@ -340,7 +340,7 @@ export default function PromptDetail() {
                     </Link>
                     {v.id !== parseInt(id, 10) && (
                       <button
-                        onClick={() => handleCompare(v.id)}
+                        onClick={() => { void handleCompare(v.id); }}
                         disabled={diffLoading}
                         title={`Compare v${v.version} → v${prompt.version}`}
                         className="flex-shrink-0 text-gray-400 hover:text-blue-300 disabled:opacity-40 p-1 rounded transition-colors"

@@ -19,7 +19,7 @@ export default function AgentsManagement() {
 
   const fetchAgents = () => agentsApi.list().then((r) => setAgents(r.data)).catch(console.error);
 
-  useEffect(() => { fetchAgents(); }, []);
+  useEffect(() => { void fetchAgents(); }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,7 +33,7 @@ export default function AgentsManagement() {
         await agentsApi.create(form);
       }
       setForm(emptyForm);
-      fetchAgents();
+      void fetchAgents();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to register agent');
     } finally {
@@ -53,7 +53,7 @@ export default function AgentsManagement() {
 
   const handleDelete = async (id) => {
     await agentsApi.delete(id);
-    fetchAgents();
+    void fetchAgents();
   };
 
   return (
@@ -68,7 +68,7 @@ export default function AgentsManagement() {
         {error && (
           <div className="mb-3 text-red-400 text-sm bg-red-900/30 px-3 py-2 rounded-lg">{error}</div>
         )}
-        <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-3">
+        <form onSubmit={(e) => { void handleSubmit(e); }} className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs text-gray-400 mb-1">Name *</label>
             <input
