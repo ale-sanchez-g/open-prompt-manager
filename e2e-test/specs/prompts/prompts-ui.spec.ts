@@ -75,9 +75,9 @@ test.describe('Prompt UI — inline delete confirmation', () => {
 
     // Fail the test if any native browser dialog (window.confirm/alert) appears.
     let nativeDialogShown = false;
-    page.on('dialog', async (dialog) => {
+    page.on('dialog', (dialog) => {
       nativeDialogShown = true;
-      await dialog.dismiss();
+      void dialog.dismiss();
     });
 
     await page.goto(`/prompts/${promptId}`);
@@ -161,9 +161,9 @@ test.describe('Tags UI — inline delete confirmation (icon-only trigger)', () =
     const tagId = await createTag(request, accessToken, uid('ui-del'));
 
     let nativeDialogShown = false;
-    page.on('dialog', async (dialog) => {
+    page.on('dialog', (dialog) => {
       nativeDialogShown = true;
-      await dialog.dismiss();
+      void dialog.dismiss();
     });
 
     await page.goto('/tags');

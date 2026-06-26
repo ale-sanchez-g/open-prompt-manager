@@ -153,7 +153,7 @@ export default function ConfirmButton({
         <button
           type="button"
           ref={confirmRef}
-          onClick={handleConfirm}
+          onClick={() => { void handleConfirm(); }}
           disabled={busy}
           className={`flex items-center gap-1.5 text-sm font-medium disabled:opacity-50 px-3 py-1.5 rounded-md transition-colors focus:outline-none focus:ring-2 ${confirmClasses}`}
           data-testid={testId ? `${testId}-confirm` : undefined}
