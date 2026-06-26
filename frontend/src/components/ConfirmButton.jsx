@@ -22,20 +22,28 @@ import { AlertTriangle } from 'lucide-react';
 export default function ConfirmButton({
   onConfirm,
   idleLabel,
-  confirmLabel,
-  cancelLabel,
-  busyLabel,
+  confirmLabel = 'Confirm',
+  cancelLabel = 'Cancel',
+  busyLabel = 'Working…',
   promptLabel,
-  icon,
-  variant,
+  icon = null,
+  variant = 'default',
   className,
   title,
+  ariaLabel,
+  disabled = false,
   testId,
 }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const containerRef = useRef(null);
   const confirmRef = useRef(null);
+
+  // Stop clicks from bubbling to clickable ancestors (e.g. a list row that
+  // navigates on click) so opening/confirming/cancelling never triggers them.
+  // Applied on the interactive buttons themselves — never on the non-interactive
+  // <fieldset> wrapper, which must not carry mouse handlers (accessibility).
+  const stop = (e) => e.stopPropagation();
 
   // Move focus to the Confirm button as soon as the prompt opens.
   useEffect(() => {
@@ -68,6 +76,8 @@ export default function ConfirmButton({
       // On success the caller typically navigates/unmounts; only reset state if
       // we are still mounted (best-effort — guarded by the ref check).
       if (containerRef.current) setConfirming(false);
+    } catch {
+      // onConfirm threw; stay in confirming state so the user can retry or cancel.
     } finally {
       if (containerRef.current) setBusy(false);
     }
@@ -85,9 +95,11 @@ export default function ConfirmButton({
     return (
       <button
         type="button"
-        onClick={() => setConfirming(true)}
+        onClick={(e) => { stop(e); setConfirming(true); }}
+        disabled={disabled}
         className={idleClasses}
         title={title}
+        aria-label={ariaLabel}
         data-testid={testId}
       >
         {icon}
@@ -131,7 +143,7 @@ export default function ConfirmButton({
         {/* Safe exit first, clearly styled as a button (not a toggle). */}
         <button
           type="button"
-          onClick={() => setConfirming(false)}
+          onClick={(e) => { stop(e); setConfirming(false); }}
           disabled={busy}
           className="text-sm font-medium border border-gray-500 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400"
           data-testid={testId ? `${testId}-cancel` : undefined}
@@ -142,7 +154,7 @@ export default function ConfirmButton({
         <button
           type="button"
           ref={confirmRef}
-          onClick={handleConfirm}
+          onClick={(e) => { stop(e); void handleConfirm(); }}
           disabled={busy}
           className={`flex items-center gap-1.5 text-sm font-medium disabled:opacity-50 px-3 py-1.5 rounded-md transition-colors focus:outline-none focus:ring-2 ${confirmClasses}`}
           data-testid={testId ? `${testId}-confirm` : undefined}
@@ -158,8 +170,8 @@ export default function ConfirmButton({
 ConfirmButton.propTypes = {
   /** Called when the user confirms. May return a promise; a busy label shows while it settles. */
   onConfirm: PropTypes.func.isRequired,
-  /** Text on the initial trigger button. */
-  idleLabel: PropTypes.node.isRequired,
+  /** Text on the initial trigger button. Omit for an icon-only trigger (provide `ariaLabel`). */
+  idleLabel: PropTypes.node,
   /** Text on the confirm button once revealed. */
   confirmLabel: PropTypes.node,
   /** Text on the cancel button once revealed. */
@@ -176,17 +188,10 @@ ConfirmButton.propTypes = {
   className: PropTypes.string,
   /** Tooltip / accessible title for the idle button. */
   title: PropTypes.string,
+  /** Accessible name for the idle trigger — required when `idleLabel` is omitted (icon-only). */
+  ariaLabel: PropTypes.string,
+  /** Disables the idle trigger so confirmation cannot be started. */
+  disabled: PropTypes.bool,
   /** Base test id; "-cancel"/"-confirm" suffixes are applied to the revealed buttons. */
   testId: PropTypes.string,
-};
-
-ConfirmButton.defaultProps = {
-  confirmLabel: 'Confirm',
-  cancelLabel: 'Cancel',
-  busyLabel: 'Working…',
-  icon: null,
-  variant: 'default',
-  className: undefined,
-  title: undefined,
-  testId: undefined,
 };

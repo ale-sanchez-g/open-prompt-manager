@@ -11,8 +11,6 @@ const mockTags = [
   { id: 2, name: 'beta',       color: '#F59E0B' },
 ];
 
-let confirmSpy;
-
 beforeEach(() => {
   tagsApi.list.mockResolvedValue({ data: mockTags });
   tagsApi.create.mockResolvedValue({ data: { id: 3, name: 'new-tag', color: '#3B82F6' } });
@@ -21,10 +19,6 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.clearAllMocks();
-  if (confirmSpy) {
-    confirmSpy.mockRestore();
-    confirmSpy = undefined;
-  }
 });
 
 function renderPage() {
@@ -68,17 +62,26 @@ describe('TagsManagement', () => {
     });
   });
 
-  it('calls delete when trash button clicked and confirmed', async () => {
-    confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+  it('calls delete after inline confirmation when trash button clicked', async () => {
     renderPage();
     await screen.findByText('production');
 
-    const buttons = screen.getAllByRole('button');
-    // Last button in the list is the delete button for the last tag
-    fireEvent.click(buttons[buttons.length - 1]);
+    // Open the inline confirmation for the "beta" tag (id 2), then confirm.
+    fireEvent.click(screen.getByTestId('delete-tag-2'));
+    fireEvent.click(screen.getByTestId('delete-tag-2-confirm'));
 
     await waitFor(() => {
-      expect(tagsApi.delete).toHaveBeenCalled();
+      expect(tagsApi.delete).toHaveBeenCalledWith(2);
     });
+  });
+
+  it('does not delete when the inline confirmation is cancelled', async () => {
+    renderPage();
+    await screen.findByText('production');
+
+    fireEvent.click(screen.getByTestId('delete-tag-2'));
+    fireEvent.click(screen.getByTestId('delete-tag-2-cancel'));
+
+    expect(tagsApi.delete).not.toHaveBeenCalled();
   });
 });

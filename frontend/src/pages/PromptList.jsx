@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Search, Star, Activity, Trash2, Edit } from 'lucide-react';
 import { promptsApi, tagsApi, agentsApi } from '../services/api';
+import ConfirmButton from '../components/ConfirmButton';
+import Badge from '../components/Badge';
 
 export default function PromptList() {
   const navigate = useNavigate();
@@ -31,10 +33,7 @@ export default function PromptList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, tagFilter, agentFilter]);
 
-  const handleDelete = async (id, e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!window.confirm('Delete this prompt?')) return;
+  const handleDelete = async (id) => {
     await promptsApi.delete(id);
     fetchPrompts();
   };
@@ -121,13 +120,9 @@ export default function PromptList() {
               {p.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1 mb-3">
                   {p.tags.map((t) => (
-                    <span
-                      key={t.id}
-                      className="text-xs px-2 py-0.5 rounded-full text-white"
-                      style={{ backgroundColor: t.color }}
-                    >
+                    <Badge key={t.id} className="text-white" style={{ backgroundColor: t.color }}>
                       {t.name}
-                    </span>
+                    </Badge>
                   ))}
                 </div>
               )}
@@ -151,13 +146,18 @@ export default function PromptList() {
                   >
                     <Edit size={14} />
                   </button>
-                  <button
-                    onClick={(e) => handleDelete(p.id, e)}
+                  <ConfirmButton
+                    onConfirm={() => handleDelete(p.id)}
+                    ariaLabel={`Delete ${p.name}`}
+                    promptLabel="Delete this prompt?"
+                    confirmLabel="Delete"
+                    busyLabel="Deleting…"
+                    icon={<Trash2 size={14} />}
+                    variant="danger"
                     className="p-1 hover:text-red-400 transition-colors"
                     title="Delete"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                    testId={`delete-prompt-${p.id}`}
+                  />
                 </div>
               </div>
             </div>

@@ -114,4 +114,52 @@ describe('ConfirmButton', () => {
     expect(screen.getByRole('button', { name: /delete/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
   });
+
+  it('supports an icon-only trigger named via ariaLabel', () => {
+    render(
+      <ConfirmButton
+        onConfirm={vi.fn()}
+        ariaLabel="Delete tag"
+        promptLabel="Delete this tag?"
+        icon={<svg data-testid="trash-icon" />}
+        testId="confirm"
+      />
+    );
+    const trigger = screen.getByRole('button', { name: 'Delete tag' });
+    expect(trigger).toBeInTheDocument();
+    expect(trigger).toHaveTextContent(''); // icon-only, no visible label
+  });
+
+  it('does not start confirmation when disabled', () => {
+    render(
+      <ConfirmButton
+        onConfirm={vi.fn()}
+        ariaLabel="Delete user"
+        promptLabel="Delete this user?"
+        disabled
+        testId="confirm"
+      />
+    );
+    const trigger = screen.getByTestId('confirm');
+    expect(trigger).toBeDisabled();
+    fireEvent.click(trigger);
+    expect(screen.queryByTestId('confirm-confirm')).not.toBeInTheDocument();
+  });
+
+  it('stops click propagation so a clickable ancestor is not triggered', () => {
+    const onAncestorClick = vi.fn();
+    render(
+      <div onClick={onAncestorClick}>
+        <ConfirmButton
+          onConfirm={vi.fn().mockResolvedValue(undefined)}
+          idleLabel="Delete"
+          promptLabel="Delete this item?"
+          testId="confirm"
+        />
+      </div>
+    );
+    fireEvent.click(screen.getByTestId('confirm'));
+    fireEvent.click(screen.getByTestId('confirm-cancel'));
+    expect(onAncestorClick).not.toHaveBeenCalled();
+  });
 });

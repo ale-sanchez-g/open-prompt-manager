@@ -2,14 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Plus, Edit, Trash2, Check, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { agentsApi } from '../services/api';
+import ConfirmButton from '../components/ConfirmButton';
+import Badge from '../components/Badge';
 
 const STATUS_OPTIONS = ['active', 'inactive', 'deprecated'];
-
-const statusStyle = {
-  active: 'bg-green-900 text-green-300',
-  inactive: 'bg-gray-700 text-gray-400',
-  deprecated: 'bg-red-900 text-red-300',
-};
 
 const emptyForm = { name: '', description: '', type: '', status: 'active' };
 
@@ -23,7 +19,7 @@ export default function AgentsManagement() {
 
   const fetchAgents = () => agentsApi.list().then((r) => setAgents(r.data)).catch(console.error);
 
-  useEffect(() => { fetchAgents(); }, []);
+  useEffect(() => { fetchAgents().catch(console.error); }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -37,7 +33,7 @@ export default function AgentsManagement() {
         await agentsApi.create(form);
       }
       setForm(emptyForm);
-      fetchAgents();
+      await fetchAgents();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to register agent');
     } finally {
@@ -56,9 +52,8 @@ export default function AgentsManagement() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this agent?')) return;
     await agentsApi.delete(id);
-    fetchAgents();
+    await fetchAgents();
   };
 
   return (
@@ -73,7 +68,7 @@ export default function AgentsManagement() {
         {error && (
           <div className="mb-3 text-red-400 text-sm bg-red-900/30 px-3 py-2 rounded-lg">{error}</div>
         )}
-        <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-3">
+        <form onSubmit={(e) => { void handleSubmit(e); }} className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs text-gray-400 mb-1">Name *</label>
             <input
@@ -150,9 +145,7 @@ export default function AgentsManagement() {
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <h4 className="font-semibold text-white">{a.name}</h4>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${statusStyle[a.status] || statusStyle.inactive}`}>
-                      {a.status}
-                    </span>
+                    <Badge tone={Badge.statusTone(a.status)}>{a.status}</Badge>
                     {a.type && (
                       <span className="text-xs text-gray-400 bg-gray-600 px-2 py-0.5 rounded">{a.type}</span>
                     )}
@@ -170,13 +163,18 @@ export default function AgentsManagement() {
                   >
                     <Edit size={16} />
                   </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDelete(a.id); }}
+                  <ConfirmButton
+                    onConfirm={() => handleDelete(a.id)}
+                    ariaLabel={`Delete ${a.name}`}
+                    promptLabel="Delete this agent?"
+                    confirmLabel="Delete"
+                    busyLabel="Deleting…"
+                    icon={<Trash2 size={16} />}
+                    variant="danger"
                     className="text-gray-400 hover:text-red-400 transition-colors"
                     title="Delete"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                    testId={`delete-agent-${a.id}`}
+                  />
                 </div>
               </div>
             ))}

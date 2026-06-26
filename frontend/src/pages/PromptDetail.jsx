@@ -1,10 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
-  ArrowLeft, Edit, Trash2, Copy, Play, Star, Activity, Clock, GitBranch, ArrowLeftRight, X, Puzzle
+  ArrowLeft, Edit, Trash2, Copy, Play, Star, Activity, Clock, GitBranch, ArrowLeftRight, Puzzle
 } from 'lucide-react';
 import { promptsApi } from '../services/api';
 import ConfirmButton from '../components/ConfirmButton';
+import Badge from '../components/Badge';
+import Modal from '../components/Modal';
+import Button from '../components/Button';
 
 // Compute a line-level unified diff between two text strings.
 // Returns an array of { type: 'unchanged'|'removed'|'added', text: string }.
@@ -104,7 +107,7 @@ export default function PromptDetail() {
       ),
     ];
     if (ids.length === 0) return;
-    Promise.all(ids.map((cid) => promptsApi.get(cid)))
+    void Promise.all(ids.map((cid) => promptsApi.get(cid)))
       .then((results) => {
         const comps = results.map((r) => r.data);
         setComponentPrompts(comps);
@@ -148,7 +151,7 @@ export default function PromptDetail() {
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(prompt.content);
+    void navigator.clipboard.writeText(prompt.content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -187,9 +190,9 @@ export default function PromptDetail() {
           <p className="text-gray-400 text-sm mt-1">v{prompt.version}</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={handleCopy} className="flex items-center gap-1 text-sm bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg transition-colors">
-            <Copy size={14} /> {copied ? 'Copied!' : 'Copy'}
-          </button>
+          <Button variant="secondary" size="sm" onClick={handleCopy} icon={<Copy size={14} />}>
+            {copied ? 'Copied!' : 'Copy'}
+          </Button>
           <Link to={`/prompts/${id}/edit`} className="flex items-center gap-1 text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition-colors">
             <Edit size={14} /> Edit
           </Link>
@@ -246,9 +249,9 @@ export default function PromptDetail() {
               <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">Tags</h3>
               <div className="flex flex-wrap gap-2">
                 {prompt.tags.map((t) => (
-                  <span key={t.id} className="text-xs px-3 py-1 rounded-full text-white" style={{ backgroundColor: t.color }}>
+                  <Badge key={t.id} size="md" className="text-white" style={{ backgroundColor: t.color }}>
                     {t.name}
-                  </span>
+                  </Badge>
                 ))}
               </div>
             </div>
@@ -284,13 +287,9 @@ export default function PromptDetail() {
             ) : (
               <p className="text-gray-500 text-sm mb-4">No variables defined.</p>
             )}
-            <button
-              onClick={handleRender}
-              disabled={rendering}
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            >
-              <Play size={14} /> {rendering ? 'Rendering...' : 'Render'}
-            </button>
+            <Button variant="success" onClick={() => { void handleRender(); }} disabled={rendering} icon={<Play size={14} />}>
+              {rendering ? 'Rendering...' : 'Render'}
+            </Button>
             {renderError && (
               <div className="mt-3 text-red-400 text-sm bg-red-900/30 px-3 py-2 rounded-lg">{renderError}</div>
             )}
@@ -341,7 +340,7 @@ export default function PromptDetail() {
                     </Link>
                     {v.id !== parseInt(id, 10) && (
                       <button
-                        onClick={() => handleCompare(v.id)}
+                        onClick={() => { void handleCompare(v.id); }}
                         disabled={diffLoading}
                         title={`Compare v${v.version} → v${prompt.version}`}
                         className="flex-shrink-0 text-gray-400 hover:text-blue-300 disabled:opacity-40 p-1 rounded transition-colors"
@@ -363,11 +362,7 @@ export default function PromptDetail() {
                 {prompt.agents.map((a) => (
                   <li key={a.id} className="text-sm text-gray-300 flex items-center justify-between">
                     <span>{a.name}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      a.status === 'active' ? 'bg-green-900 text-green-300' :
-                      a.status === 'inactive' ? 'bg-gray-700 text-gray-400' :
-                      'bg-red-900 text-red-300'
-                    }`}>{a.status}</span>
+                    <Badge tone={Badge.statusTone(a.status)}>{a.status}</Badge>
                   </li>
                 ))}
               </ul>
@@ -435,29 +430,24 @@ export default function PromptDetail() {
 
       {/* Diff modal */}
       {diffTarget && (
-        <div className="fixed inset-0 bg-black/70 flex items-start justify-center z-50 p-4 overflow-auto">
-          <div className="bg-gray-900 rounded-xl border border-gray-700 w-full max-w-4xl shadow-2xl mt-8 mb-8">
-            {/* Modal header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-700">
-              <div className="flex items-center gap-3">
-                <ArrowLeftRight size={16} className="text-blue-400" />
-                <span className="text-white font-semibold">
-                  Diff: v{diffTarget.prompt.version}
-                  <span className="text-gray-400 mx-2">→</span>
-                  v{prompt.version}
-                </span>
-                <span className="text-xs text-gray-500 ml-1">
-                  ({diffTarget.diff.filter(l => l.type !== 'unchanged').length} change(s))
-                </span>
-              </div>
-              <button
-                onClick={() => setDiffTarget(null)}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
+        <Modal
+          onClose={() => setDiffTarget(null)}
+          ariaLabel="Version diff"
+          maxWidth="max-w-4xl"
+          title={
+            <>
+              <ArrowLeftRight size={16} className="text-blue-400" />
+              <span className="text-white font-semibold">
+                Diff: v{diffTarget.prompt.version}
+                <span className="text-gray-400 mx-2">→</span>
+                v{prompt.version}
+              </span>
+              <span className="text-xs text-gray-500 ml-1">
+                ({diffTarget.diff.filter(l => l.type !== 'unchanged').length} change(s))
+              </span>
+            </>
+          }
+        >
             {/* Legend */}
             <div className="flex items-center gap-4 px-5 py-2 bg-gray-800 border-b border-gray-700 text-xs">
               <span className="flex items-center gap-1.5 text-red-400"><span className="w-3 h-3 rounded-sm bg-red-900 inline-block" /> Removed from v{diffTarget.prompt.version}</span>
@@ -500,8 +490,7 @@ export default function PromptDetail() {
               <span>Audit comparison — {diffTarget.prompt.name} v{diffTarget.prompt.version} → v{prompt.version}</span>
               <span>Generated: {new Date().toISOString()}</span>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

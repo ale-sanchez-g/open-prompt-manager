@@ -106,11 +106,11 @@ describe('AgentDetail', () => {
     });
   });
 
-  it('deletes agent and navigates away', async () => {
-    window.confirm = jest.fn().mockReturnValue(true);
+  it('deletes agent and navigates away after inline confirmation', async () => {
     renderPage();
     await screen.findByText('SwagBot');
-    fireEvent.click(screen.getByText('Delete'));
+    fireEvent.click(screen.getByTestId('delete-agent'));
+    fireEvent.click(screen.getByTestId('delete-agent-confirm'));
     await waitFor(() => {
       expect(agentsApi.delete).toHaveBeenCalledWith('1');
     });
@@ -118,12 +118,12 @@ describe('AgentDetail', () => {
   });
 
   it('shows error and stays on page when delete fails', async () => {
-    window.confirm = jest.fn().mockReturnValue(true);
     agentsApi.delete.mockRejectedValueOnce({ response: { data: { detail: 'Delete failed' } } });
 
     renderPage();
     await screen.findByText('SwagBot');
-    fireEvent.click(screen.getByText('Delete'));
+    fireEvent.click(screen.getByTestId('delete-agent'));
+    fireEvent.click(screen.getByTestId('delete-agent-confirm'));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Delete failed');
     expect(screen.queryByText('Agents List')).not.toBeInTheDocument();

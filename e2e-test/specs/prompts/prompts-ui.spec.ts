@@ -44,6 +44,16 @@ async function createPrompt(request: APIRequestContext, accessToken: string, nam
   return (await resp.json()).id;
 }
 
+/** Create a tag via the API and return its id. */
+async function createTag(request: APIRequestContext, accessToken: string, name: string): Promise<number> {
+  const resp = await request.post('/api/tags/', {
+    headers: authHeaders(accessToken),
+    data: { name, color: '#10B981' },
+  });
+  expect(resp.status()).toBe(201);
+  return (await resp.json()).id;
+}
+
 test.describe('Prompt UI — inline delete confirmation', () => {
   let testEmail: string;
   let accessToken: string;
@@ -65,9 +75,9 @@ test.describe('Prompt UI — inline delete confirmation', () => {
 
     // Fail the test if any native browser dialog (window.confirm/alert) appears.
     let nativeDialogShown = false;
-    page.on('dialog', async (dialog) => {
+    page.on('dialog', (dialog) => {
       nativeDialogShown = true;
-      await dialog.dismiss();
+      void dialog.dismiss();
     });
 
     await page.goto(`/prompts/${promptId}`);
@@ -128,5 +138,54 @@ test.describe('Prompt UI — inline delete confirmation', () => {
     // The prompt is gone from the backend.
     const getResp = await request.get(`/api/prompts/${promptId}`, { headers: authHeaders(accessToken) });
     expect(getResp.status()).toBe(404);
+  });
+});
+
+test.describe('Tags UI — inline delete confirmation (icon-only trigger)', () => {
+  let testEmail: string;
+  let accessToken: string;
+
+  test.beforeAll(async ({ request }) => {
+    testEmail = uniqueEmail('tag-ui-test');
+    await request.post('/auth/register', { data: { email: testEmail, password: STRONG_PASSWORD } });
+    const loginResp = await request.post('/auth/login', { data: { email: testEmail, password: STRONG_PASSWORD } });
+    expect(loginResp.status()).toBe(200);
+    accessToken = (await loginResp.json()).access_token;
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await loginViaUI(page, testEmail);
+  });
+
+  test('icon-only delete reveals inline confirmation and confirm sends DELETE', async ({ page, request }) => {
+    const tagId = await createTag(request, accessToken, uid('ui-del'));
+
+    let nativeDialogShown = false;
+    page.on('dialog', (dialog) => {
+      nativeDialogShown = true;
+      void dialog.dismiss();
+    });
+
+    await page.goto('/tags');
+    await expect(page.getByTestId(`delete-tag-${tagId}`)).toBeVisible();
+
+    // Open the inline confirmation — no native dialog, no modal overlay.
+    await page.getByTestId(`delete-tag-${tagId}`).click();
+    await expect(page.getByTestId(`delete-tag-${tagId}-confirm`)).toBeVisible();
+    await expect(page.getByText('Delete this tag?')).toBeVisible();
+    expect(nativeDialogShown).toBe(false);
+
+    // Confirm fires the DELETE request.
+    const [deleteRequest] = await Promise.all([
+      page.waitForRequest(
+        (req) => req.method() === 'DELETE' && req.url().includes(`/api/tags/${tagId}`),
+      ),
+      page.getByTestId(`delete-tag-${tagId}-confirm`).click(),
+    ]);
+    expect(deleteRequest).toBeTruthy();
+
+    // The tag is gone from the backend.
+    const tags = await (await request.get('/api/tags/', { headers: authHeaders(accessToken) })).json();
+    expect(tags.find((t: { id: number }) => t.id === tagId)).toBeUndefined();
   });
 });
