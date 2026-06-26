@@ -15,7 +15,6 @@ beforeEach(() => {
   promptsApi.list.mockResolvedValue({ data: mockPrompts });
   tagsApi.list.mockResolvedValue({ data: [{ id: 1, name: 'prod', color: '#10B981' }] });
   agentsApi.list.mockResolvedValue({ data: [] });
-  promptsApi.delete.mockResolvedValue({});
 });
 
 afterEach(() => {
@@ -73,33 +72,16 @@ describe('PromptList', () => {
     });
   });
 
-  it('shows inline confirmation before deleting and does not delete yet', async () => {
+  // Issue #306: deleting a prompt from a list tile rendered the inline
+  // confirmation inside a cramped card and overflowed on small screens. The
+  // delete action was removed from the list — prompts are deleted from the
+  // Prompt Detail page, which has room to render the confirmation correctly.
+  it('does not render a delete control on prompt tiles', async () => {
     renderPage();
     await screen.findByText('Alpha Prompt');
 
-    fireEvent.click(screen.getByTestId('delete-prompt-1'));
-
-    expect(screen.getByTestId('delete-prompt-1-confirm')).toBeInTheDocument();
-    expect(promptsApi.delete).not.toHaveBeenCalled();
-  });
-
-  it('deletes the prompt when the inline confirmation is confirmed', async () => {
-    renderPage();
-    await screen.findByText('Alpha Prompt');
-
-    fireEvent.click(screen.getByTestId('delete-prompt-1'));
-    fireEvent.click(screen.getByTestId('delete-prompt-1-confirm'));
-
-    await waitFor(() => expect(promptsApi.delete).toHaveBeenCalledWith(1));
-  });
-
-  it('does not navigate to the prompt when opening its delete confirmation', async () => {
-    renderPage();
-    await screen.findByText('Alpha Prompt');
-
-    // Clicking delete inside the clickable card must not bubble to the card's
-    // navigate handler (no crash / no navigation side effects).
-    fireEvent.click(screen.getByTestId('delete-prompt-1'));
-    expect(screen.getByTestId('delete-prompt-1-cancel')).toBeInTheDocument();
+    expect(screen.queryByTestId('delete-prompt-1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('delete-prompt-2')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Delete Alpha Prompt')).not.toBeInTheDocument();
   });
 });

@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, Star, Activity, Trash2, Edit } from 'lucide-react';
+import { Plus, Search, Star, Activity, Edit } from 'lucide-react';
 import { promptsApi, tagsApi, agentsApi } from '../services/api';
-import ConfirmButton from '../components/ConfirmButton';
 import Badge from '../components/Badge';
 
 export default function PromptList() {
@@ -32,11 +31,6 @@ export default function PromptList() {
     fetchPrompts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, tagFilter, agentFilter]);
-
-  const handleDelete = async (id) => {
-    await promptsApi.delete(id);
-    fetchPrompts();
-  };
 
   return (
     <div className="space-y-4">
@@ -146,18 +140,6 @@ export default function PromptList() {
                   >
                     <Edit size={14} />
                   </button>
-                  <ConfirmButton
-                    onConfirm={() => handleDelete(p.id)}
-                    ariaLabel={`Delete ${p.name}`}
-                    promptLabel="Delete this prompt?"
-                    confirmLabel="Delete"
-                    busyLabel="Deleting…"
-                    icon={<Trash2 size={14} />}
-                    variant="danger"
-                    className="p-1 hover:text-red-400 transition-colors"
-                    title="Delete"
-                    testId={`delete-prompt-${p.id}`}
-                  />
                 </div>
               </div>
             </div>

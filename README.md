@@ -25,9 +25,9 @@ The application version displayed in the sidebar and landing page header is fetc
 | `/register` | Register | Create a new account with password complexity validation |
 | `/` | Landing Page | Protected product overview shown after authentication |
 | `/dashboard` | Dashboard | Overview stats, recent prompts, and quality metrics |
-| `/prompts` | Prompt List | Browse and search all prompts |
+| `/prompts` | Prompt List | Browse, search, and open prompts (edit shortcut per tile) |
 | `/prompts/new` | Prompt Editor | Create a new prompt |
-| `/prompts/:id` | Prompt Detail | View a specific prompt |
+| `/prompts/:id` | Prompt Detail | View a specific prompt, and copy, edit, or delete it |
 | `/prompts/:id/edit` | Prompt Editor | Edit an existing prompt |
 | `/tags` | Tags Management | Create and manage tags |
 | `/agents` | Agents Management | Create and manage AI agents |
