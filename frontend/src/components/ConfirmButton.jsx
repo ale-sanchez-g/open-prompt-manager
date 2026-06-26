@@ -74,6 +74,8 @@ export default function ConfirmButton({
       // On success the caller typically navigates/unmounts; only reset state if
       // we are still mounted (best-effort — guarded by the ref check).
       if (containerRef.current) setConfirming(false);
+    } catch {
+      // onConfirm threw; stay in confirming state so the user can retry or cancel.
     } finally {
       if (containerRef.current) setBusy(false);
     }
