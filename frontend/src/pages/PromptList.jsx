@@ -20,12 +20,12 @@ export default function PromptList() {
     if (search) params.search = search;
     if (tagFilter) params.tag_id = tagFilter;
     if (agentFilter) params.agent_id = agentFilter;
-    void promptsApi.list(params).then((r) => setPrompts(r.data)).catch(console.error).finally(() => setLoading(false));
+    promptsApi.list(params).then((r) => setPrompts(r.data)).catch(console.error).finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    void tagsApi.list().then((r) => setTags(r.data)).catch(console.error);
-    void agentsApi.list().then((r) => setAgents(r.data)).catch(console.error);
+    tagsApi.list().then((r) => setTags(r.data)).catch(console.error);
+    agentsApi.list().then((r) => setAgents(r.data)).catch(console.error);
   }, []);
 
   useEffect(() => {

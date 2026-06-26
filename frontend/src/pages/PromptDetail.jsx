@@ -83,7 +83,7 @@ export default function PromptDetail() {
   };
 
   useEffect(() => {
-    void promptsApi.get(id).then((r) => {
+    promptsApi.get(id).then((r) => {
       setPrompt(r.data);
       // Init variable inputs with defaults
       const defaults = {};
@@ -93,7 +93,7 @@ export default function PromptDetail() {
       setVariables(defaults);
     }).catch(console.error);
 
-    void promptsApi.getVersions(id).then((r) => setVersions(r.data)).catch(console.error);
+    promptsApi.getVersions(id).then((r) => setVersions(r.data)).catch(console.error);
   }, [id]);
 
   useEffect(() => {

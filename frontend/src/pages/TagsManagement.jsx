@@ -17,7 +17,7 @@ export default function TagsManagement() {
 
   const fetchTags = () => tagsApi.list().then((r) => setTags(r.data)).catch(console.error);
 
-  useEffect(() => { void fetchTags(); }, []);
+  useEffect(() => { fetchTags().catch(console.error); }, []);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -26,7 +26,7 @@ export default function TagsManagement() {
     try {
       await tagsApi.create(form);
       setForm({ name: '', color: '#3B82F6' });
-      void fetchTags();
+      await fetchTags();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to create tag');
     } finally {
@@ -36,7 +36,7 @@ export default function TagsManagement() {
 
   const handleDelete = async (id) => {
     await tagsApi.delete(id);
-    void fetchTags();
+    await fetchTags();
   };
 
   return (

@@ -19,7 +19,7 @@ export default function AgentsManagement() {
 
   const fetchAgents = () => agentsApi.list().then((r) => setAgents(r.data)).catch(console.error);
 
-  useEffect(() => { void fetchAgents(); }, []);
+  useEffect(() => { fetchAgents().catch(console.error); }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,7 +33,7 @@ export default function AgentsManagement() {
         await agentsApi.create(form);
       }
       setForm(emptyForm);
-      void fetchAgents();
+      await fetchAgents();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to register agent');
     } finally {
@@ -53,7 +53,7 @@ export default function AgentsManagement() {
 
   const handleDelete = async (id) => {
     await agentsApi.delete(id);
-    void fetchAgents();
+    await fetchAgents();
   };
 
   return (

@@ -25,7 +25,7 @@ export default function UserManagement() {
       .catch((err) => setListError(err.response?.data?.error || 'Failed to load users'));
 
   useEffect(() => {
-    void fetchUsers();
+    fetchUsers().catch(console.error);
   }, []);
 
   const handleCreate = async (e) => {
@@ -35,7 +35,7 @@ export default function UserManagement() {
     try {
       await adminApi.createUser(form);
       setForm({ email: '', password: '', role: 'user' });
-      void fetchUsers();
+      await fetchUsers();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create user');
     } finally {
@@ -46,7 +46,7 @@ export default function UserManagement() {
   const handleRoleChange = async (id, role) => {
     try {
       await adminApi.updateUser(id, { role });
-      void fetchUsers();
+      await fetchUsers();
     } catch (err) {
       setListError(err.response?.data?.error || 'Failed to update role');
     }
@@ -55,7 +55,7 @@ export default function UserManagement() {
   const handleDelete = async (id) => {
     try {
       await adminApi.deleteUser(id);
-      void fetchUsers();
+      await fetchUsers();
     } catch (err) {
       setListError(err.response?.data?.error || 'Failed to delete user');
     }
