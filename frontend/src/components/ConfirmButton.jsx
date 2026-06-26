@@ -41,6 +41,8 @@ export default function ConfirmButton({
 
   // Stop clicks from bubbling to clickable ancestors (e.g. a list row that
   // navigates on click) so opening/confirming/cancelling never triggers them.
+  // Applied on the interactive buttons themselves — never on the non-interactive
+  // <fieldset> wrapper, which must not carry mouse handlers (accessibility).
   const stop = (e) => e.stopPropagation();
 
   // Move focus to the Confirm button as soon as the prompt opens.
@@ -128,7 +130,6 @@ export default function ConfirmButton({
     <fieldset
       ref={containerRef}
       aria-label={promptLabel}
-      onClick={stop}
       className={`m-0 inline-flex min-w-0 items-center gap-3 rounded-lg py-1.5 pl-3 pr-2 ${containerClasses}`}
     >
       <span
@@ -142,7 +143,7 @@ export default function ConfirmButton({
         {/* Safe exit first, clearly styled as a button (not a toggle). */}
         <button
           type="button"
-          onClick={() => setConfirming(false)}
+          onClick={(e) => { stop(e); setConfirming(false); }}
           disabled={busy}
           className="text-sm font-medium border border-gray-500 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400"
           data-testid={testId ? `${testId}-cancel` : undefined}
@@ -153,7 +154,7 @@ export default function ConfirmButton({
         <button
           type="button"
           ref={confirmRef}
-          onClick={() => { void handleConfirm(); }}
+          onClick={(e) => { stop(e); void handleConfirm(); }}
           disabled={busy}
           className={`flex items-center gap-1.5 text-sm font-medium disabled:opacity-50 px-3 py-1.5 rounded-md transition-colors focus:outline-none focus:ring-2 ${confirmClasses}`}
           data-testid={testId ? `${testId}-confirm` : undefined}
