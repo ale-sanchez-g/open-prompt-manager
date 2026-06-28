@@ -46,6 +46,17 @@ variable "availability_zones" {
   default     = ["ap-southeast-2a", "ap-southeast-2b"]
 }
 
+variable "alb_http_ingress_cidrs" {
+  description = "CIDR ranges permitted to reach the ALB on HTTP port 80. Empty by default so no plaintext HTTP is exposed to the internet (HTTPS-only target architecture). Set to specific trusted ranges only if temporary HTTP access is required; 0.0.0.0/0 is rejected."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = !contains(var.alb_http_ingress_cidrs, "0.0.0.0/0")
+    error_message = "alb_http_ingress_cidrs must not contain 0.0.0.0/0; expose HTTP only to restricted source ranges."
+  }
+}
+
 # ─────────────────────────────────────────────
 # ECS / Application
 # ─────────────────────────────────────────────

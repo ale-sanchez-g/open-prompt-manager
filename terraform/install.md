@@ -67,7 +67,8 @@ Internet
 | **NAT Gateway** | Single NAT GW in the first public subnet (`ap-southeast-2a`); allows ECS tasks in private subnets to reach the internet (e.g. to pull ECR images) without being publicly reachable. |
 | **Route Tables** | Public RT routes `0.0.0.0/0` → IGW. Private RT routes `0.0.0.0/0` → NAT GW. |
 | **Application Load Balancer (ALB)** | Internet-facing, deployed across both public subnets. HTTP listener (port 80) redirects to HTTPS when enabled, otherwise forwards directly. Two listener rules: priority 10 (`/api/*`, `/auth/*` → backend REST/auth API) and priority 20 (`/mcp`, `/mcp/*` → backend MCP server). All other traffic forwarded to the frontend React SPA. |
-| **Security Groups** | Four security groups: `alb-sg` (HTTP/HTTPS from `0.0.0.0/0`), `frontend-sg` (port 80 from ALB only), `backend-sg` (port 8000 from ALB only), `rds-sg` (port 5432 from backend SG only). |
+| **Security Groups** | Five security groups: `alb-sg` (HTTPS from `0.0.0.0/0`; HTTP port 80 only from `var.alb_http_ingress_cidrs`, empty by default), `frontend-sg` / `backend-sg` (from ALB only; egress restricted to in-VPC AWS endpoints, S3 prefix list, RDS, and DNS — no `0.0.0.0/0`), `rds-sg` (port 5432 from backend SG only, no egress), `vpce-sg` (HTTPS from the VPC CIDR to the interface endpoints). |
+| **VPC Endpoints** | Interface endpoints (ECR api/dkr, CloudWatch Logs, Secrets Manager, STS, KMS) plus an S3 gateway endpoint keep ECS task traffic to AWS APIs inside the VPC, so the application security groups need no unrestricted egress. |
 | **ACM Certificate** | Optional TLS certificate created via `certificate.tf` with DNS validation. Automatically adds `www.` SAN for apex domains. Can be provided externally via `acm_certificate_arn`. |
 | **ECS Fargate** | Serverless container runtime. Runs backend (512 CPU / 1024 MB, 2 tasks) and frontend (256 CPU / 512 MB, 2 tasks) in private subnets. Cluster has Container Insights enabled and supports both `FARGATE` and `FARGATE_SPOT`. |
 | **ECR** | Private container image registry with lifecycle policies for backend and frontend Docker images. Image layers are encrypted at rest with a dedicated customer-managed KMS key (`alias/<project>-ecr`). |
@@ -300,7 +301,8 @@ Review the resources that will be created. Key items to confirm:
   - 1 Internet Gateway
   - 1 NAT Gateway + 1 Elastic IP (in first public subnet)
   - 2 Route Tables (public and private) with associations
-  - 4 Security Groups: `alb-sg`, `frontend-sg`, `backend-sg`, `rds-sg`
+  - 5 Security Groups: `alb-sg`, `frontend-sg`, `backend-sg`, `rds-sg`, `vpce-sg`
+  - VPC endpoints: interface (ECR api/dkr, logs, secretsmanager, sts, kms) + S3 gateway
   - 1 Application Load Balancer (internet-facing, across both public subnets):
     - HTTP listener (port 80): redirects to HTTPS if enabled, else forwards to frontend
     - HTTPS listener (port 443, when `enable_https = true`): TLS 1.2+
@@ -853,7 +855,8 @@ terraform/
 ├── versions.tf          # Terraform and AWS provider version constraints
 ├── variables.tf         # All input variables with defaults
 ├── vpc.tf               # VPC, subnets, IGW, NAT Gateway, route tables
-├── security_groups.tf   # Security groups for ALB, frontend, backend, and RDS
+├── vpc_endpoints.tf     # Interface (ECR/logs/secrets/sts/kms) + S3 gateway VPC endpoints
+├── security_groups.tf   # Security groups for ALB, frontend, backend, RDS, and VPC endpoints
 ├── iam.tf               # IAM roles for ECS and RDS Enhanced Monitoring
 ├── ecr.tf               # ECR repositories and lifecycle policies
 ├── alb.tf               # Application Load Balancer, target groups, listener rules

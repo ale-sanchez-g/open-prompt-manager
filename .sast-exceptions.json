@@ -46,12 +46,6 @@
       "justification": "RDS uses password-based auth via Secrets Manager. Planned: enable IAM database authentication as an additional access control layer."
     },
     {
-      "id": "CKV_AWS_260",
-      "owner": "github-agents",
-      "expires": "2026-06-30",
-      "justification": "ALB security group allows inbound port 80 from 0.0.0.0/0 for HTTP-to-HTTPS redirect. Planned: restrict port 80 ingress once HTTPS is enforced across all environments."
-    },
-    {
       "id": "CKV_AWS_293",
       "owner": "github-agents",
       "expires": "2026-06-30",
@@ -62,12 +56,6 @@
       "owner": "github-agents",
       "expires": "2026-06-30",
       "justification": "Target groups use HTTP protocol for ALB-to-ECS communication within the VPC. Planned: evaluate end-to-end TLS with HTTPS target groups once ECS tasks support TLS termination."
-    },
-    {
-      "id": "CKV_AWS_382",
-      "owner": "github-agents",
-      "expires": "2026-06-30",
-      "justification": "Security groups allow unrestricted egress (0.0.0.0/0) for ECS tasks to pull images and reach AWS APIs. Planned: restrict egress to specific CIDR ranges and VPC endpoints."
     },
     {
       "id": "CKV2_AWS_20",

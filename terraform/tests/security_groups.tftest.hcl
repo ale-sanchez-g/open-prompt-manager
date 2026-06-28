@@ -13,6 +13,7 @@ variables {
   project_name  = "opm-test"
   environment   = "test"
   aws_region    = "us-east-1"
+  vpc_cidr      = "10.0.0.0/16"
   frontend_port = 80
   backend_port  = 8000
 }
@@ -20,14 +21,38 @@ variables {
 # ─────────────────────────────────────────────
 # ALB Security Group
 # ─────────────────────────────────────────────
-run "alb_sg_allows_http_ingress" {
+run "alb_sg_no_public_http_ingress_by_default" {
   command = plan
+
+  # With the default (empty) alb_http_ingress_cidrs there must be no port 80
+  # ingress at all, and never one from 0.0.0.0/0 (CKV_AWS_260).
+  assert {
+    condition = alltrue([
+      for r in aws_security_group.alb.ingress : !(r.from_port == 80 && r.to_port == 80)
+    ])
+    error_message = "ALB must not expose HTTP (port 80) ingress when alb_http_ingress_cidrs is empty."
+  }
+}
+
+run "alb_sg_http_ingress_restricted_when_enabled" {
+  command = plan
+
+  variables {
+    alb_http_ingress_cidrs = ["203.0.113.0/24"]
+  }
 
   assert {
     condition = anytrue([
-      for r in aws_security_group.alb.ingress : r.from_port == 80 && r.to_port == 80 && contains(r.cidr_blocks, "0.0.0.0/0")
+      for r in aws_security_group.alb.ingress : r.from_port == 80 && r.to_port == 80 && contains(r.cidr_blocks, "203.0.113.0/24")
     ])
-    error_message = "ALB security group must allow inbound HTTP (port 80) from 0.0.0.0/0."
+    error_message = "ALB must allow HTTP (port 80) from the configured restricted range."
+  }
+
+  assert {
+    condition = alltrue([
+      for r in aws_security_group.alb.ingress : !(r.from_port == 80 && contains(r.cidr_blocks, "0.0.0.0/0"))
+    ])
+    error_message = "ALB HTTP ingress must never come from 0.0.0.0/0 (CKV_AWS_260)."
   }
 }
 
@@ -39,6 +64,17 @@ run "alb_sg_allows_https_ingress" {
       for r in aws_security_group.alb.ingress : r.from_port == 443 && r.to_port == 443 && contains(r.cidr_blocks, "0.0.0.0/0")
     ])
     error_message = "ALB security group must allow inbound HTTPS (port 443) from 0.0.0.0/0."
+  }
+}
+
+run "alb_sg_egress_not_open_to_world" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for r in aws_security_group.alb.egress : !contains(r.cidr_blocks, "0.0.0.0/0")
+    ])
+    error_message = "ALB egress must not allow 0.0.0.0/0 (CKV_AWS_382)."
   }
 }
 
@@ -136,5 +172,46 @@ run "backend_sg_has_required_tags" {
   assert {
     condition     = aws_security_group.backend.tags["Environment"] == var.environment
     error_message = "Backend security group must have 'Environment' tag."
+  }
+}
+
+# ─────────────────────────────────────────────
+# Restricted egress (CKV_AWS_382)
+# ─────────────────────────────────────────────
+run "frontend_sg_egress_not_open_to_world" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for r in aws_security_group.frontend.egress : !contains(r.cidr_blocks, "0.0.0.0/0")
+    ])
+    error_message = "Frontend egress must not allow 0.0.0.0/0 (CKV_AWS_382)."
+  }
+}
+
+run "backend_sg_egress_not_open_to_world" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      for r in aws_security_group.backend.egress : !contains(r.cidr_blocks, "0.0.0.0/0")
+    ])
+    error_message = "Backend egress must not allow 0.0.0.0/0 (CKV_AWS_382)."
+  }
+
+  assert {
+    condition = anytrue([
+      for r in aws_security_group.backend.egress : r.from_port == 5432 && r.to_port == 5432
+    ])
+    error_message = "Backend must retain egress to PostgreSQL (port 5432)."
+  }
+}
+
+run "rds_sg_has_no_egress" {
+  command = plan
+
+  assert {
+    condition     = length(aws_security_group.rds.egress) == 0
+    error_message = "RDS security group must not declare any egress rules (locked down)."
   }
 }
