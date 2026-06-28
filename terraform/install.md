@@ -73,8 +73,9 @@ Internet
 | **ECS Fargate** | Serverless container runtime. Runs backend (1024 CPU / 2048 MB, 2 tasks — sized to fit the OTel Collector sidecar) and frontend (256 CPU / 512 MB, 2 tasks) in private subnets. Cluster has Container Insights enabled and supports both `FARGATE` and `FARGATE_SPOT`. |
 | **OTel Collector (sidecar)** | AWS Distro for OpenTelemetry Collector runs as a sidecar in the backend task (`otel.tf`, image pinned by digest, toggle via `otel_collector_enabled`). Receives OTLP on `localhost:4317`/`4318`; exporter defaults to `debug` (no-op) until `otel_exporter_otlp_endpoint` is set. Config is rendered by Terraform into the SSM SecureString parameter `/<project>/<env>/otel/collector-config` and injected as `AOT_CONFIG_CONTENT`, so the exporter target flips without a new task-definition image. Logs to `/ecs/<project>/otel-collector`. |
 | **ECR** | Private container image registry with lifecycle policies for backend and frontend Docker images. Image layers are encrypted at rest with a dedicated customer-managed KMS key (`alias/<project>-ecr`). |
-| **RDS PostgreSQL 16** | `db.t4g.micro` with 20 GiB gp3 storage, encrypted at rest, in the private subnets. Multi-AZ disabled by default (enable via `db_multi_az = true`). |
-| **Secrets Manager** | Stores the auto-generated PostgreSQL `DATABASE_URL` at `<project>/<env>/database-url` and the `JWT_SECRET`, both encrypted with a dedicated customer-managed KMS key (`alias/<project>-secrets`). Injected into the backend ECS container at task start — never a plain-text env var. |
+| **RDS PostgreSQL 16** | `db.t4g.micro` with 20 GiB gp3 storage, encrypted at rest, in the private subnets. Multi-AZ disabled by default (enable via `db_multi_az = true`). **IAM database authentication enabled** as an additional access path alongside password auth. |
+| **Secrets Manager** | Stores the auto-generated PostgreSQL `DATABASE_URL` at `<project>/<env>/database-url` and the `JWT_SECRET`, both encrypted with a dedicated customer-managed KMS key (`alias/<project>-secrets`). Injected into the backend ECS container at task start — never a plain-text env var. The `DATABASE_URL` secret is **rotated automatically** every `db_secret_rotation_days` (default 30) by an in-VPC Lambda. |
+| **Secret rotation Lambda** | `db-rotation` function (private subnets, dedicated SG, DLQ, X-Ray) rotates the RDS master password and rewrites the `DATABASE_URL` secret in place. Built from `terraform/lambda/db_rotation/` (`pg8000`, vendored by `build.sh`). |
 | **KMS** | Customer-managed keys (with automatic rotation) for CloudWatch Logs, Secrets Manager, and ECR image encryption. |
 | **CloudWatch Logs** | Log groups `/ecs/<project>/backend` and `/ecs/<project>/frontend` with configurable retention (`cloudwatch_log_retention_in_days`, default 365). RDS exports `postgresql` and `upgrade` logs to CloudWatch. |
 
@@ -798,8 +799,48 @@ The Terraform configuration provisions an Amazon RDS PostgreSQL 16 instance in t
 | `aws_iam_role.rds_enhanced_monitoring` | IAM role trusted by `monitoring.rds.amazonaws.com` for Enhanced Monitoring |
 | `random_password` | 32-char random password, never stored in state as plain text |
 | `aws_secretsmanager_secret` | Full `DATABASE_URL` stored at `<project>/<env>/database-url` |
+| `aws_secretsmanager_secret_rotation` | Automatic rotation of `DATABASE_URL` every `db_secret_rotation_days` (default 30) |
+| `aws_lambda_function.db_rotation` | In-VPC rotation function (private subnets + `db-rotation-sg`, DLQ, Active tracing) |
+| `iam_database_authentication_enabled` | IAM auth enabled on the instance (additive to password auth) |
 
 The `DATABASE_URL` is injected into the backend ECS container as an ECS secret (not a plain-text environment variable). ECS pulls the value from Secrets Manager at task start.
+
+### Secret rotation and IAM database authentication
+
+The `DATABASE_URL` secret rotates automatically every `db_secret_rotation_days`
+(default 30). A custom in-VPC Lambda (`terraform/lambda/db_rotation/`) generates
+a new master password, applies it with `ALTER USER`, verifies it, and rewrites
+the connection-string secret in place — the application's `DATABASE_URL`
+contract is unchanged. The Lambda's only runtime dependency is `pg8000`
+(pure-Python); `deploy.sh` and the deploy workflow vendor it via `build.sh`
+before `terraform apply`. If you apply Terraform by hand, run the build first:
+
+```bash
+terraform/lambda/db_rotation/build.sh
+cd terraform && terraform apply
+```
+
+**Connection-pool note (single-user rotation).** Running ECS tasks cache
+`DATABASE_URL` at start, so after a rotation they must be recycled to pick up
+the new password. Force a fresh deployment after an out-of-band rotation:
+
+```bash
+aws ecs update-service --cluster <project>-cluster \
+  --service <project>-backend --force-new-deployment
+```
+
+**Trigger a rotation on demand:**
+
+```bash
+aws secretsmanager rotate-secret \
+  --secret-id "open-prompt-manager/prod/database-url"
+```
+
+`iam_database_authentication_enabled = true` adds an IAM-based access path
+(15-minute auth tokens for principals granted `rds-db:connect`) alongside the
+existing password authentication. See
+[`docs/adr-secrets-rotation-iam-auth.md`](../docs/adr-secrets-rotation-iam-auth.md)
+for the full rationale, trade-offs, and follow-ups.
 
 ### Retrieve the DATABASE_URL
 

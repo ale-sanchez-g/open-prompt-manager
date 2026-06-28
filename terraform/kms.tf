@@ -108,6 +108,20 @@ data "aws_iam_policy_document" "secrets_kms" {
     }
   }
 
+  # The rotation Lambda role decrypts the current secret and re-encrypts the new
+  # value when rotating DATABASE_URL (see rotation.tf / iam.tf).
+  statement {
+    sid       = "AllowRotationLambdaUse"
+    effect    = "Allow"
+    actions   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
+    resources = ["*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = [aws_iam_role.db_rotation.arn]
+    }
+  }
+
   # Scope general key use to the Secrets Manager service in this account.
   statement {
     sid    = "AllowSecretsManagerUse"

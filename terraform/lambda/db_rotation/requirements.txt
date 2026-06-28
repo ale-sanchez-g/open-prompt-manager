@@ -1,0 +1,4 @@
+# Runtime dependency for the DATABASE_URL rotation Lambda.
+# pg8000 is a pure-Python PostgreSQL driver, so it needs no native build step
+# and packages cleanly into a Lambda zip on any platform.
+pg8000==1.31.2

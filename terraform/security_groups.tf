@@ -248,12 +248,55 @@ resource "aws_security_group" "rds" {
     security_groups = [aws_security_group.backend.id]
   }
 
+  ingress {
+    description     = "PostgreSQL from secret-rotation Lambda"
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.db_rotation.id]
+  }
+
   # No egress rules: the database never initiates outbound connections, so
   # declaring the resource without an egress block revokes the default
   # allow-all rule and leaves egress fully locked down (CKV_AWS_382).
 
   tags = {
     Name        = "${var.project_name}-rds-sg"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+# ─────────────────────────────────────────────
+# Secret Rotation Lambda Security Group
+# The DATABASE_URL rotation Lambda (rotation.tf)
+# runs in the private subnets. It needs egress to
+# PostgreSQL (to ALTER the password) and HTTPS (to
+# reach the Secrets Manager API via NAT/endpoint).
+# ─────────────────────────────────────────────
+resource "aws_security_group" "db_rotation" {
+  name        = "${var.project_name}-db-rotation-sg"
+  description = "Secret rotation Lambda egress to RDS and Secrets Manager"
+  vpc_id      = aws_vpc.main.id
+
+  egress {
+    description = "PostgreSQL to RDS"
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    description = "HTTPS to AWS APIs (Secrets Manager, KMS)"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name        = "${var.project_name}-db-rotation-sg"
     Project     = var.project_name
     Environment = var.environment
   }

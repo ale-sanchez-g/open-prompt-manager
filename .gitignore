@@ -52,6 +52,15 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 
+# Terraform Lambda packaging — keep source, ignore vendored deps and built zips
+terraform/lambda/*.zip
+terraform/lambda/db_rotation/*
+!terraform/lambda/db_rotation/lambda_function.py
+!terraform/lambda/db_rotation/test_rotation_helpers.py
+!terraform/lambda/db_rotation/requirements.txt
+!terraform/lambda/db_rotation/build.sh
+!terraform/lambda/db_rotation/README.md
+
 
 # Playwright Test
 playwright-report/

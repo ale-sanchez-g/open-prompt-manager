@@ -306,6 +306,11 @@ jobs:
             frontend-sbom.cdx.json
           retention-days: 90
 
+      - name: Build secret-rotation Lambda package
+        run: |
+          set -euo pipefail
+          terraform/lambda/db_rotation/build.sh
+
       - name: Terraform apply infrastructure and services
         working-directory: terraform
         run: |
