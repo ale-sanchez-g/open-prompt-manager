@@ -367,6 +367,14 @@ class VersionCreate(BaseModel):
         None,
         description='Updated variable definitions. Inherits from parent if omitted.',
     )
+    tag_ids: Optional[list[int]] = Field(
+        None,
+        description='Tag IDs to associate with the new version. Inherits from parent if omitted.',
+    )
+    agent_ids: Optional[list[int]] = Field(
+        None,
+        description='Agent IDs to associate with the new version. Inherits from parent if omitted.',
+    )
     version: Optional[str] = Field(
         None,
         description='Explicit semantic version string. Auto-increments the patch segment if omitted.',

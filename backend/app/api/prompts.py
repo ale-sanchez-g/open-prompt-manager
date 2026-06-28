@@ -210,8 +210,14 @@ def create_version(prompt_id: int, payload: VersionCreate, db: Session = Depends
         variables=[v.model_dump() for v in payload.variables] if payload.variables is not None else parent.variables,
         components=parent.components,
     )
-    new_prompt.tags = list(parent.tags)
-    new_prompt.agents = list(parent.agents)
+    if payload.tag_ids is not None:
+        new_prompt.tags = db.query(Tag).filter(Tag.id.in_(payload.tag_ids)).all()
+    else:
+        new_prompt.tags = list(parent.tags)
+    if payload.agent_ids is not None:
+        new_prompt.agents = db.query(Agent).filter(Agent.id.in_(payload.agent_ids)).all()
+    else:
+        new_prompt.agents = list(parent.agents)
     db.add(new_prompt)
     db.commit()
     db.refresh(new_prompt)

@@ -209,6 +209,8 @@ export default function PromptEditor() {
           content: form.content,
           description: form.description,
           variables: form.variables,
+          tag_ids: form.tag_ids,
+          agent_ids: form.agent_ids,
         });
         navigate(`/prompts/${res.data.id}`);
       } else {
