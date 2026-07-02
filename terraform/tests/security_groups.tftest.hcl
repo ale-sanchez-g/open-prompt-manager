@@ -24,13 +24,12 @@ variables {
 run "alb_sg_no_public_http_ingress_by_default" {
   command = plan
 
-  # With the default (empty) alb_http_ingress_cidrs there must be no port 80
-  # ingress at all, and never one from 0.0.0.0/0 (CKV_AWS_260).
+  # ALB rules are separate aws_vpc_security_group_*_rule resources. With the
+  # default (empty) alb_http_ingress_cidrs no HTTP (port 80) rule is created
+  # at all, so it can never be exposed to 0.0.0.0/0 (CKV_AWS_260).
   assert {
-    condition = alltrue([
-      for r in aws_security_group.alb.ingress : !(r.from_port == 80 && r.to_port == 80)
-    ])
-    error_message = "ALB must not expose HTTP (port 80) ingress when alb_http_ingress_cidrs is empty."
+    condition     = length(aws_vpc_security_group_ingress_rule.alb_http) == 0
+    error_message = "ALB must not create an HTTP (port 80) ingress rule when alb_http_ingress_cidrs is empty."
   }
 }
 
@@ -43,14 +42,14 @@ run "alb_sg_http_ingress_restricted_when_enabled" {
 
   assert {
     condition = anytrue([
-      for r in aws_security_group.alb.ingress : r.from_port == 80 && r.to_port == 80 && contains(r.cidr_blocks, "203.0.113.0/24")
+      for r in aws_vpc_security_group_ingress_rule.alb_http : r.from_port == 80 && r.to_port == 80 && r.cidr_ipv4 == "203.0.113.0/24"
     ])
     error_message = "ALB must allow HTTP (port 80) from the configured restricted range."
   }
 
   assert {
     condition = alltrue([
-      for r in aws_security_group.alb.ingress : !(r.from_port == 80 && contains(r.cidr_blocks, "0.0.0.0/0"))
+      for r in aws_vpc_security_group_ingress_rule.alb_http : r.cidr_ipv4 != "0.0.0.0/0"
     ])
     error_message = "ALB HTTP ingress must never come from 0.0.0.0/0 (CKV_AWS_260)."
   }
@@ -60,9 +59,7 @@ run "alb_sg_allows_https_ingress" {
   command = plan
 
   assert {
-    condition = anytrue([
-      for r in aws_security_group.alb.ingress : r.from_port == 443 && r.to_port == 443 && contains(r.cidr_blocks, "0.0.0.0/0")
-    ])
+    condition     = aws_vpc_security_group_ingress_rule.alb_https.from_port == 443 && aws_vpc_security_group_ingress_rule.alb_https.cidr_ipv4 == "0.0.0.0/0"
     error_message = "ALB security group must allow inbound HTTPS (port 443) from 0.0.0.0/0."
   }
 }
@@ -71,9 +68,7 @@ run "alb_sg_egress_not_open_to_world" {
   command = plan
 
   assert {
-    condition = alltrue([
-      for r in aws_security_group.alb.egress : !contains(r.cidr_blocks, "0.0.0.0/0")
-    ])
+    condition     = aws_vpc_security_group_egress_rule.alb_frontend.cidr_ipv4 != "0.0.0.0/0" && aws_vpc_security_group_egress_rule.alb_backend.cidr_ipv4 != "0.0.0.0/0"
     error_message = "ALB egress must not allow 0.0.0.0/0 (CKV_AWS_382)."
   }
 }
@@ -181,9 +176,11 @@ run "backend_sg_has_required_tags" {
 run "frontend_sg_egress_not_open_to_world" {
   command = plan
 
+  # Prefix-list-only egress rules have cidr_blocks == null, so coalesce to an
+  # empty list before checking.
   assert {
     condition = alltrue([
-      for r in aws_security_group.frontend.egress : !contains(r.cidr_blocks, "0.0.0.0/0")
+      for r in aws_security_group.frontend.egress : !contains(coalesce(r.cidr_blocks, []), "0.0.0.0/0")
     ])
     error_message = "Frontend egress must not allow 0.0.0.0/0 (CKV_AWS_382)."
   }
@@ -194,7 +191,7 @@ run "backend_sg_egress_not_open_to_world" {
 
   assert {
     condition = alltrue([
-      for r in aws_security_group.backend.egress : !contains(r.cidr_blocks, "0.0.0.0/0")
+      for r in aws_security_group.backend.egress : !contains(coalesce(r.cidr_blocks, []), "0.0.0.0/0")
     ])
     error_message = "Backend egress must not allow 0.0.0.0/0 (CKV_AWS_382)."
   }
