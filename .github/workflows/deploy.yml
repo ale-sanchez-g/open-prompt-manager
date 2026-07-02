@@ -126,12 +126,22 @@ jobs:
           set -euo pipefail
           terraform workspace select "${TF_WORKSPACE}"
 
+          # The ALB security group blocks internet HTTP (port 80) unless
+          # trusted ranges are supplied. Configure the repository variable
+          # ALB_HTTP_INGRESS_CIDRS as a JSON list (e.g. ["203.0.113.0/24"])
+          # while plaintext HTTP is still needed; 0.0.0.0/0 is rejected.
+          if [[ -z "${ALB_HTTP_INGRESS_CIDRS}" ]]; then
+            echo "::warning::ALB_HTTP_INGRESS_CIDRS is not set — internet HTTP (port 80) stays blocked; the app is only reachable over HTTPS."
+            ALB_HTTP_INGRESS_CIDRS='[]'
+          fi
+
           terraform apply -auto-approve \
             -var="aws_region=${AWS_REGION}" \
             -var="project_name=${PROJECT_NAME}" \
             -var="environment=${ENVIRONMENT}" \
             -var="backend_image=${BACKEND_REPO}:${DEPLOY_TAG}" \
-            -var="frontend_image=${FRONTEND_REPO}:${DEPLOY_TAG}"
+            -var="frontend_image=${FRONTEND_REPO}:${DEPLOY_TAG}" \
+            -var="alb_http_ingress_cidrs=${ALB_HTTP_INGRESS_CIDRS}"
         env:
           AWS_REGION: ${{ steps.config.outputs.aws_region }}
           PROJECT_NAME: ${{ steps.config.outputs.project_name }}
@@ -140,3 +150,4 @@ jobs:
           BACKEND_REPO: ${{ steps.ecr.outputs.backend_repo }}
           FRONTEND_REPO: ${{ steps.ecr.outputs.frontend_repo }}
           DEPLOY_TAG: ${{ github.ref_name }}
+          ALB_HTTP_INGRESS_CIDRS: ${{ vars.ALB_HTTP_INGRESS_CIDRS }}

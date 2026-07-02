@@ -7,7 +7,12 @@
 #   ./deploy.sh --https --domain example.com                     # enable HTTPS with certificate
 #   ./deploy.sh --https --domain example.com --domain www.example.com  # multiple domains
 #   ./deploy.sh --https --domain example.com --route53           # HTTPS + Route 53 DNS management
+#   ./deploy.sh --http-cidr 203.0.113.0/24                        # allow plaintext HTTP from a trusted range
 #   ./deploy.sh --destroy                                         # tear down all infrastructure
+#
+# Note: the ALB security group blocks internet HTTP (port 80) unless trusted
+# ranges are supplied via --http-cidr (0.0.0.0/0 is rejected). Without
+# --https, provide at least one --http-cidr or the app will be unreachable.
 set -euo pipefail
 
 # ─────────────────────────────────────────────
@@ -24,6 +29,7 @@ ACM_CERTIFICATE_ARN=""
 ROUTE53_ZONE_ID=""
 PRIMARY_DOMAIN=""
 DOMAIN_NAMES=()
+HTTP_INGRESS_CIDRS=()
 JWT_SECRET=""
 
 load_or_generate_jwt_secret() {
@@ -78,6 +84,7 @@ while [[ $# -gt 0 ]]; do
     --project)  PROJECT_NAME="$2";  shift 2 ;;
     --domain)   DOMAIN_NAMES+=("$2"); PRIMARY_DOMAIN="${PRIMARY_DOMAIN:-$2}"; ENABLE_HTTPS=true; CREATE_CERTIFICATE=true; shift 2 ;;
     --https)    ENABLE_HTTPS=true;  shift   ;;
+    --http-cidr) HTTP_INGRESS_CIDRS+=("$2"); shift 2 ;;
     --route53)  CREATE_ROUTE53_ZONE=true; shift ;;
     --destroy)  DESTROY=true;       shift   ;;
     --migrate)  MIGRATE=true;       shift   ;;
@@ -249,6 +256,17 @@ build_domain_names_arg() {
   echo "[${domain_names_json%,}]"
 }
 
+build_http_cidrs_arg() {
+  if [[ ${#HTTP_INGRESS_CIDRS[@]} -eq 0 ]]; then
+    echo '[]'
+    return
+  fi
+
+  local cidrs_json
+  cidrs_json=$(printf '"%s",' "${HTTP_INGRESS_CIDRS[@]}")
+  echo "[${cidrs_json%,}]"
+}
+
 prepare_terraform_workspace() {
   terraform init -input=false -reconfigure
   terraform workspace select "${TF_WORKSPACE}" >/dev/null 2>&1 \
@@ -396,6 +414,13 @@ DEPLOY_TAG=$(git -C "${SCRIPT_DIR}" rev-parse --short HEAD 2>/dev/null || date +
 ok "Deploy image tag: ${DEPLOY_TAG}"
 
 DOMAIN_NAMES_ARG=$(build_domain_names_arg)
+HTTP_CIDRS_ARG=$(build_http_cidrs_arg)
+
+if [[ "${DESTROY}" != "true" && "${ENABLE_HTTPS}" != "true" && ${#HTTP_INGRESS_CIDRS[@]} -eq 0 ]]; then
+  warn "HTTPS is disabled and no --http-cidr was provided."
+  warn "The ALB security group blocks internet HTTP (port 80) by default, so the app will NOT be reachable."
+  warn "Re-run with --https --domain <domain>, or pass --http-cidr <trusted-range> (0.0.0.0/0 is rejected)."
+fi
 
 if [[ "${CREATE_ROUTE53_ZONE}" == "true" && -n "${PRIMARY_DOMAIN}" ]]; then
   ROUTE53_ZONE_ID=$(get_delegated_public_zone_id)
@@ -422,6 +447,7 @@ if [[ "$DESTROY" == "true" ]]; then
     -var="acm_certificate_arn=${ACM_CERTIFICATE_ARN}" \
     -var="domain_name=${PRIMARY_DOMAIN}" \
     -var="domain_names=${DOMAIN_NAMES_ARG}" \
+    -var="alb_http_ingress_cidrs=${HTTP_CIDRS_ARG}" \
     -var="route53_zone_id=${ROUTE53_ZONE_ID}" \
     -var="create_route53_zone=${CREATE_ROUTE53_ZONE}"
   ok "Infrastructure destroyed."
@@ -529,6 +555,7 @@ terraform plan -out="${PLAN_FILE}" \
   -var="acm_certificate_arn=${ACM_CERTIFICATE_ARN}" \
   -var="domain_name=${PRIMARY_DOMAIN}" \
   -var="domain_names=${DOMAIN_NAMES_ARG}" \
+  -var="alb_http_ingress_cidrs=${HTTP_CIDRS_ARG}" \
   -var="route53_zone_id=${ROUTE53_ZONE_ID}" \
   -var="create_route53_zone=${CREATE_ROUTE53_ZONE}" 2>&1 | tee "${PLAN_FILE}.log"
 
@@ -617,7 +644,14 @@ echo "════════════════════════�
 echo ""
 echo "  ECS tasks may take 1-2 minutes to become healthy."
 echo ""
-echo "  Verify health:"
-echo "    curl ${APP_URL}/api/health"
-echo ""
+if [[ "${ENABLE_HTTPS}" != "true" && ${#HTTP_INGRESS_CIDRS[@]} -eq 0 ]]; then
+  echo "  ⚠  Internet HTTP (port 80) is blocked by the ALB security group."
+  echo "     The URL above will not respond until you re-deploy with --https"
+  echo "     or allow trusted ranges via --http-cidr."
+  echo ""
+else
+  echo "  Verify health:"
+  echo "    curl ${APP_URL}/api/health"
+  echo ""
+fi
 
