@@ -1,38 +1,95 @@
 # ─────────────────────────────────────────────
 # ALB Security Group
-# Allows inbound HTTP traffic from the internet.
+# Inbound HTTPS from the internet; HTTP (port 80)
+# only from restricted ranges (opt-in). Egress is
+# limited to the application tasks inside the VPC.
 # ─────────────────────────────────────────────
 resource "aws_security_group" "alb" {
   name        = "${var.project_name}-alb-sg"
-  description = "Allow inbound HTTP/HTTPS from the internet"
+  description = "Allow inbound HTTPS from the internet (HTTP only from restricted ranges)"
   vpc_id      = aws_vpc.main.id
 
-  ingress {
-    description = "HTTP"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "HTTPS"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    description = "Allow all outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  # Rules are declared as separate aws_vpc_security_group_*_rule resources
+  # below so that the public 0.0.0.0/0 HTTPS rule and the (opt-in,
+  # never-public) HTTP rule are evaluated independently — keeping CKV_AWS_260
+  # from cross-associating the two within a single resource. No inline
+  # ingress/egress may be configured here (not even egress = []): inline
+  # rules and standalone rule resources on the same security group conflict,
+  # and an explicit empty egress would remove the standalone egress rules on
+  # every subsequent apply. The provider already revokes AWS's default
+  # allow-all egress rule when it creates the group, so the dedicated
+  # aws_vpc_security_group_egress_rule resources fully control outbound access.
 
   tags = {
     Name        = "${var.project_name}-alb-sg"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "alb_https" {
+  security_group_id = aws_security_group.alb.id
+  description       = "HTTPS from the internet"
+  from_port         = 443
+  to_port           = 443
+  ip_protocol       = "tcp"
+  cidr_ipv4         = "0.0.0.0/0"
+
+  tags = {
+    Name        = "${var.project_name}-alb-https-in"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+# Port 80 ingress is opt-in via var.alb_http_ingress_cidrs and is never
+# exposed to 0.0.0.0/0 (CKV_AWS_260; the variable validation rejects it).
+# Leave the list empty for the HTTPS-only target architecture; populate it
+# with trusted source ranges only while plaintext HTTP is temporarily needed.
+resource "aws_vpc_security_group_ingress_rule" "alb_http" {
+  for_each = toset(var.alb_http_ingress_cidrs)
+
+  security_group_id = aws_security_group.alb.id
+  description       = "HTTP from restricted source range"
+  from_port         = 80
+  to_port           = 80
+  ip_protocol       = "tcp"
+  cidr_ipv4         = each.value
+
+  tags = {
+    Name        = "${var.project_name}-alb-http-in"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+# Egress is restricted to the application tasks inside the VPC; the ALB only
+# forwards requests to the frontend and backend target groups (CKV_AWS_382).
+resource "aws_vpc_security_group_egress_rule" "alb_frontend" {
+  security_group_id = aws_security_group.alb.id
+  description       = "Forward to frontend tasks within the VPC"
+  from_port         = var.frontend_port
+  to_port           = var.frontend_port
+  ip_protocol       = "tcp"
+  cidr_ipv4         = var.vpc_cidr
+
+  tags = {
+    Name        = "${var.project_name}-alb-frontend-out"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_vpc_security_group_egress_rule" "alb_backend" {
+  security_group_id = aws_security_group.alb.id
+  description       = "Forward to backend tasks within the VPC"
+  from_port         = var.backend_port
+  to_port           = var.backend_port
+  ip_protocol       = "tcp"
+  cidr_ipv4         = var.vpc_cidr
+
+  tags = {
+    Name        = "${var.project_name}-alb-backend-out"
     Project     = var.project_name
     Environment = var.environment
   }
@@ -55,12 +112,39 @@ resource "aws_security_group" "frontend" {
     security_groups = [aws_security_group.alb.id]
   }
 
+  # Outbound is restricted to in-VPC AWS endpoints and DNS; image layers
+  # are pulled from S3 via the gateway endpoint prefix list. No 0.0.0.0/0
+  # egress (CKV_AWS_382).
   egress {
-    description = "Allow all outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTPS to AWS interface VPC endpoints (ECR, logs)"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    description     = "HTTPS to S3 via gateway endpoint (ECR image layers)"
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
+    prefix_list_ids = [aws_vpc_endpoint.s3.prefix_list_id]
+  }
+
+  egress {
+    description = "DNS (UDP) to the VPC resolver"
+    from_port   = 53
+    to_port     = 53
+    protocol    = "udp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    description = "DNS (TCP) to the VPC resolver"
+    from_port   = 53
+    to_port     = 53
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
   }
 
   tags = {
@@ -87,12 +171,46 @@ resource "aws_security_group" "backend" {
     security_groups = [aws_security_group.alb.id]
   }
 
+  # Outbound is restricted to in-VPC AWS endpoints, S3 (gateway endpoint),
+  # the RDS database, and DNS. No 0.0.0.0/0 egress (CKV_AWS_382).
   egress {
-    description = "Allow all outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTPS to AWS interface VPC endpoints (ECR, logs, secrets, sts, kms)"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    description     = "HTTPS to S3 via gateway endpoint (ECR image layers)"
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
+    prefix_list_ids = [aws_vpc_endpoint.s3.prefix_list_id]
+  }
+
+  egress {
+    description = "PostgreSQL to RDS within the VPC"
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    description = "DNS (UDP) to the VPC resolver"
+    from_port   = 53
+    to_port     = 53
+    protocol    = "udp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    description = "DNS (TCP) to the VPC resolver"
+    from_port   = 53
+    to_port     = 53
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
   }
 
   tags = {
@@ -120,13 +238,9 @@ resource "aws_security_group" "rds" {
     security_groups = [aws_security_group.backend.id]
   }
 
-  egress {
-    description = "Allow all outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  # No egress rules: the database never initiates outbound connections, so
+  # declaring the resource without an egress block revokes the default
+  # allow-all rule and leaves egress fully locked down (CKV_AWS_382).
 
   tags = {
     Name        = "${var.project_name}-rds-sg"
