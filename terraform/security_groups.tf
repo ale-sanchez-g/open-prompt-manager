@@ -8,13 +8,16 @@ resource "aws_security_group" "alb" {
   name        = "${var.project_name}-alb-sg"
   description = "Allow inbound HTTPS from the internet (HTTP only from restricted ranges)"
   vpc_id      = aws_vpc.main.id
-  egress      = []
 
   # Rules are declared as separate aws_vpc_security_group_*_rule resources
   # below so that the public 0.0.0.0/0 HTTPS rule and the (opt-in,
   # never-public) HTTP rule are evaluated independently — keeping CKV_AWS_260
-  # from cross-associating the two within a single resource. Setting egress = []
-  # explicitly revokes AWS's default allow-all outbound rule so the dedicated
+  # from cross-associating the two within a single resource. No inline
+  # ingress/egress may be configured here (not even egress = []): inline
+  # rules and standalone rule resources on the same security group conflict,
+  # and an explicit empty egress would remove the standalone egress rules on
+  # every subsequent apply. The provider already revokes AWS's default
+  # allow-all egress rule when it creates the group, so the dedicated
   # aws_vpc_security_group_egress_rule resources fully control outbound access.
 
   tags = {

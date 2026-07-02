@@ -64,17 +64,21 @@ run "alb_sg_allows_https_ingress" {
   }
 }
 
+# ALB egress lives entirely in standalone aws_vpc_security_group_egress_rule
+# resources; the group itself configures no inline egress (an explicit
+# egress = [] would conflict with the standalone rules and remove them on
+# apply), so only the rule resources are asserted here.
 run "alb_sg_egress_not_open_to_world" {
   command = plan
 
   assert {
-    condition     = length(aws_security_group.alb.egress) == 0
-    error_message = "ALB security group must revoke the default inline allow-all egress rule."
+    condition     = aws_vpc_security_group_egress_rule.alb_frontend.cidr_ipv4 != "0.0.0.0/0" && aws_vpc_security_group_egress_rule.alb_backend.cidr_ipv4 != "0.0.0.0/0"
+    error_message = "ALB egress must not allow 0.0.0.0/0 (CKV_AWS_382)."
   }
 
   assert {
-    condition     = aws_vpc_security_group_egress_rule.alb_frontend.cidr_ipv4 != "0.0.0.0/0" && aws_vpc_security_group_egress_rule.alb_backend.cidr_ipv4 != "0.0.0.0/0"
-    error_message = "ALB egress must not allow 0.0.0.0/0 (CKV_AWS_382)."
+    condition     = aws_vpc_security_group_egress_rule.alb_frontend.cidr_ipv4 == var.vpc_cidr && aws_vpc_security_group_egress_rule.alb_backend.cidr_ipv4 == var.vpc_cidr
+    error_message = "ALB egress must stay within the VPC CIDR."
   }
 }
 
