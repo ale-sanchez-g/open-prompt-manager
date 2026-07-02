@@ -68,6 +68,11 @@ run "alb_sg_egress_not_open_to_world" {
   command = plan
 
   assert {
+    condition     = length(aws_security_group.alb.egress) == 0
+    error_message = "ALB security group must revoke the default inline allow-all egress rule."
+  }
+
+  assert {
     condition     = aws_vpc_security_group_egress_rule.alb_frontend.cidr_ipv4 != "0.0.0.0/0" && aws_vpc_security_group_egress_rule.alb_backend.cidr_ipv4 != "0.0.0.0/0"
     error_message = "ALB egress must not allow 0.0.0.0/0 (CKV_AWS_382)."
   }
