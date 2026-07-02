@@ -176,8 +176,8 @@ run "backend_sg_has_required_tags" {
 run "frontend_sg_egress_not_open_to_world" {
   command = plan
 
-  # Prefix-list-only egress rules have cidr_blocks == null, so coalesce to an
-  # empty list before checking.
+  # The S3 gateway/prefix-list-only egress rule has cidr_blocks == null, so
+  # coalesce to an empty list before checking for 0.0.0.0/0.
   assert {
     condition = alltrue([
       for r in aws_security_group.frontend.egress : !contains(coalesce(r.cidr_blocks, []), "0.0.0.0/0")
