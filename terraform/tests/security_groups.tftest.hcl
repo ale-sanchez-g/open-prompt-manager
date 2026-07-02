@@ -204,8 +204,11 @@ run "backend_sg_egress_not_open_to_world" {
   }
 }
 
+# Uses command = apply: with no egress block the security group's egress set
+# is Computed and therefore unknown at plan time, so the count can only be
+# evaluated after apply (mock_provider resolves it to an empty set).
 run "rds_sg_has_no_egress" {
-  command = plan
+  command = apply
 
   assert {
     condition     = length(aws_security_group.rds.egress) == 0
