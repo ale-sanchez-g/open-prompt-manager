@@ -212,8 +212,17 @@ run "backend_sg_egress_not_open_to_world" {
 # Uses command = apply: with no egress block the security group's egress set
 # is Computed and therefore unknown at plan time, so the count can only be
 # evaluated after apply (mock_provider resolves it to an empty set).
+# The apply is targeted at the RDS security group: a full mocked apply fails
+# because mock_provider fills computed ARNs (aws_lb.main.arn, IAM role ARNs,
+# log group ARNs) with random strings that downstream resources reject as
+# invalid ARNs. The target closure only contains VPC/SG resources, which
+# carry no ARN-validated attributes.
 run "rds_sg_has_no_egress" {
   command = apply
+
+  plan_options {
+    target = [aws_security_group.rds]
+  }
 
   assert {
     condition     = length(aws_security_group.rds.egress) == 0
