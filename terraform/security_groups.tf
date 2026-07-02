@@ -9,49 +9,81 @@ resource "aws_security_group" "alb" {
   description = "Allow inbound HTTPS from the internet (HTTP only from restricted ranges)"
   vpc_id      = aws_vpc.main.id
 
-  # Port 80 ingress is opt-in via var.alb_http_ingress_cidrs and is never
-  # exposed to 0.0.0.0/0 (CKV_AWS_260). Leave the list empty for the
-  # HTTPS-only target architecture; populate it with trusted source ranges
-  # only while plaintext HTTP is temporarily required.
-  dynamic "ingress" {
-    for_each = length(var.alb_http_ingress_cidrs) > 0 ? [1] : []
-    content {
-      description = "HTTP from restricted source ranges"
-      from_port   = 80
-      to_port     = 80
-      protocol    = "tcp"
-      cidr_blocks = var.alb_http_ingress_cidrs
-    }
-  }
-
-  ingress {
-    description = "HTTPS"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # Egress is restricted to the application tasks inside the VPC; the ALB
-  # only forwards requests to the frontend and backend target groups.
-  egress {
-    description = "Forward to frontend tasks within the VPC"
-    from_port   = var.frontend_port
-    to_port     = var.frontend_port
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
-  }
-
-  egress {
-    description = "Forward to backend tasks within the VPC"
-    from_port   = var.backend_port
-    to_port     = var.backend_port
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
-  }
+  # Rules are declared as separate aws_vpc_security_group_*_rule resources
+  # below so that the public 0.0.0.0/0 HTTPS rule and the (opt-in,
+  # never-public) HTTP rule are evaluated independently — keeping CKV_AWS_260
+  # from cross-associating the two within a single resource.
 
   tags = {
     Name        = "${var.project_name}-alb-sg"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "alb_https" {
+  security_group_id = aws_security_group.alb.id
+  description       = "HTTPS from the internet"
+  from_port         = 443
+  to_port           = 443
+  ip_protocol       = "tcp"
+  cidr_ipv4         = "0.0.0.0/0"
+
+  tags = {
+    Name        = "${var.project_name}-alb-https-in"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+# Port 80 ingress is opt-in via var.alb_http_ingress_cidrs and is never
+# exposed to 0.0.0.0/0 (CKV_AWS_260; the variable validation rejects it).
+# Leave the list empty for the HTTPS-only target architecture; populate it
+# with trusted source ranges only while plaintext HTTP is temporarily needed.
+resource "aws_vpc_security_group_ingress_rule" "alb_http" {
+  for_each = toset(var.alb_http_ingress_cidrs)
+
+  security_group_id = aws_security_group.alb.id
+  description       = "HTTP from restricted source range"
+  from_port         = 80
+  to_port           = 80
+  ip_protocol       = "tcp"
+  cidr_ipv4         = each.value
+
+  tags = {
+    Name        = "${var.project_name}-alb-http-in"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+# Egress is restricted to the application tasks inside the VPC; the ALB only
+# forwards requests to the frontend and backend target groups (CKV_AWS_382).
+resource "aws_vpc_security_group_egress_rule" "alb_frontend" {
+  security_group_id = aws_security_group.alb.id
+  description       = "Forward to frontend tasks within the VPC"
+  from_port         = var.frontend_port
+  to_port           = var.frontend_port
+  ip_protocol       = "tcp"
+  cidr_ipv4         = var.vpc_cidr
+
+  tags = {
+    Name        = "${var.project_name}-alb-frontend-out"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_vpc_security_group_egress_rule" "alb_backend" {
+  security_group_id = aws_security_group.alb.id
+  description       = "Forward to backend tasks within the VPC"
+  from_port         = var.backend_port
+  to_port           = var.backend_port
+  ip_protocol       = "tcp"
+  cidr_ipv4         = var.vpc_cidr
+
+  tags = {
+    Name        = "${var.project_name}-alb-backend-out"
     Project     = var.project_name
     Environment = var.environment
   }
