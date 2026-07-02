@@ -15,9 +15,12 @@ restricted egress, DNSSEC, and others). Every entry carries an `expires`
 date, and the `IaC SAST (checkov)` CI job hard-fails when any suppression
 has expired.
 
-Before the renewal, all 23 suppressions expired on **2026-06-30**. Since then, every fresh CI
-run on every pull request — including dependency bumps that do not touch
-infrastructure — fails the Checkov gate, blocking all merges.
+Before the renewal, the register still contained 23 suppressions; the
+current count is 21 because PR #313 removes `CKV_AWS_260` and
+`CKV_AWS_382` while resolving the underlying findings. All 23 of those
+pre-remediation suppressions expired on **2026-06-30**. Since then, every
+fresh CI run on every pull request — including dependency bumps that do not
+touch infrastructure — fails the Checkov gate, blocking all merges.
 
 Remediation work is in flight but not yet mergeable:
 
@@ -54,4 +57,5 @@ justifications recorded in the register remain accurate.
 * Each suppression must be remediated or consciously renewed again by
   **2026-09-30**, at which point the CI gate will hard-fail once more.
   Landing #312 and #313 ahead of that date shrinks the register by four
-  entries.
+  entries in total: `CKV_AWS_161`, `CKV2_AWS_57`, `CKV_AWS_260`, and
+  `CKV_AWS_382`.
