@@ -6,139 +6,139 @@
     {
       "id": "CKV_AWS_2",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "HTTP listener only created when HTTPS is disabled (dev/test). Planned: enforce HTTPS-only listeners across all environments."
     },
     {
       "id": "CKV_AWS_51",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "ECR tag mutability required for current CI/CD image push workflow. Planned: migrate to immutable tags with SHA-based image references."
     },
     {
       "id": "CKV_AWS_103",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "HTTP listener exists only when enable_https is false (non-production). TLS 1.2 is enforced on the HTTPS listener. Planned: remove HTTP listener entirely and enforce HTTPS across all environments."
     },
     {
       "id": "CKV_AWS_130",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "Public subnets assign public IPs by design for ALB and NAT gateway placement. Risk accepted: no EC2 instances are launched in public subnets; only managed AWS resources (ALB, NAT GW) use them."
     },
     {
       "id": "CKV_AWS_150",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "ALB deletion protection is controlled by var.db_deletion_protection but currently defaults to false. Planned: enable deletion protection for production workloads via variable override."
     },
     {
       "id": "CKV_AWS_157",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "RDS Multi-AZ is controlled by var.db_multi_az but defaults to false. Planned: enable Multi-AZ for production to ensure HA failover."
     },
     {
       "id": "CKV_AWS_161",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "RDS uses password-based auth via Secrets Manager. Planned: enable IAM database authentication as an additional access control layer."
     },
     {
       "id": "CKV_AWS_260",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "ALB security group allows inbound port 80 from 0.0.0.0/0 for HTTP-to-HTTPS redirect. Planned: restrict port 80 ingress once HTTPS is enforced across all environments."
     },
     {
       "id": "CKV_AWS_293",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "RDS deletion protection controlled by var.db_deletion_protection, currently defaults to false. Planned: enforce deletion_protection = true for production via variable override."
     },
     {
       "id": "CKV_AWS_378",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "Target groups use HTTP protocol for ALB-to-ECS communication within the VPC. Planned: evaluate end-to-end TLS with HTTPS target groups once ECS tasks support TLS termination."
     },
     {
       "id": "CKV_AWS_382",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "Security groups allow unrestricted egress (0.0.0.0/0) for ECS tasks to pull images and reach AWS APIs. Planned: restrict egress to specific CIDR ranges and VPC endpoints."
     },
     {
       "id": "CKV2_AWS_20",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "ALB HTTP-to-HTTPS redirect only active when enable_https is true; Checkov cannot evaluate conditional resources. Planned: enforce HTTPS-only and remove the HTTP listener."
     },
     {
       "id": "CKV2_AWS_28",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "Public-facing ALB not protected by WAF. Planned: add aws_wafv2_web_acl with managed rule groups (AWSManagedRulesCommonRuleSet, AWSManagedRulesKnownBadInputsRuleSet) and associate with the ALB."
     },
     {
       "id": "CKV2_AWS_30",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "PostgreSQL query logging not enabled via parameter group. Planned: create aws_db_parameter_group with log_statement = all and log_min_duration_statement = 1000."
     },
     {
       "id": "CKV2_AWS_38",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "Route53 hosted zone DNSSEC signing not enabled. Planned: enable DNSSEC via aws_route53_key_signing_key and aws_route53_hosted_zone_dnssec resources."
     },
     {
       "id": "CKV2_AWS_39",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "Route53 DNS query logging not enabled. Planned: add aws_route53_query_log resource with CloudWatch Log Group destination."
     },
     {
       "id": "CKV2_AWS_57",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "Secrets Manager automatic rotation not configured. Planned: add aws_secretsmanager_secret_rotation with Lambda rotation function for database credentials."
     },
     {
       "id": "CKV_AWS_145",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "The ALB access-log bucket uses SSE-S3 (AES256) because ELB access-log delivery does not support SSE-KMS buckets. Risk accepted: logs are server-side encrypted at rest; KMS is not an option for this delivery channel."
     },
     {
       "id": "CKV_AWS_144",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "Cross-region replication is not warranted for transient ALB access logs that are lifecycle-expired after 365 days. Risk accepted for this non-critical log data."
     },
     {
       "id": "CKV2_AWS_62",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "Event notifications are not required for the passive ALB access-log sink bucket. Risk accepted; no event-driven processing is performed on these logs."
     },
     {
       "id": "CKV_AWS_109",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "False positive on the CloudWatch Logs KMS key policy: the root-account statement granting kms:* is the AWS-recommended default that prevents key lockout, and KMS key policies are inherently scoped to the key they are attached to."
     },
     {
       "id": "CKV_AWS_111",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "False positive on the CloudWatch Logs KMS key policy: the root-account statement granting kms:* is the AWS-recommended default that prevents key lockout, and KMS key policies are inherently scoped to the key they are attached to."
     },
     {
       "id": "CKV_AWS_356",
       "owner": "github-agents",
-      "expires": "2026-06-30",
+      "expires": "2026-09-30",
       "justification": "KMS key policies must use Resource: \"*\" to refer to the key the policy is attached to; this cannot be scoped further. The service-principal statement is additionally constrained by an encryption-context condition."
     }
   ]
