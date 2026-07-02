@@ -29,6 +29,10 @@ resource "aws_security_group" "vpc_endpoints" {
   description = "Allow HTTPS from within the VPC to interface VPC endpoints"
   vpc_id      = aws_vpc.main.id
 
+  # Explicitly revoke AWS's default allow-all egress rule; interface endpoints
+  # only need to respond to in-VPC connections.
+  egress = []
+
   ingress {
     description = "HTTPS from within the VPC"
     from_port   = 443
