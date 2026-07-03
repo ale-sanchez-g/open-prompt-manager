@@ -5,7 +5,13 @@
 # limited to the application tasks inside the VPC.
 # ─────────────────────────────────────────────
 resource "aws_security_group" "alb" {
-  name        = "${var.project_name}-alb-sg"
+  # Use name_prefix (not a fixed name) together with create_before_destroy so
+  # that when an immutable attribute forces replacement, Terraform can stand up
+  # the new group (under a unique generated name), move the ALB onto it, and
+  # only then delete the old one. A fixed name would collide during that
+  # overlap window; destroy-before-create fails with DependencyViolation while
+  # the ALB's ENIs still reference the old group.
+  name_prefix = "${var.project_name}-alb-"
   description = "Allow inbound HTTPS from the internet (HTTP only from restricted ranges)"
   vpc_id      = aws_vpc.main.id
 
@@ -24,6 +30,10 @@ resource "aws_security_group" "alb" {
     Name        = "${var.project_name}-alb-sg"
     Project     = var.project_name
     Environment = var.environment
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
 

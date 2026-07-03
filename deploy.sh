@@ -75,6 +75,76 @@ load_or_generate_jwt_secret() {
 }
 
 # ─────────────────────────────────────────────
+# Usage / help
+# ─────────────────────────────────────────────
+KNOWN_FLAGS=(--region --env --project --domain --https --http-cidr --route53 --destroy --migrate --help)
+
+usage() {
+  cat <<'EOF'
+deploy.sh – Full deployment script for Open Prompt Manager on AWS
+
+Usage:
+  ./deploy.sh [options]
+
+Options:
+  --region <region>     AWS region to deploy into (default: ap-southeast-2)
+  --env <name>          Environment name (default: prod)
+  --project <name>      Project name (default: open-prompt-manager)
+  --domain <domain>     Enable HTTPS and request/attach an ACM cert for <domain>.
+                        Repeat to add multiple domains (SANs).
+  --https               Enable HTTPS (implied by --domain)
+  --http-cidr <cidr>    Allow plaintext HTTP (port 80) from a trusted CIDR range.
+                        Repeat for multiple ranges. 0.0.0.0/0 is rejected.
+  --route53             Manage DNS for the domain in Route 53
+  --destroy             Tear down all infrastructure
+  --migrate             Run database migrations
+  --help, -h            Show this help and exit
+
+Examples:
+  ./deploy.sh --region eu-west-1
+  ./deploy.sh --https --domain example.com --route53
+  ./deploy.sh --http-cidr 203.0.113.0/24
+  ./deploy.sh --destroy
+
+Note: the ALB security group blocks internet HTTP (port 80) unless trusted
+ranges are supplied via --http-cidr (0.0.0.0/0 is rejected). Without --https,
+provide at least one --http-cidr or the app will be unreachable.
+EOF
+}
+
+# Suggest the closest known flag for an unrecognized option (Levenshtein distance).
+suggest_flag() {
+  local input="$1" best="" best_dist=99 flag dist
+  for flag in "${KNOWN_FLAGS[@]}"; do
+    dist=$(awk -v a="$input" -v b="$flag" '
+      BEGIN {
+        la = length(a); lb = length(b);
+        for (i = 0; i <= la; i++) d[i,0] = i;
+        for (j = 0; j <= lb; j++) d[0,j] = j;
+        for (i = 1; i <= la; i++)
+          for (j = 1; j <= lb; j++) {
+            c = (substr(a,i,1) == substr(b,j,1)) ? 0 : 1;
+            m = d[i-1,j] + 1;
+            n = d[i,j-1] + 1;
+            o = d[i-1,j-1] + c;
+            m = (n < m) ? n : m;
+            m = (o < m) ? o : m;
+            d[i,j] = m;
+          }
+        print d[la,lb];
+      }')
+    if (( dist < best_dist )); then
+      best_dist=$dist
+      best=$flag
+    fi
+  done
+  # Only suggest when the guess is reasonably close.
+  if (( best_dist <= 3 )); then
+    echo "$best"
+  fi
+}
+
+# ─────────────────────────────────────────────
 # Parse arguments
 # ─────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
@@ -88,7 +158,14 @@ while [[ $# -gt 0 ]]; do
     --route53)  CREATE_ROUTE53_ZONE=true; shift ;;
     --destroy)  DESTROY=true;       shift   ;;
     --migrate)  MIGRATE=true;       shift   ;;
-    *) echo "Unknown option: $1"; exit 1 ;;
+    --help|-h)  usage; exit 0 ;;
+    *)
+      echo "Unknown option: $1" >&2
+      suggestion="$(suggest_flag "$1")"
+      [[ -n "$suggestion" ]] && echo "Did you mean '${suggestion}'?" >&2
+      echo "Run './deploy.sh --help' to see all available options." >&2
+      exit 1
+      ;;
   esac
 done
 
