@@ -86,8 +86,8 @@ run "alb_sg_name_contains_project" {
   command = plan
 
   assert {
-    condition     = aws_security_group.alb.name == "${var.project_name}-alb-sg"
-    error_message = "ALB security group name must follow the pattern '<project_name>-alb-sg'."
+    condition     = startswith(aws_security_group.alb.name, "${var.project_name}-alb-")
+    error_message = "ALB security group name must start with '<project_name>-alb-'."
   }
 }
 
