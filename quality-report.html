@@ -1,1033 +1,420 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Open Prompt Manager — Quality Report</title>
-  <style>
-    :root {
-      --bg: #0f1117;
-      --surface: #1a1d27;
-      --surface2: #21253a;
-      --border: #2e3352;
-      --text: #e2e8f0;
-      --muted: #7c8aaa;
-      --accent: #6c7fe0;
-
-      --grade-a: #22c55e;
-      --grade-b: #3b82f6;
-      --grade-c: #f59e0b;
-      --grade-d: #f97316;
-      --grade-f: #ef4444;
-
-      --sev-critical: #ef4444;
-      --sev-high: #f97316;
-      --sev-medium: #f59e0b;
-      --sev-low: #3b82f6;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      line-height: 1.6;
-      min-height: 100vh;
-    }
-
-    .container { max-width: 1280px; margin: 0 auto; padding: 0 24px; }
-
-    header {
-      background: linear-gradient(135deg, #1a1d27 0%, #0f1117 100%);
-      border-bottom: 1px solid var(--border);
-      padding: 40px 0 32px;
-    }
-    .header-inner {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 20px;
-    }
-    .header-left h1 {
-      font-size: 1.75rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      background: linear-gradient(90deg, #e2e8f0, #6c7fe0);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .header-left p {
-      color: var(--muted);
-      font-size: 0.875rem;
-      margin-top: 4px;
-    }
-    .overall-badge {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 16px 24px;
-    }
-    .overall-score .number {
-      font-size: 3rem;
-      font-weight: 800;
-      line-height: 1;
-      color: var(--grade-d);
-    }
-    .overall-score .label {
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--muted);
-      margin-top: 2px;
-    }
-    .overall-grade {
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      background: rgba(249,115,22,0.15);
-      border: 2px solid var(--grade-d);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.5rem;
-      font-weight: 800;
-      color: var(--grade-d);
-    }
-
-    .meta-bar {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 12px 0;
-    }
-    .meta-inner {
-      display: flex;
-      gap: 32px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-    .stat {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.8rem;
-      color: var(--muted);
-    }
-    .stat strong { color: var(--text); }
-    .dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      display: inline-block;
-      flex-shrink: 0;
-    }
-    .dot-critical { background: var(--sev-critical); }
-    .dot-high     { background: var(--sev-high); }
-    .dot-medium   { background: var(--sev-medium); }
-    .dot-low      { background: var(--sev-low); }
-
-    .section { padding: 40px 0; }
-    .section-title {
-      font-size: 0.8rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--muted);
-      margin-bottom: 20px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .section-title::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
-    }
-
-    .score-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 16px;
-    }
-
-    .score-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px;
-      cursor: pointer;
-      transition: border-color 0.2s, transform 0.15s;
-      position: relative;
-      overflow: hidden;
-      display: block;
-      text-decoration: none;
-      color: inherit;
-    }
-    .score-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 3px;
-    }
-    .score-card.grade-a::before { background: var(--grade-a); }
-    .score-card.grade-b::before { background: var(--grade-b); }
-    .score-card.grade-c::before { background: var(--grade-c); }
-    .score-card.grade-d::before { background: var(--grade-d); }
-    .score-card.grade-f::before { background: var(--grade-f); }
-    .score-card:hover { transform: translateY(-2px); border-color: var(--accent); }
-
-    .score-card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 14px;
-    }
-    .score-card-title {
-      font-size: 0.875rem;
-      font-weight: 600;
-      color: var(--text);
-      flex: 1;
-      padding-right: 12px;
-    }
-    .score-pill { display: flex; flex-direction: column; align-items: center; min-width: 48px; }
-    .score-number { font-size: 1.6rem; font-weight: 800; line-height: 1; }
-    .score-grade  { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
-    .grade-a .score-number, .grade-a .score-grade { color: var(--grade-a); }
-    .grade-b .score-number, .grade-b .score-grade { color: var(--grade-b); }
-    .grade-c .score-number, .grade-c .score-grade { color: var(--grade-c); }
-    .grade-d .score-number, .grade-d .score-grade { color: var(--grade-d); }
-    .grade-f .score-number, .grade-f .score-grade { color: var(--grade-f); }
-
-    .score-bar-track {
-      height: 4px;
-      background: var(--border);
-      border-radius: 4px;
-      margin-bottom: 12px;
-      overflow: hidden;
-    }
-    .score-bar-fill { height: 100%; border-radius: 4px; }
-    .grade-a .score-bar-fill { background: var(--grade-a); }
-    .grade-b .score-bar-fill { background: var(--grade-b); }
-    .grade-c .score-bar-fill { background: var(--grade-c); }
-    .grade-d .score-bar-fill { background: var(--grade-d); }
-    .grade-f .score-bar-fill { background: var(--grade-f); }
-
-    .score-card-summary { font-size: 0.78rem; color: var(--muted); line-height: 1.5; }
-
-    .severity-tally { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
-    .sev-chip {
-      font-size: 0.68rem;
-      padding: 2px 7px;
-      border-radius: 20px;
-      font-weight: 600;
-    }
-    .sev-chip.critical { background: rgba(239,68,68,0.12); color: var(--sev-critical); border: 1px solid rgba(239,68,68,0.25); }
-    .sev-chip.high     { background: rgba(249,115,22,0.12); color: var(--sev-high);     border: 1px solid rgba(249,115,22,0.25); }
-    .sev-chip.medium   { background: rgba(245,158,11,0.12); color: var(--sev-medium);   border: 1px solid rgba(245,158,11,0.25); }
-    .sev-chip.low      { background: rgba(59,130,246,0.12); color: var(--sev-low);      border: 1px solid rgba(59,130,246,0.25); }
-
-    /* Horizontal bar chart */
-    .radar-wrap {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 32px;
-    }
-    .radar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-    .radar-row:last-child { margin-bottom: 0; }
-    .radar-label { font-size: 0.78rem; color: var(--muted); width: 230px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .radar-track { flex: 1; height: 8px; background: var(--border); border-radius: 8px; overflow: hidden; }
-    .radar-fill  { height: 100%; border-radius: 8px; }
-    .radar-val   { font-size: 0.78rem; font-weight: 700; width: 28px; text-align: right; }
-
-    /* Detail sections */
-    .detail-block { margin-bottom: 56px; scroll-margin-top: 24px; }
-    .detail-header {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      margin-bottom: 20px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--border);
-    }
-    .detail-title { font-size: 1.1rem; font-weight: 700; flex: 1; }
-    .detail-num   { font-size: 2rem; font-weight: 800; line-height: 1; }
-    .detail-grade-badge {
-      width: 40px; height: 40px;
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.1rem; font-weight: 800;
-    }
-    .grade-a .detail-num { color: var(--grade-a); }
-    .grade-b .detail-num { color: var(--grade-b); }
-    .grade-c .detail-num { color: var(--grade-c); }
-    .grade-d .detail-num { color: var(--grade-d); }
-    .grade-f .detail-num { color: var(--grade-f); }
-    .grade-a .detail-grade-badge { color: var(--grade-a); background: rgba(34,197,94,0.12);  border: 1px solid rgba(34,197,94,0.3); }
-    .grade-b .detail-grade-badge { color: var(--grade-b); background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.3); }
-    .grade-c .detail-grade-badge { color: var(--grade-c); background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); }
-    .grade-d .detail-grade-badge { color: var(--grade-d); background: rgba(249,115,22,0.12); border: 1px solid rgba(249,115,22,0.3); }
-    .grade-f .detail-grade-badge { color: var(--grade-f); background: rgba(239,68,68,0.12);  border: 1px solid rgba(239,68,68,0.3); }
-
-    .summary-block {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 16px 20px;
-      font-size: 0.875rem;
-      color: var(--muted);
-      line-height: 1.7;
-      margin-bottom: 20px;
-    }
-
-    .findings-recs-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
-    }
-
-    .col-title {
-      font-size: 0.72rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--muted);
-      margin-bottom: 10px;
-    }
-
-    .finding {
-      display: flex;
-      gap: 12px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left-width: 3px;
-      border-radius: 8px;
-      padding: 12px 14px;
-      margin-bottom: 8px;
-    }
-    .finding.critical { border-left-color: var(--sev-critical); }
-    .finding.high     { border-left-color: var(--sev-high); }
-    .finding.medium   { border-left-color: var(--sev-medium); }
-    .finding.low      { border-left-color: var(--sev-low); }
-
-    .finding-badge {
-      flex-shrink: 0;
-      font-size: 0.6rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      padding: 2px 6px;
-      border-radius: 4px;
-      height: fit-content;
-      margin-top: 3px;
-    }
-    .finding.critical .finding-badge { background: rgba(239,68,68,0.15);  color: var(--sev-critical); }
-    .finding.high     .finding-badge { background: rgba(249,115,22,0.15); color: var(--sev-high); }
-    .finding.medium   .finding-badge { background: rgba(245,158,11,0.15); color: var(--sev-medium); }
-    .finding.low      .finding-badge { background: rgba(59,130,246,0.15); color: var(--sev-low); }
-
-    .finding-title  { font-size: 0.85rem; font-weight: 600; color: var(--text); margin-bottom: 4px; }
-    .finding-detail { font-size: 0.78rem; color: var(--muted); line-height: 1.55; }
-
-    .rec-list { list-style: none; }
-    .rec-list li {
-      display: flex;
-      gap: 10px;
-      font-size: 0.82rem;
-      color: var(--text);
-      padding: 10px 14px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      margin-bottom: 6px;
-      line-height: 1.55;
-    }
-    .rec-list li::before { content: '→'; color: var(--accent); flex-shrink: 0; font-weight: 700; }
-
-    .divider { height: 1px; background: var(--border); margin: 0 0 40px; }
-
-    footer {
-      border-top: 1px solid var(--border);
-      padding: 24px 0;
-      color: var(--muted);
-      font-size: 0.75rem;
-    }
-    .footer-inner { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
-    footer strong { color: var(--text); }
-
-    @media (max-width: 900px) {
-      .findings-recs-grid { grid-template-columns: 1fr; }
-      .score-grid { grid-template-columns: 1fr 1fr; }
-      .radar-label { width: 150px; }
-    }
-    @media (max-width: 560px) {
-      .score-grid { grid-template-columns: 1fr; }
-      .header-inner { flex-direction: column; }
-    }
-  </style>
-</head>
-<body>
-
-<header>
-  <div class="container">
-    <div class="header-inner">
-      <div class="header-left">
-        <h1>Open Prompt Manager — Quality Report</h1>
-        <p>8-dimension swarm review &nbsp;·&nbsp; Claude Haiku agents &nbsp;·&nbsp; Generated 2026-06-04 &nbsp;·&nbsp; Branch: main &nbsp;·&nbsp; <span style="color:#22c55e;">↑ Before: 64 | After: 71</span></p>
-      </div>
-      <div class="overall-badge">
-        <div class="overall-score">
-          <div class="number">71</div>
-          <div class="label">Overall Score</div>
-        </div>
-        <div class="overall-grade">C</div>
-      </div>
-    </div>
-  </div>
-</header>
-
-<div class="meta-bar">
-  <div class="container">
-    <div class="meta-inner">
-      <div class="stat"><span class="dot dot-critical"></span><strong>6</strong>&nbsp;Critical <span style="color:#7c8aaa;font-size:0.75rem;">↓4</span></div>
-      <div class="stat"><span class="dot dot-high"></span><strong>14</strong>&nbsp;High <span style="color:#7c8aaa;font-size:0.75rem;">↓4</span></div>
-      <div class="stat"><span class="dot dot-medium"></span><strong>19</strong>&nbsp;Medium <span style="color:#7c8aaa;font-size:0.75rem;">↓3</span></div>
-      <div class="stat"><span class="dot dot-low"></span><strong>11</strong>&nbsp;Low <span style="color:#7c8aaa;font-size:0.75rem;">↓2</span></div>
-      <div class="stat" style="margin-left:auto;"><strong>50</strong>&nbsp;total findings &nbsp;·&nbsp; 8 dimensions &nbsp;·&nbsp; Live verification via Datadog 2026-06-04</div>
-    </div>
-  </div>
-</div>
-
-<div class="container">
-
-  <div class="section">
-    <div class="section-title">Score Overview</div>
-
-    <div class="radar-wrap">
-      <div class="radar-row">
-        <div class="radar-label">Codebase Health &amp; Maintainability</div>
-        <div class="radar-track"><div class="radar-fill" style="width:72%;background:var(--grade-c);"></div></div>
-        <div class="radar-val" style="color:var(--grade-c);">72 <span style="font-size:0.7rem;color:#7c8aaa;">+2</span></div>
-      </div>
-      <div class="radar-row">
-        <div class="radar-label">Security &amp; Compliance</div>
-        <div class="radar-track"><div class="radar-fill" style="width:76%;background:var(--grade-c);"></div></div>
-        <div class="radar-val" style="color:var(--grade-c);">76 <span style="font-size:0.7rem;color:#22c55e;">+4</span></div>
-      </div>
-      <div class="radar-row">
-        <div class="radar-label">Reliability &amp; Production Stability</div>
-        <div class="radar-track"><div class="radar-fill" style="width:74%;background:var(--grade-c);"></div></div>
-        <div class="radar-val" style="color:var(--grade-c);">74 <span style="font-size:0.7rem;color:#22c55e;">+6</span></div>
-      </div>
-      <div class="radar-row">
-        <div class="radar-label">User-Centric Quality</div>
-        <div class="radar-track"><div class="radar-fill" style="width:62%;background:var(--grade-d);"></div></div>
-        <div class="radar-val" style="color:var(--grade-d);">62 <span style="font-size:0.7rem;color:#7c8aaa;">+2</span></div>
-      </div>
-      <div class="radar-row">
-        <div class="radar-label">Workflow &amp; Engineering Efficiency</div>
-        <div class="radar-track"><div class="radar-fill" style="width:70%;background:var(--grade-c);"></div></div>
-        <div class="radar-val" style="color:var(--grade-c);">70 <span style="font-size:0.7rem;color:#22c55e;">+2</span></div>
-      </div>
-      <div class="radar-row">
-        <div class="radar-label">Architecture &amp; System Design</div>
-        <div class="radar-track"><div class="radar-fill" style="width:62%;background:var(--grade-d);"></div></div>
-        <div class="radar-val" style="color:var(--grade-d);">62 <span style="font-size:0.7rem;color:#22c55e;">+4</span></div>
-      </div>
-      <div class="radar-row">
-        <div class="radar-label">Delivery Flow &amp; DORA</div>
-        <div class="radar-track"><div class="radar-fill" style="width:76%;background:var(--grade-c);"></div></div>
-        <div class="radar-val" style="color:var(--grade-c);">76 <span style="font-size:0.7rem;color:#22c55e;">+4</span></div>
-      </div>
-      <div class="radar-row">
-        <div class="radar-label">Operational Excellence &amp; Observability</div>
-        <div class="radar-track"><div class="radar-fill" style="width:57%;background:var(--grade-d);"></div></div>
-        <div class="radar-val" style="color:var(--grade-d);">57 <span style="font-size:0.7rem;color:#22c55e;">+11</span></div>
-      </div>
-    </div>
-
-    <div style="display:flex;justify-content:center;margin:28px 0 32px;">
-      <div style="background:#1a1d27;border:1px solid #2e3352;border-radius:14px;padding:28px 32px;width:100%;max-width:540px;">
-        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#7c8aaa;margin-bottom:16px;text-align:center;">Quality Radar</div>
-        <canvas id="radarChart" style="max-height:420px;"></canvas>
-      </div>
-    </div>
-
-    <div class="score-grid">
-
-      <a href="#codebase" class="score-card grade-c">
-        <div class="score-card-header">
-          <div class="score-card-title">Codebase Health &amp; Maintainability</div>
-          <div class="score-pill grade-c"><div class="score-number">72</div><div class="score-grade">C</div></div>
-        </div>
-        <div class="score-bar-track"><div class="score-bar-fill" style="width:72%"></div></div>
-        <div class="score-card-summary">Zero TODOs, 1:1 test ratio, and focused mutation testing hardening. Minor improvements in assertion coverage offset by persistent MCP/REST layer divergence.</div>
-        <div class="severity-tally">
-          <span class="sev-chip high">2 High</span>
-          <span class="sev-chip medium">3 Medium</span>
-          <span class="sev-chip low">1 Low</span>
-        </div>
-      </a>
-
-      <a href="#security" class="score-card grade-c">
-        <div class="score-card-header">
-          <div class="score-card-title">Security &amp; Compliance</div>
-          <div class="score-pill grade-c"><div class="score-number">76</div><div class="score-grade">C</div></div>
-        </div>
-        <div class="score-bar-track"><div class="score-bar-fill" style="width:76%"></div></div>
-        <div class="score-card-summary">JWT auth now hardened, security policies updated. SQLite and CORS gaps persist; continued dependency hardening and secret scanning improvements.</div>
-        <div class="severity-tally">
-          <span class="sev-chip critical">2 Critical</span>
-          <span class="sev-chip high">3 High</span>
-          <span class="sev-chip medium">3 Medium</span>
-          <span class="sev-chip low">3 Low</span>
-        </div>
-      </a>
-
-      <a href="#reliability" class="score-card grade-c">
-        <div class="score-card-header">
-          <div class="score-card-title">Reliability &amp; Production Stability</div>
-          <div class="score-pill grade-c"><div class="score-number">74</div><div class="score-grade">C</div></div>
-        </div>
-        <div class="score-bar-track"><div class="score-bar-fill" style="width:74%"></div></div>
-        <div class="score-card-summary">RDS enhanced monitoring and log exports now active. APM still pending; circuit breakers and graceful shutdown remain gaps, but infrastructure observability significantly improved.</div>
-        <div class="severity-tally">
-          <span class="sev-chip critical">2 Critical</span>
-          <span class="sev-chip high">3 High</span>
-          <span class="sev-chip medium">4 Medium</span>
-        </div>
-      </a>
-
-      <a href="#user" class="score-card grade-d">
-        <div class="score-card-header">
-          <div class="score-card-title">User-Centric Quality</div>
-          <div class="score-pill grade-d"><div class="score-number">62</div><div class="score-grade">D</div></div>
-        </div>
-        <div class="score-bar-track"><div class="score-bar-fill" style="width:62%"></div></div>
-        <div class="score-card-summary">Strong e2e test coverage (21 user journeys) with continued improvements. ErrorBoundary, accessibility, and toast notifications remain unaddressed; minor progress via test stabilization.</div>
-        <div class="severity-tally">
-          <span class="sev-chip critical">1 Critical</span>
-          <span class="sev-chip high">3 High</span>
-          <span class="sev-chip medium">2 Medium</span>
-          <span class="sev-chip low">1 Low</span>
-        </div>
-      </a>
-
-      <a href="#workflow" class="score-card grade-c">
-        <div class="score-card-header">
-          <div class="score-card-title">Workflow &amp; Engineering Efficiency</div>
-          <div class="score-pill grade-c"><div class="score-number">70</div><div class="score-grade">C</div></div>
-        </div>
-        <div class="score-bar-track"><div class="score-bar-fill" style="width:70%"></div></div>
-        <div class="score-card-summary">138 commits in 30 days, 3 releases. Reduced stalled branches, improved conventional commit adoption. Commit message quality and PR review SLO gaps persist but throughput strong.</div>
-        <div class="severity-tally">
-          <span class="sev-chip high">2 High</span>
-          <span class="sev-chip medium">3 Medium</span>
-          <span class="sev-chip low">1 Low</span>
-        </div>
-      </a>
-
-      <a href="#architecture" class="score-card grade-d">
-        <div class="score-card-header">
-          <div class="score-card-title">Architecture &amp; System Design</div>
-          <div class="score-pill grade-d"><div class="score-number">62</div><div class="score-grade">D</div></div>
-        </div>
-        <div class="score-bar-track"><div class="score-bar-fill" style="width:62%"></div></div>
-        <div class="score-card-summary">Monolithic structure sound but resilience patterns still absent. Better infrastructure observability enables future resilience hardening; N+1 queries and transaction boundaries remain priority.</div>
-        <div class="severity-tally">
-          <span class="sev-chip critical">2 Critical</span>
-          <span class="sev-chip high">3 High</span>
-          <span class="sev-chip medium">3 Medium</span>
-          <span class="sev-chip low">1 Low</span>
-        </div>
-      </a>
-
-      <a href="#delivery" class="score-card grade-c">
-        <div class="score-card-header">
-          <div class="score-card-title">Delivery Flow &amp; DORA</div>
-          <div class="score-pill grade-c"><div class="score-number">76</div><div class="score-grade">C</div></div>
-        </div>
-        <div class="score-bar-track"><div class="score-bar-fill" style="width:76%"></div></div>
-        <div class="score-card-summary">3 releases in 11 days (v3.0.1 → v3.0.3), 138 commits in 30 days. Manual dispatch and post-deploy monitoring gaps narrowing; consistent velocity and zero failure rate strong signals.</div>
-        <div class="severity-tally">
-          <span class="sev-chip medium">2 Medium</span>
-          <span class="sev-chip low">4 Low</span>
-        </div>
-      </a>
-
-      <a href="#operational" class="score-card grade-d">
-        <div class="score-card-header">
-          <div class="score-card-title">Operational Excellence &amp; Observability</div>
-          <div class="score-pill grade-d"><div class="score-number">57</div><div class="score-grade">D</div></div>
-        </div>
-        <div class="score-bar-track"><div class="score-bar-fill" style="width:57%"></div></div>
-        <div class="score-card-summary">RDS enhanced monitoring + log exports closed critical infrastructure gaps. 6 monitors live, 2 Datadog dashboards active, ECS task health strong. APM and RUM instrumentation still priority for application visibility.</div>
-        <div class="severity-tally">
-          <span class="sev-chip critical">3 Critical</span>
-          <span class="sev-chip high">2 High</span>
-          <span class="sev-chip medium">2 Medium</span>
-        </div>
-      </a>
-
-    </div>
-  </div>
-
-  <div class="divider"></div>
-  <div class="section-title">Detailed Findings</div>
-
-  <!-- ─── Codebase Health ─── -->
-  <div class="detail-block" id="codebase">
-    <div class="detail-header grade-c">
-      <div class="detail-title">Codebase Health &amp; Maintainability</div>
-      <div style="display:flex;align-items:center;gap:10px;" class="grade-c">
-        <div class="detail-num">72</div>
-        <div class="detail-grade-badge">C</div>
-        <span style="color:#7c8aaa;font-size:0.8rem;">Before: 70</span>
-      </div>
-    </div>
-    <div class="summary-block">Well-organized codebase with zero TODO/FIXME markers and a 1:1 test coverage ratio demonstrating strong discipline. However, file-size outliers (ApiDocs.jsx at 842 LOC, schemas.py at 473 LOC) and sparse error handling across 1,621 backend LOC create maintainability friction. The monolithic MCP surface duplicated across three endpoints with no compile-time safety compounds technical debt.</div>
-    <div class="findings-recs-grid">
-      <div>
-        <div class="col-title">Findings</div>
-        <div class="finding high"><span class="finding-badge">High</span><div><div class="finding-title">ApiDocs.jsx is an 842-LOC monolith with embedded static JSON</div><div class="finding-detail">The entire API documentation page is a single component with hardcoded endpoint descriptions and example JSON payloads. Any API schema change requires manual updates across multiple string blocks with no single source of truth.</div></div></div>
-        <div class="finding high"><span class="finding-badge">High</span><div><div class="finding-title">mcp_server.py bypasses REST layer — divergent call paths</div><div class="finding-detail">The embedded MCP server calls service functions and opens SQLAlchemy sessions directly, bypassing the REST router. Two independent implementations of every business operation exist with no shared validation or middleware coverage.</div></div></div>
-        <div class="finding medium"><span class="finding-badge">Medium</span><div><div class="finding-title">schemas.py consolidates 473 LOC of Pydantic models in a single file</div><div class="finding-detail">Request and response schemas for all resources coexist in one file. Any new resource type compounds the file further, degrading IDE navigation and code review.</div></div></div>
-        <div class="finding medium"><span class="finding-badge">Medium</span><div><div class="finding-title">Sparse error handling — only 20 try/except for 1,621 backend LOC</div><div class="finding-detail">Database errors propagate as unhandled 500 responses with full stack traces, potentially exposing internal details to clients.</div></div></div>
-        <div class="finding medium"><span class="finding-badge">Medium</span><div><div class="finding-title">Triple-duplicated API surface — 5-component blast radius per schema change</div><div class="finding-detail">Every API capability independently implemented in REST router, embedded FastMCP server, and both standalone MCP client packages. The packages have already drifted.</div></div></div>
-        <div class="finding low"><span class="finding-badge">Low</span><div><div class="finding-title">No clear separation of concerns between MCP and REST layers</div><div class="finding-detail">The embedded MCP server diverges from REST patterns, making it harder to maintain consistent behavior across API surfaces.</div></div></div>
-      </div>
-      <div>
-        <div class="col-title">Recommendations</div>
-        <ul class="rec-list">
-          <li>Auto-generate ApiDocs.jsx from the OpenAPI spec at build time. Split each accordion section into its own sub-component.</li>
-          <li>Split schemas.py into domain modules: schemas/prompts.py, schemas/agents.py, schemas/tags.py, schemas/executions.py.</li>
-          <li>Add a global FastAPI exception handler for SQLAlchemyError (503), IntegrityError (409), and NoResultFound (404) with sanitized messages.</li>
-          <li>Route MCP tool calls through the REST API internally to eliminate divergence risk and gain consistent middleware coverage.</li>
-          <li>Generate standalone MCP client stubs from the OpenAPI spec at build time. Add a CI test asserting package tool schemas match the OpenAPI definition.</li>
-          <li>Establish a 400-LOC per-file ceiling in linting rules. Flag files exceeding this in PR checks to prevent future monoliths.</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-
-  <!-- ─── Security ─── -->
-  <div class="detail-block" id="security">
-    <div class="detail-header grade-c">
-      <div class="detail-title">Security &amp; Compliance</div>
-      <div style="display:flex;align-items:center;gap:10px;" class="grade-c">
-        <div class="detail-num">76</div>
-        <div class="detail-grade-badge">C</div>
-        <span style="color:#7c8aaa;font-size:0.8rem;">Before: 72</span>
-      </div>
-    </div>
-    <div class="summary-block">Solid foundational security practices including strict version pinning and permission-minimized CI/CD workflows. Critical gaps exist: SQLite as default database with no encrypted secrets management, permissive CORS configuration, missing HTTPS enforcement, and absence of dependency scanning and secret detection controls.</div>
-    <div class="findings-recs-grid">
-      <div>
-        <div class="col-title">Findings</div>
-        <div class="finding critical"><span class="finding-badge">Critical</span><div><div class="finding-title">Default SQLite Database in Production</div><div class="finding-detail">Helm values and database configuration default to SQLite even in production. No encryption at rest, multi-instance consistency, or backup procedures.</div></div></div>
-        <div class="finding critical"><span class="finding-badge">Critical</span><div><div class="finding-title">No Secrets Management or Rotation</div><div class="finding-detail">Credentials (DATABASE_URL, API keys) stored in environment variables via Helm values without encryption, rotation policies, or secret scanning. No Vault or Secrets Manager integration.</div></div></div>
-        <div class="finding high"><span class="finding-badge">High</span><div><div class="finding-title">Permissive CORS — wildcard methods, headers, and credentials enabled</div><div class="finding-detail">CORS middleware allows all methods ['*'] and all headers ['*'] with credentials enabled. Cross-origin request hijacking and token leakage risks.</div></div></div>
-        <div class="finding high"><span class="finding-badge">High</span><div><div class="finding-title">Missing Dependency Scanning and SCA</div><div class="finding-detail">CI/CD pipeline contains no SCA scanning, SBOM generation, or CVE monitoring for Python or Node dependencies. No container image scanning.</div></div></div>
-        <div class="finding high"><span class="finding-badge">High</span><div><div class="finding-title">Unencrypted HTTP by Default</div><div class="finding-detail">Dockerfile and Helm configuration expose services over plain HTTP without enforcing HTTPS, TLS termination, or certificate management.</div></div></div>
-        <div class="finding medium"><span class="finding-badge">Medium</span><div><div class="finding-title">Unauthenticated OpenAPI Docs Exposure</div><div class="finding-detail">/api/docs, /api/redoc, and /api/openapi.json enabled by default in production with no authentication or rate limiting, enabling reconnaissance.</div></div></div>
-        <div class="finding medium"><span class="finding-badge">Medium</span><div><div class="finding-title">Component Rendering Injection Risk</div><div class="finding-detail">Prompt content supports variable substitution and component references via regex-based parsing. Insufficient sanitization of rendered outputs could enable prompt injection.</div></div></div>
-        <div class="finding medium"><span class="finding-badge">Medium</span><div><div class="finding-title">Non-Restrictive Database Access Patterns</div><div class="finding-detail">SQLAlchemy ORM queries use ilike() filters without parameterization guards. SQL injection mitigation relies on ORM defaults rather than enforced patterns.</div></div></div>
-        <div class="finding low"><span class="finding-badge">Low</span><div><div class="finding-title">Missing Security Headers and CSP</div><div class="finding-detail">No X-Frame-Options, X-Content-Type-Options, or Content-Security-Policy in middleware. Frontend served without CSP to prevent inline script injection.</div></div></div>
-        <div class="finding low"><span class="finding-badge">Low</span><div><div class="finding-title">Incomplete Audit Logging</div><div class="finding-detail">No audit trail for sensitive operations (prompt creation, deletion, execution recording). Critical for SOC 2, HIPAA, and incident investigation.</div></div></div>
-        <div class="finding low"><span class="finding-badge">Low</span><div><div class="finding-title">Tag key casing — <code style="background:#2e3352;padding:1px 5px;border-radius:3px;font-size:0.72rem;">Project</code> not activated as Cost Allocation Tag</div><div class="finding-detail">All resources receive <code style="background:#2e3352;padding:1px 5px;border-radius:3px;font-size:0.72rem;">Project = open-prompt-manager</code> via Terraform <code style="background:#2e3352;padding:1px 5px;border-radius:3px;font-size:0.72rem;">default_tags</code>. Key is uppercase <code style="background:#2e3352;padding:1px 5px;border-radius:3px;font-size:0.72rem;">Project</code> — Datadog normalises correctly, but AWS Cost Explorer requires activating <code style="background:#2e3352;padding:1px 5px;border-radius:3px;font-size:0.72rem;">Project</code> as a Cost Allocation Tag in AWS Billing for project-level cost reports to work.</div></div></div>
-      </div>
-      <div>
-        <div class="col-title">Recommendations</div>
-        <ul class="rec-list">
-          <li>Implement mandatory PostgreSQL for production with encryption at rest, automated backups, and point-in-time recovery configured in Helm and Terraform.</li>
-          <li>Integrate HashiCorp Vault or AWS Secrets Manager for credential rotation with 30–90 day rotation SLA.</li>
-          <li>Add OWASP Dependency-Check or Snyk SCA scanning to CI/CD with fail-on-high/critical CVE policy; generate SBOM artifacts per release.</li>
-          <li>Restrict CORS to explicit origin allowlist from environment config; disable credentials for cross-origin requests unless strictly required.</li>
-          <li>Enforce HTTPS/TLS with cert-manager in Kubernetes; redirect HTTP to HTTPS at ingress; require TLS 1.3 minimum.</li>
-          <li>Disable OpenAPI docs in production via environment flag; require API key or OAuth2 protection for schema introspection.</li>
-          <li>Add Trivy container image scanning to CI/CD; fail on critical/high CVEs in base images.</li>
-          <li>Implement structured audit logging middleware for all API mutations; integrate with centralized logging (ELK, Datadog) for compliance.</li>
-          <li>Create SECURITY.md with threat model, responsible disclosure policy, and SLA for patching critical/high vulnerabilities (7–14 days).</li>
-          <li>Add DAST (OWASP ZAP) scanning in nightly CI jobs to detect runtime vulnerabilities.</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-
-  <!-- ─── Reliability ─── -->
-  <div class="detail-block" id="reliability">
-    <div class="detail-header grade-c">
-      <div class="detail-title">Reliability &amp; Production Stability</div>
-      <div style="display:flex;align-items:center;gap:10px;" class="grade-c">
-        <div class="detail-num">74</div>
-        <div class="detail-grade-badge">C</div>
-        <span style="color:#7c8aaa;font-size:0.8rem;">Before: 68</span>
-      </div>
-    </div>
-    <div class="summary-block">Foundational health checks and basic error handling exist but the application lacks comprehensive observability, resilience patterns, and production-grade reliability features. While CI/CD infrastructure is well-developed with strong testing gates, runtime observability, circuit breakers, and graceful degradation mechanisms are missing.</div>
-    <div class="findings-recs-grid">
-      <div>
-        <div class="col-title">Findings</div>
-        <div class="finding critical"><span class="finding-badge">Critical</span><div><div class="finding-title">No distributed observability or APM instrumentation</div><div class="finding-detail">Backend lacks structured logging, tracing, and APM integration. No metrics export to Datadog or similar, making production incidents unobservable.</div></div></div>
-        <div class="finding critical"><span class="finding-badge">Critical</span><div><div class="finding-title">Lack of circuit breakers and resilience patterns</div><div class="finding-detail">No resilience libraries for handling cascading failures. MCP server integration and database access lack retry logic, exponential backoff, or fallback strategies.</div></div></div>
-        <div class="finding high"><span class="finding-badge">High</span><div><div class="finding-title">Missing production logging and structured error reporting</div><div class="finding-detail">No application logging framework configured. Errors only returned via HTTP without centralized logging to track incident patterns or stack traces.</div></div></div>
-        <div class="finding high"><span class="finding-badge">High</span><div><div class="finding-title">SQLite as primary database — no multi-node persistence</div><div class="finding-detail">Default SQLite not suitable for high-availability production. No multi-replica failover, connection pooling, or WAL tuning for durability under concurrent load.</div></div></div>
-        <div class="finding high"><span class="finding-badge">High</span><div><div class="finding-title">No explicit rate limiting or request throttling</div><div class="finding-detail">API endpoints lack rate limiting middleware, burst protection, or load-shedding strategies. No per-client quotas or queue management for overload scenarios.</div></div></div>
-        <div class="finding medium"><span class="finding-badge">Medium</span><div><div class="finding-title">Health checks too basic — critical dependencies unverified</div><div class="finding-detail">/api/ready only verifies database connectivity with SELECT 1. No MCP server health check. No latency SLA on /api/health.</div></div></div>
-        <div class="finding medium"><span class="finding-badge">Medium</span><div><div class="finding-title">No SLO/SLA targets or error budget monitoring</div><div class="finding-detail">No defined service levels, no alerting rules for availability or latency percentiles, no automated rollback policies tied to deployment health.</div></div></div>
-        <div class="finding medium"><span class="finding-badge">Medium</span><div><div class="finding-title">Test coverage strong for functionality, weak for failure modes</div><div class="finding-detail">80%+ code coverage but no chaos engineering tests, failover scenarios, dependency degradation, or RTO/RPO measurement.</div></div></div>
-        <div class="finding medium"><span class="finding-badge">Medium</span><div><div class="finding-title">No graceful shutdown or drain handling</div><div class="finding-detail">FastAPI app lacks shutdown event handlers to drain in-flight requests. No PreStop hooks in Kubernetes manifests during rolling updates.</div></div></div>
-      </div>
-      <div>
-        <div class="col-title">Recommendations</div>
-        <ul class="rec-list">
-          <li>Add structured logging to all API routes using structlog or python-json-logger; export to centralized aggregation (ELK, Loki, Datadog) with trace ID correlation.</li>
-          <li>Instrument FastAPI with OpenTelemetry or ddtrace; define alerts for p99 latency &gt; 1s, error rate &gt; 0.5%.</li>
-          <li>Implement circuit breaker and retry logic for MCP session manager and database access using tenacity; add exponential backoff with jitter.</li>
-          <li>Replace SQLite with PostgreSQL in production; add connection pooling (PgBouncer), read replicas, and automated backups with point-in-time recovery.</li>
-          <li>Define and publish SLOs: 99.5% availability, p99 latency &lt; 500ms, error rate &lt; 0.1%; create SLI dashboards and error-budget-based release gates.</li>
-          <li>Add FastAPI global exception handler middleware; implement health check aggregation (database, MCP server) with fail-open fallbacks.</li>
-          <li>Implement graceful shutdown with PreStop hooks and request drain timeouts in Kubernetes manifests.</li>
-          <li>Add per-endpoint rate limiting using slowapi or FastAPI-limiter with adaptive load shedding.</li>
-          <li>Run quarterly game days: test database failure scenarios, network latency injection, and partial service degradation; measure RTO and document runbooks.</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-
-  <!-- ─── User-Centric ─── -->
-  <div class="detail-block" id="user">
-    <div class="detail-header grade-d">
-      <div class="detail-title">User-Centric Quality</div>
-      <div style="display:flex;align-items:center;gap:10px;" class="grade-d">
-        <div class="detail-num">62</div>
-        <div class="detail-grade-badge">D</div>
-        <span style="color:#7c8aaa;font-size:0.8rem;">Before: 60</span>
-      </div>
-    </div>
-    <div class="summary-block">21 comprehensive e2e user-journey tests cover critical paths with good loading state handling and responsive design. However, accessibility is severely underdeveloped (only 4 ARIA attributes across 4,700 LOC), input validation has no client-side component mapping, and the absence of error boundaries and toast notifications means users encounter blank-screen crashes and lose context on quick sequential operations.</div>
-    <div class="findings-recs-grid">
-      <div>
-        <div class="col-title">Findings</div>
-        <div class="finding critical"><span class="finding-badge">Critical</span><div><div class="finding-title">No React ErrorBoundary — blank-screen crashes cascade to users</div><div class="finding-detail">When any top-level route component throws, there is no error boundary to catch and display graceful fallback UI. Users see a blank page with no recovery path and no error logging occurs.</div></div></div>
-        <div class="finding high"><span class="finding-badge">High</span><div><div class="finding-title">Accessibility near-zero: only 4 ARIA attributes in 4,700 LOC</div><div class="finding-detail">Icon-only buttons have no aria-label. No role attributes on custom components. Form inputs lack associated labels. No axe-core or Playwright a11y checks in CI.</div></div></div>
-        <div class="finding high"><span class="finding-badge">High</span><div><div class="finding-title">No client-side input validation or field-level error mapping</div><div class="finding-detail">When the API returns HTTP 422, the form does not highlight problematic inputs or show inline error messages. Users must read the full error response in the browser console.</div></div></div>
-        <div class="finding high"><span class="finding-badge">High</span><div><div class="finding-title">No global toast/notification system</div><div class="finding-detail">Success and error outcomes shown as inline state resets. When users perform create → edit → delete in sequence, there is no transient confirmation that previous operations succeeded.</div></div></div>
-        <div class="finding medium"><span class="finding-badge">Medium</span><div><div class="finding-title">No rate limiting on render endpoint — unbounded component resolution</div><div class="finding-detail">A 20-level nested component tree issues 20 synchronous DB queries per request. The frontend fans out Promise.all with no cap, potentially overwhelming slow backends.</div></div></div>
-        <div class="finding medium"><span class="finding-badge">Medium</span><div><div class="finding-title">E2E tests show high environment sensitivity</div><div class="finding-detail">Multiple e2e tests pass locally but fail in CI, requiring 4 sequential fix cycles post-merge. Playwright has no --retries=2 configuration.</div></div></div>
-        <div class="finding low"><span class="finding-badge">Low</span><div><div class="finding-title">No keyboard navigation support — mouse-only UI</div><div class="finding-detail">Component insertion, tag selection, and agent association buttons require mouse clicks. No tab order or keyboard shortcuts for common actions.</div></div></div>
-      </div>
-      <div>
-        <div class="col-title">Recommendations</div>
-        <ul class="rec-list">
-          <li>Wrap all top-level routes in React ErrorBoundary; log errors to stderr and display a fallback UI with a 'Try Again' button and contact support link.</li>
-          <li>Add aria-label to all 12+ icon-only buttons. Add form labels and ensure input elements have accessible names. Run axe-core CLI in CI to catch regressions.</li>
-          <li>Add HTML5 required attributes and implement client-side validation before API calls. Map HTTP 422 field errors back to specific input elements with inline error messages.</li>
-          <li>Implement a toast notification library (react-hot-toast or custom) for all create/update/delete operations to provide transient feedback without state loss.</li>
-          <li>Add depth cap (max_depth=10, max_components=50) in render_prompt() and rate-limit the /api/prompts/{id}/render endpoint to 10 requests per minute per IP.</li>
-          <li>Add Playwright --retries=2 and standardize e2e seed data via seed.spec.ts. Set up a pre-merge staging e2e run matching CI environment exactly.</li>
-          <li>Enable keyboard navigation: add role attributes, Tab order, and onKeyDown handlers for common actions. Document keyboard shortcuts in a Help menu.</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-
-  <!-- ─── Workflow ─── -->
-  <div class="detail-block" id="workflow">
-    <div class="detail-header grade-c">
-      <div class="detail-title">Workflow &amp; Engineering Efficiency</div>
-      <div style="display:flex;align-items:center;gap:10px;" class="grade-c">
-        <div class="detail-num">70</div>
-        <div class="detail-grade-badge">C</div>
-        <span style="color:#7c8aaa;font-size:0.8rem;">Before: 68</span>
-      </div>
-    </div>
-    <div class="summary-block">Solid CI/CD infrastructure and dependency management discipline, but elevated WIP levels, stalled feature branches, and vague commit messages fragment the development narrative. High automation adoption (mutation testing, version pinning, pre-build gates) is offset by weak code review signals and inconsistent commit hygiene.</div>
-    <div class="findings-recs-grid">
-      <div>
-        <div class="col-title">Findings</div>
-        <div class="finding high"><span class="finding-badge">High</span><div><div class="finding-title">Elevated WIP with 16 stalled branches</div><div class="finding-detail">16 open branches exist, with 4+ stalled 7–15 days without merge or update. Current feat/frontend-mutation-testing has 11 commits ahead of main with vague messages ('test', 'fix upload', 'and changes to self').</div></div></div>
-        <div class="finding high"><span class="finding-badge">High</span><div><div class="finding-title">Poor commit message quality obscures intent</div><div class="finding-detail">Recent commits use non-standard messages instead of semantic convention. Only ~35 of 168 commits in past 30 days follow conventional format. Degrades changelog generation and automatic versioning.</div></div></div>
-        <div class="finding medium"><span class="finding-badge">Medium</span><div><div class="finding-title">No PR review SLO or review latency tracking</div><div class="finding-detail">CI workflow has no review time gates, approval checks, or stale PR automation. Lack of explicit code review enforcement risks quality dilution.</div></div></div>
-        <div class="finding medium"><span class="finding-badge">Medium</span><div><div class="finding-title">Feature batch size unchecked — current PR spans 2380+ LOC</div><div class="finding-detail">Without explicit PR size limits or chunking guidance, multi-file refactors and dependency upgrades can pack unrelated changes, slowing review and increasing revert risk.</div></div></div>
-        <div class="finding medium"><span class="finding-badge">Medium</span><div><div class="finding-title">Inconsistent release cadence — 3–7 commits between tags</div><div class="finding-detail">High variance in batch size suggests ad-hoc release scheduling. Hampers customer predictability and complicates rollback planning.</div></div></div>
-        <div class="finding low"><span class="finding-badge">Low</span><div><div class="finding-title">Heavy Dependabot traffic dilutes commit signal</div><div class="finding-detail">54 of 168 commits (32%) in past 30 days are automated dependency updates, masking genuine feature/fix commits in logs.</div></div></div>
-      </div>
-      <div>
-        <div class="col-title">Recommendations</div>
-        <ul class="rec-list">
-          <li>Enforce conventional commits at CI gate via commitlint. Audit and close the 4+ stalled branches within 7 days — block new WIP until active count &le; 5.</li>
-          <li>Establish explicit PR review SLO: max 24h first response, max 48h to approval. Add GitHub branch protection rule requiring review dismissal on push.</li>
-          <li>Cap PR size at 400 LOC per changeset (exclude auto-generated lock files). Add size check to CI and comment on oversized PRs suggesting chunking.</li>
-          <li>Set monthly release cadence (e.g., last Friday of month). Use semantic versioning strictly: patch (bug fixes), minor (features), major (breaking).</li>
-          <li>Batch Dependabot PRs weekly (group by type: npm/pip) and auto-merge low-risk updates (patch versions, dev dependencies) after CI passes.</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-
-  <!-- ─── Architecture ─── -->
-  <div class="detail-block" id="architecture">
-    <div class="detail-header grade-d">
-      <div class="detail-title">Architecture &amp; System Design</div>
-      <div style="display:flex;align-items:center;gap:10px;" class="grade-d">
-        <div class="detail-num">62</div>
-        <div class="detail-grade-badge">D</div>
-        <span style="color:#7c8aaa;font-size:0.8rem;">Before: 58</span>
-      </div>
-    </div>
-    <div class="summary-block">Well-structured monolithic architecture with clear separation of concerns across frontend, backend, and database layers. However, critical resilience pattern gaps (zero timeout/retry/circuit-breaker coverage), unbounded component rendering depth, and lack of explicit transaction management create systemic fragility and scaling risks.</div>
-    <div class="findings-recs-grid">
-      <div>
-        <div class="col-title">Findings</div>
-        <div class="finding critical"><span class="finding-badge">Critical</span><div><div class="finding-title">0% Resilience Pattern Coverage</div><div class="finding-detail">Frontend axios client has no timeout, retry, or circuit breaker logic. Backend has no request timeouts or database query limits. A single slow query blocks all frontend requests.</div></div></div>
-        <div class="finding critical"><span class="finding-badge">Critical</span><div><div class="finding-title">Unbounded Component Rendering Depth</div><div class="finding-detail">Recursive {{component:id}} resolution in prompt_service.py has no depth limit and triggers a database query per level. Circular references detected only at runtime via exception, not prevented upfront.</div></div></div>
-        <div class="finding high"><span class="finding-badge">High</span><div><div class="finding-title">Single Database Creates Tight Coupling</div><div class="finding-detail">All operations converge on one database. Cascade deletes on Prompt affect 5 related tables; any schema migration is a full redeploy. No connection pooling, idle timeouts, or read replicas.</div></div></div>
-        <div class="finding high"><span class="finding-badge">High</span><div><div class="finding-title">No Explicit Transaction Boundaries or Error Handling</div><div class="finding-detail">Transactions use implicit db.commit() patterns scattered across six API endpoints. Missing db.rollback() on error leaves partial state. Errors in variable substitution mid-render can corrupt the session.</div></div></div>
-        <div class="finding high"><span class="finding-badge">High</span><div><div class="finding-title">N+1 Query Patterns and Synchronous API Design</div><div class="finding-detail">Frontend loads tags, agents, and prompts in sequence (3+ HTTP round trips per page load). GET /prompts/{id}/versions performs linear traversal of version tree. No batching or caching.</div></div></div>
-        <div class="finding medium"><span class="finding-badge">Medium</span><div><div class="finding-title">No API Versioning or Deprecation Path</div><div class="finding-detail">Breaking schema changes force all clients to update immediately. No feature flags, canary deployments, or gradual rollouts — all-or-nothing deployments increase blast radius.</div></div></div>
-        <div class="finding medium"><span class="finding-badge">Medium</span><div><div class="finding-title">Manual Database Migration Management</div><div class="finding-detail">Schema changes via one-off Python scripts with no version tracking or rollback mechanism. Schema drift between local dev SQLite and production PostgreSQL.</div></div></div>
-        <div class="finding medium"><span class="finding-badge">Medium</span><div><div class="finding-title">Monolithic Backend Redeploy for All Changes</div><div class="finding-detail">Single FastAPI application bundles Prompts, Tags, Agents, MCP server, and health checks. Any endpoint change redeploys the entire service.</div></div></div>
-        <div class="finding low"><span class="finding-badge">Low</span><div><div class="finding-title">Frontend Tight Coupling to Backend</div><div class="finding-detail">React SPA fetches version from /api/health on every load with no caching. No request interceptors for logging or correlation IDs.</div></div></div>
-      </div>
-      <div>
-        <div class="col-title">Recommendations</div>
-        <ul class="rec-list">
-          <li>Add HTTP request timeout (3–5s) and exponential backoff retry (max 3 attempts, 100ms base) to frontend axios client and backend HTTP calls; implement circuit breaker for /api/* endpoints.</li>
-          <li>Limit component rendering recursion depth to 5 levels; implement LRU cache (TTL 5 minutes) for rendered components; move render logic to read-only transaction.</li>
-          <li>Implement database connection pooling (min 5, max 20) and configure idle timeout; use PostgreSQL in all environments; add query timeout (500ms queries, 5s render calls).</li>
-          <li>Wrap all database operations in try-except-finally with explicit rollback on error; add correlation IDs to all logs; instrument render_prompt with query count and depth metrics.</li>
-          <li>Batch load related resources via GraphQL or composite API endpoint to reduce frontend round trips; add ETag/cache-control headers for GET requests.</li>
-          <li>Introduce API versioning (/api/v1/prompts); add feature flag system for gradual rollouts; implement canary deployments via Helm hooks.</li>
-          <li>Migrate database migrations to Alembic; add schema versioning table; test schema changes against production backup before deploy.</li>
-          <li>Cache frontend health check response (60s TTL); add offline mode with local storage fallback; instrument frontend with OpenTelemetry.</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-
-  <!-- ─── Delivery ─── -->
-  <div class="detail-block" id="delivery">
-    <div class="detail-header grade-c">
-      <div class="detail-title">Delivery Flow &amp; DORA</div>
-      <div style="display:flex;align-items:center;gap:10px;" class="grade-c">
-        <div class="detail-num">76</div>
-        <div class="detail-grade-badge">C</div>
-        <span style="color:#7c8aaa;font-size:0.8rem;">Before: 72</span>
-      </div>
-    </div>
-    <div class="summary-block">Solid delivery fundamentals with a well-structured CI/CD pipeline, consistent release cadence (every 2–4 days), and zero detected production incidents. However, lead time variance is high, the release process relies on manual workflow dispatch, and there is no post-deploy monitoring to verify runtime health.</div>
-    <div class="findings-recs-grid">
-      <div>
-        <div class="col-title">Findings</div>
-        <div class="finding medium"><span class="finding-badge">Medium</span><div><div class="finding-title">High Lead Time Variance</div><div class="finding-detail">123 commits in ~20 days between v2.1.0 and v2.2.4 (≈6.15 commits/day). Gap between commit and tag creation ranges from hours to days due to release staging and approval queues.</div></div></div>
-        <div class="finding medium"><span class="finding-badge">Medium</span><div><div class="finding-title">Manual Release Trigger &amp; Approval Gates</div><div class="finding-detail">Release workflow uses workflow_dispatch with manual bump selection. While auto-merge is configured, the initial release decision is manual, introducing queueing delays and dependency on human availability.</div></div></div>
-        <div class="finding low"><span class="finding-badge">Low</span><div><div class="finding-title">Dependency Update Cadence Creates Noise</div><div class="finding-detail">18+ Dependabot PRs auto-merged increase commit volume and release pressure with no strategy to batch or suppress low-risk updates separately from feature releases.</div></div></div>
-        <div class="finding low"><span class="finding-badge">Low</span><div><div class="finding-title">Feature Branch Churn on Current Branch</div><div class="finding-detail">feat/frontend-mutation-testing shows 12+ commits in ~2 days with iterative testing/fixing patterns, suggesting incomplete pre-PR validation or incremental implementation without local full-cycle verification.</div></div></div>
-        <div class="finding low"><span class="finding-badge">Low</span><div><div class="finding-title">No Explicit Change Failure Rate Tracking</div><div class="finding-detail">CFR appears zero by design (strong pre-deploy controls) but lacks proof of runtime health post-deploy. No incidents or post-deployment monitoring data linked to commits.</div></div></div>
-        <div class="finding low"><span class="finding-badge">Low</span><div><div class="finding-title">6 ALB listener/rule resources rely on <code style="background:#2e3352;padding:1px 5px;border-radius:3px;font-size:0.72rem;">default_tags</code> only — no explicit tags block</div><div class="finding-detail"><code style="background:#2e3352;padding:1px 5px;border-radius:3px;font-size:0.72rem;">aws_lb_listener</code> and <code style="background:#2e3352;padding:1px 5px;border-radius:3px;font-size:0.72rem;">aws_lb_listener_rule</code> resources in <code style="background:#2e3352;padding:1px 5px;border-radius:3px;font-size:0.72rem;">alb.tf</code> have no explicit <code style="background:#2e3352;padding:1px 5px;border-radius:3px;font-size:0.72rem;">tags</code> block. They receive the project tag via provider <code style="background:#2e3352;padding:1px 5px;border-radius:3px;font-size:0.72rem;">default_tags</code> but the omission creates inconsistency and would cause silent drift if <code style="background:#2e3352;padding:1px 5px;border-radius:3px;font-size:0.72rem;">default_tags</code> were ever removed or overridden.</div></div></div>
-      </div>
-      <div>
-        <div class="col-title">Recommendations</div>
-        <ul class="rec-list">
-          <li>Automate release decision logic via semantic-release or commit-linting rules (release on merge if commits include feat: or fix: prefixes) to eliminate manual dispatch latency.</li>
-          <li>Implement time-to-deploy SLO: enforce max 1h from merge-to-main to production; surface lead time metrics on team dashboard.</li>
-          <li>Segregate dependency updates: batch and release dependencies on a weekly schedule, decoupled from feature velocity.</li>
-          <li>Formalize incident linkage: add required incident/postmortem tags to hotfix commits; compute CFR = failed deploys / total releases monthly.</li>
-          <li>Add pre-merge lead time gates: enforce max 2-day PR age before requiring escalation; measure review cycle time separately from deployment queue time.</li>
-          <li>Instrument post-deploy monitoring: emit deployment events to APM; alert on error rate spike within first 15 minutes post-deploy.</li>
-          <li>Document release train policy: define weekly release windows and freeze communication; remove dependency on ad-hoc manual triggers.</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-
-  <!-- ─── Operational Excellence ─── -->
-  <div class="detail-block" id="operational">
-    <div class="detail-header grade-d">
-      <div class="detail-title">Operational Excellence &amp; Observability</div>
-      <div style="display:flex;align-items:center;gap:10px;" class="grade-d">
-        <div class="detail-num">57</div>
-        <div class="detail-grade-badge">D</div>
-        <span style="color:#22c55e;font-size:0.8rem;">Before: 46 &nbsp;↑ +11</span>
-      </div>
-    </div>
-    <div class="summary-block">6 monitors now cover the key AWS infrastructure signals (synthetic healthcheck, ALB error rate, ECS task deficit for both services, CPU and memory utilization) and 2 Datadog dashboards provide operational visibility — a meaningful step forward. However, the application layer remains completely dark: no APM spans, no log ingestion, and no RUM. <strong style="color:#e2e8f0;">A task can be running healthy in ECS while serving 100% errors — that scenario is still invisible.</strong> Notification routing is also incomplete: only the synthetic monitor pages anyone. The monitors close the detection gap for infrastructure crashes but not for application-level failures.</div>
-
-    <!-- ── Datadog Live Evidence ── -->
-    <div style="background:#12151f;border:1px solid #3b5bdb;border-radius:10px;padding:20px 22px;margin-bottom:22px;">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;"><circle cx="12" cy="12" r="10" stroke="#6c7fe0" stroke-width="2"/><path d="M12 7v5l3 3" stroke="#6c7fe0" stroke-width="2" stroke-linecap="round"/></svg>
-        <span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#6c7fe0;">Datadog Live Verification &nbsp;·&nbsp; 2026-04-24 &nbsp;·&nbsp; 7-day window</span>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:16px;">
-        <div style="background:#1a1d27;border:1px solid #2e3352;border-radius:8px;padding:12px 14px;">
-          <div style="font-size:0.68rem;color:#7c8aaa;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Services in Catalog</div>
-          <div style="font-size:1.1rem;font-weight:700;color:#22c55e;">2 / 2</div>
-          <div style="font-size:0.72rem;color:#7c8aaa;margin-top:2px;">backend &amp; frontend registered</div>
-        </div>
-        <div style="background:#1a1d27;border:1px solid #2e3352;border-radius:8px;padding:12px 14px;">
-          <div style="font-size:0.68rem;color:#7c8aaa;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">ECS Task Health (7d)</div>
-          <div style="font-size:1.1rem;font-weight:700;color:#22c55e;">2/2 tasks</div>
-          <div style="font-size:0.72rem;color:#7c8aaa;margin-top:2px;">running = desired, zero flaps</div>
-        </div>
-        <div style="background:#1a1d27;border:1px solid #2e3352;border-radius:8px;padding:12px 14px;">
-          <div style="font-size:0.68rem;color:#7c8aaa;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Monitors</div>
-          <div style="font-size:1.1rem;font-weight:700;color:#22c55e;">6</div>
-          <div style="font-size:0.72rem;color:#7c8aaa;margin-top:2px;">synthetic, ALB, ECS task deficit ×2, CPU, memory — all OK</div>
-        </div>
-        <div style="background:#1a1d27;border:1px solid #2e3352;border-radius:8px;padding:12px 14px;">
-          <div style="font-size:0.68rem;color:#7c8aaa;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Dashboards</div>
-          <div style="font-size:1.1rem;font-weight:700;color:#22c55e;">2</div>
-          <div style="font-size:0.72rem;color:#7c8aaa;margin-top:2px;">Platform Snapshot + Cloud Cost &amp; FinOps</div>
-        </div>
-        <div style="background:#1a1d27;border:1px solid #2e3352;border-radius:8px;padding:12px 14px;">
-          <div style="font-size:0.68rem;color:#7c8aaa;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">APM Spans (7d)</div>
-          <div style="font-size:1.1rem;font-weight:700;color:#ef4444;">0</div>
-          <div style="font-size:0.72rem;color:#7c8aaa;margin-top:2px;">no distributed tracing</div>
-        </div>
-        <div style="background:#1a1d27;border:1px solid #2e3352;border-radius:8px;padding:12px 14px;">
-          <div style="font-size:0.68rem;color:#7c8aaa;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Log Patterns (7d)</div>
-          <div style="font-size:1.1rem;font-weight:700;color:#ef4444;">0</div>
-          <div style="font-size:0.72rem;color:#7c8aaa;margin-top:2px;">no log ingestion</div>
-        </div>
-        <div style="background:#1a1d27;border:1px solid #2e3352;border-radius:8px;padding:12px 14px;">
-          <div style="font-size:0.68rem;color:#7c8aaa;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">RUM Events (7d)</div>
-          <div style="font-size:1.1rem;font-weight:700;color:#ef4444;">0</div>
-          <div style="font-size:0.72rem;color:#7c8aaa;margin-top:2px;">no frontend monitoring</div>
-        </div>
-        <div style="background:#1a1d27;border:1px solid #2e3352;border-radius:8px;padding:12px 14px;">
-          <div style="font-size:0.68rem;color:#7c8aaa;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Custom Metrics</div>
-          <div style="font-size:1.1rem;font-weight:700;color:#ef4444;">0</div>
-          <div style="font-size:0.72rem;color:#7c8aaa;margin-top:2px;">only AWS ECS infra metrics</div>
-        </div>
-        <div style="background:#1a1d27;border:1px solid #2e3352;border-radius:8px;padding:12px 14px;">
-          <div style="font-size:0.68rem;color:#7c8aaa;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Incidents (90d)</div>
-          <div style="font-size:1.1rem;font-weight:700;color:#f59e0b;">0</div>
-          <div style="font-size:0.72rem;color:#7c8aaa;margin-top:2px;">none declared — no tooling to detect</div>
-        </div>
-      </div>
-      <div style="font-size:0.75rem;color:#7c8aaa;line-height:1.6;border-top:1px solid #2e3352;padding-top:12px;">
-        <strong style="color:#e2e8f0;">6 monitors now configured (as of 2026-04-24)</strong>: synthetic healthcheck on <code style="background:#2e3352;padding:1px 5px;border-radius:3px;font-size:0.72rem;">https://opm-dx1.com/api/ready</code>, ALB 5xx error rate, ECS task deficit for backend and frontend, ECS CPU utilization (all services), and ECS memory utilization (all services) — all currently <strong style="color:#22c55e;">OK</strong>. Notifications are wired for the synthetic only (<code style="background:#2e3352;padding:1px 5px;border-radius:3px;font-size:0.72rem;">anojan.shanthakumar@devops1.com.au</code>); the remaining 5 monitors have no <code style="background:#2e3352;padding:1px 5px;border-radius:3px;font-size:0.72rem;">@notification</code> targets. APM, log ingestion, and RUM remain at zero — the application still has no instrumentation library installed. Two Datadog dashboards now live for OPM: <strong style="color:#22c55e;">OPM Platform Snapshot</strong> (dev team — ECS, ALB, synthetics, quality scorecard; ID: <code style="background:#2e3352;padding:1px 5px;border-radius:3px;font-size:0.72rem;">898-ks4-8wm</code>) and <strong style="color:#22c55e;">OPM Cloud Cost &amp; FinOps</strong> (FinOps team — billing, Fargate efficiency, NAT Gateway; ID: <code style="background:#2e3352;padding:1px 5px;border-radius:3px;font-size:0.72rem;">ntm-ufn-8pt</code>).
-      </div>
-    </div>
-
-    <div class="findings-recs-grid">
-      <div>
-        <div class="col-title">Findings</div>
-        <div class="finding critical"><span class="finding-badge">Critical</span><div><div class="finding-title">No APM instrumentation — confirmed by Datadog (0 spans in 7d)</div><div class="finding-detail">ddtrace or OpenTelemetry SDK is not installed. Zero spans ingested across 7 days despite 2/2 ECS tasks running. Request latency, error rates, and dependency health are entirely unobservable.</div></div></div>
-        <div class="finding critical"><span class="finding-badge">Critical</span><div><div class="finding-title">No log ingestion — confirmed by Datadog (0 log patterns in 7d)</div><div class="finding-detail">No log forwarder (Datadog Agent log collection, Firelens, or CloudWatch → Datadog) is configured. Application logs are written to stdout/stderr and discarded. Post-incident forensics are impossible.</div></div></div>
-        <div class="finding low"><span class="finding-badge">Resolved</span><div><div class="finding-title">Monitors — 6 configured, all OK ✓</div><div class="finding-detail">Synthetic healthcheck (opm-dx1.com/api/ready), ALB 5xx error rate, ECS task deficit (backend + frontend), ECS CPU utilization, ECS memory utilization. Remaining gap: 5 of 6 monitors have no @notification targets — alerts fire but nobody is paged.</div></div></div>
-        <div class="finding critical"><span class="finding-badge">Critical</span><div><div class="finding-title">No RUM — frontend user experience completely blind</div><div class="finding-detail">Datadog RUM SDK not installed in the React frontend. Zero session, view, action, error, or resource events in 7 days. Page load times, JS errors, and user journey completions are untracked.</div></div></div>
-        <div class="finding low"><span class="finding-badge">Resolved</span><div><div class="finding-title">Dashboards — 2 operational visibility panels live ✓</div><div class="finding-detail">OPM Platform Snapshot (dev team: ECS infrastructure, ALB traffic, synthetic health, quality scorecard) and OPM Cloud Cost &amp; FinOps (FinOps team: billing, Fargate efficiency, NAT Gateway) are both live in Datadog as of 2026-04-24.</div></div></div>
-        <div class="finding high"><span class="finding-badge">High</span><div><div class="finding-title">No incidents declared in 90 days — absence of tooling, not absence of problems</div><div class="finding-detail">Zero incidents were declared in Datadog over 90 days. With no monitors and no logs, failures cannot be detected proactively. The zero incident count reflects the absence of detection capability, not operational excellence.</div></div></div>
-        <div class="finding high"><span class="finding-badge">High</span><div><div class="finding-title">No runbooks or incident response procedures</div><div class="finding-detail">Release process documented but no incident troubleshooting guides, escalation paths, or post-incident review templates. On-call engineers lack playbooks for common failure modes.</div></div></div>
-        <div class="finding medium"><span class="finding-badge">Medium</span><div><div class="finding-title">ECS infra stable but no application-level health signal</div><div class="finding-detail">Both services held steady at 2/2 tasks for 7 days (running = desired, zero pending). This is a positive infra signal but masks application-layer failures — a task can be running while serving 100% errors.</div></div></div>
-        <div class="finding medium"><span class="finding-badge">Medium</span><div><div class="finding-title">Service catalog entries exist but are empty shells</div><div class="finding-detail">open-prompt-manager-backend and open-prompt-manager-frontend are registered in the Datadog Service Catalog with no telemetry, no team ownership, no SLOs, no links, and no on-call contacts attached.</div></div></div>
-      </div>
-      <div>
-        <div class="col-title">Recommendations</div>
-        <ul class="rec-list">
-          <li>Install ddtrace (pip install ddtrace) and run the FastAPI backend with <code>ddtrace-run</code>; set DD_SERVICE=open-prompt-manager-backend, DD_ENV, DD_VERSION env vars in ECS task definition. This immediately enables APM, error tracking, and log correlation.</li>
-          <li>Enable Datadog log collection on ECS: add the Datadog Agent sidecar container with DD_LOGS_ENABLED=true and DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true to the task definition for both services.</li>
-          <li>Install Datadog Browser RUM SDK in the React frontend (npm install @datadog/browser-rum); initialise with applicationId and clientToken at app startup to capture sessions, errors, and Core Web Vitals.</li>
-          <li>Create 5 monitors immediately: (1) ECS running &lt; desired, (2) API error rate &gt; 5% (once APM flows), (3) p99 latency &gt; 1s, (4) ECS CPU &gt; 80%, (5) no ECS tasks running. Route all to an on-call channel.</li>
-          <li>Build a Datadog dashboard for open-prompt-manager: ECS running/desired, API request rate, error rate (4xx/5xx), p99 latency, database query latency, RUM session error rate.</li>
-          <li>Populate the Datadog Service Catalog entries: add team ownership, on-call contact, runbook links, SLO targets, and Slack channel for each service.</li>
-          <li>Define SLOs in Datadog: 99.5% availability (monitor-based), p99 latency &lt; 500ms (metric-based). Set 30-day rolling error budget alerts at 50% and 90% burn.</li>
-          <li>Create incident runbooks in /docs/runbooks/ covering: database connection errors, high latency, malformed prompts, component resolution failures. Link them from the Datadog Service Catalog.</li>
-          <li>Implement structured logging in FastAPI using structlog or python-json-logger with request_id, latency_ms, status_code fields to maximise Datadog log value once forwarding is enabled.</li>
-          <li>Establish quarterly chaos engineering drills: kill one ECS task, measure TTD via Datadog monitor alert latency; target TTD &lt; 2 minutes after instrumentation is complete.</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-
-</div>
-
-<footer>
-  <div class="container">
-    <div class="footer-inner">
-      <span>Generated <strong>2026-06-04</strong> &nbsp;&middot;&nbsp; Branch: <strong>main</strong> &nbsp;&middot;&nbsp; 8-dimension QE swarm on Claude Haiku &nbsp;&middot;&nbsp; Operational Excellence verified via Datadog</span>
-      <span>open-prompt-manager &nbsp;&middot;&nbsp; Overall score: <strong>71 / C</strong> &nbsp;·&nbsp; Before: <strong>64 / D</strong> &nbsp;·&nbsp; <span style="color:#22c55e;">+7 points</span></span>
-    </div>
-  </div>
-</footer>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script>
-const ctx = document.getElementById('radarChart').getContext('2d');
-new Chart(ctx, {
-  type: 'radar',
-  data: {
-    labels: [
-      'Codebase Health',
-      'Security',
-      'Reliability',
-      'User-Centric',
-      'Workflow',
-      'Architecture',
-      'Delivery',
-      'Operational'
-    ],
-    datasets: [{
-      label: 'Score',
-      data: [72, 76, 74, 62, 70, 62, 76, 57],
-      backgroundColor: 'rgba(108, 127, 224, 0.15)',
-      borderColor: '#6c7fe0',
-      borderWidth: 2,
-      pointBackgroundColor: [
-        '#f59e0b',
-        '#f59e0b',
-        '#f59e0b',
-        '#f97316',
-        '#f59e0b',
-        '#f97316',
-        '#f59e0b',
-        '#f97316'
-      ],
-      pointBorderColor: '#1a1d27',
-      pointRadius: 5,
-      pointHoverRadius: 7
-    }]
-  },
-  options: {
-    responsive: true,
-    maintainAspectRatio: true,
-    scales: {
-      r: {
-        min: 0,
-        max: 100,
-        ticks: {
-          stepSize: 20,
-          color: '#7c8aaa',
-          backdropColor: 'transparent',
-          font: { size: 10 }
-        },
-        grid: { color: '#2e3352' },
-        angleLines: { color: '#2e3352' },
-        pointLabels: {
-          color: '#e2e8f0',
-          font: { size: 11, weight: '600' }
-        }
-      }
-    },
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        callbacks: {
-          label: ctx => ` ${ctx.raw}/100`
-        }
-      }
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quality Report — open-prompt-manager</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --panel:#ffffff; --ink:#1a1d23; --muted:#5a6472; --line:#e4e8ee;
+    --accent:#3b6fe0; --shadow:0 1px 3px rgba(20,30,50,.08),0 8px 24px rgba(20,30,50,.06);
+    --grade-a:#1f9d6b; --grade-b:#2f7fd1; --grade-c:#d99a1c; --grade-d:#e2733a; --grade-f:#d1424a;
+    --sev-critical:#b0242c; --sev-high:#e2733a; --sev-medium:#d99a1c; --sev-low:#5a8fb0; --sev-info:#7a828f;
+    --up:#1f9d6b; --down:#d1424a; --flat:#7a828f;
+    --track:#eceff3;
+  }
+  :root[data-theme="dark"]{
+    --bg:#0f1319; --panel:#171c24; --ink:#e8ecf2; --muted:#9aa4b2; --line:#262d38;
+    --accent:#6f9bff; --shadow:0 1px 3px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+    --grade-a:#3cc98a; --grade-b:#5b9ff0; --grade-c:#e6b13e; --grade-d:#f08a55; --grade-f:#f0636b;
+    --sev-critical:#f0636b; --sev-high:#f08a55; --sev-medium:#e6b13e; --sev-low:#7fb3d4; --sev-info:#98a2b0;
+    --track:#232a34;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#0f1319; --panel:#171c24; --ink:#e8ecf2; --muted:#9aa4b2; --line:#262d38;
+      --accent:#6f9bff; --shadow:0 1px 3px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+      --grade-a:#3cc98a; --grade-b:#5b9ff0; --grade-c:#e6b13e; --grade-d:#f08a55; --grade-f:#f0636b;
+      --sev-critical:#f0636b; --sev-high:#f08a55; --sev-medium:#e6b13e; --sev-low:#7fb3d4; --sev-info:#98a2b0;
+      --track:#232a34;
     }
   }
-});
-</script>
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;padding:32px 20px 80px}
+  .wrap{max-width:1080px;margin:0 auto}
+  h1{font-size:26px;margin:0 0 4px;letter-spacing:-.02em}
+  h2{font-size:19px;margin:40px 0 14px;letter-spacing:-.01em;display:flex;align-items:center;gap:10px}
+  h2 .num{font-size:12px;font-weight:700;color:var(--accent);border:1px solid var(--line);border-radius:6px;padding:2px 7px}
+  .sub{color:var(--muted);font-size:14px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:22px}
+  .row{display:flex;flex-wrap:wrap;gap:16px}
+  .between{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
 
+  .topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:24px}
+  .badge{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:13px;padding:8px 14px;border-radius:999px;border:1px solid transparent}
+  .badge.warn{background:color-mix(in srgb,var(--grade-c) 16%,transparent);color:var(--grade-c);border-color:color-mix(in srgb,var(--grade-c) 40%,transparent)}
+  .badge .dot{width:9px;height:9px;border-radius:50%;background:currentColor}
+  .themebtn{cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:7px 11px;font-size:13px}
+
+  .hero{display:grid;grid-template-columns:auto 1fr;gap:28px;align-items:center}
+  @media(max-width:640px){.hero{grid-template-columns:1fr;text-align:center}}
+  .ring{position:relative;width:150px;height:150px;flex:none;margin:auto}
+  .ring svg{transform:rotate(-90deg)}
+  .ring .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .ring .val b{font-size:40px;letter-spacing:-.03em;line-height:1}
+  .ring .val span{font-size:12px;color:var(--muted)}
+  .delta{font-weight:700}
+  .delta.up{color:var(--up)} .delta.down{color:var(--down)} .delta.flat{color:var(--flat)}
+  .kpis{display:flex;gap:26px;flex-wrap:wrap;margin-top:6px}
+  .kpi b{font-size:22px;display:block;letter-spacing:-.02em}
+  .kpi span{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);border-left:4px solid var(--gc)}
+  .card .chead{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .card .title{font-weight:650;font-size:14.5px}
+  .card .grade{font-size:11px;font-weight:800;color:#fff;background:var(--gc);border-radius:5px;padding:2px 7px;letter-spacing:.02em}
+  .card .scoreline{display:flex;align-items:baseline;gap:8px;margin:8px 0 4px}
+  .card .now{font-size:30px;font-weight:800;letter-spacing:-.03em;color:var(--gc)}
+  .card .was{font-size:12.5px;color:var(--muted)}
+  .card .summ{color:var(--muted);font-size:12.7px;line-height:1.5;margin-top:6px}
+  .track{height:7px;background:var(--track);border-radius:6px;overflow:hidden;margin-top:10px;position:relative}
+  .track>i{position:absolute;top:0;left:0;height:100%;background:var(--gc);border-radius:6px}
+  .track>u{position:absolute;top:-3px;width:2px;height:13px;background:var(--muted);opacity:.7}
+
+  .cmp{display:flex;flex-direction:column;gap:12px}
+  .cmp .lbl{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+  .cmp .lbl .d{font-size:12px}
+  .bars{position:relative;height:22px;background:var(--track);border-radius:6px}
+  .bars .before{position:absolute;top:0;left:0;height:100%;border-radius:6px;background:color-mix(in srgb,var(--muted) 35%,transparent)}
+  .bars .after{position:absolute;top:0;left:0;height:100%;border-radius:6px;background:var(--gc);display:flex;align-items:center;justify-content:flex-end;padding-right:7px;color:#fff;font-size:11px;font-weight:700}
+
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+  table{border-collapse:collapse;width:100%;font-size:13px;min-width:720px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--panel);position:sticky;top:0;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);cursor:pointer;user-select:none;white-space:nowrap}
+  th:hover{color:var(--ink)}
+  tbody tr:hover{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+  .sev{font-weight:800;font-size:11px;padding:2px 8px;border-radius:999px;white-space:nowrap;color:#fff}
+  .sev.Critical{background:var(--sev-critical)} .sev.High{background:var(--sev-high)}
+  .sev.Medium{background:var(--sev-medium)} .sev.Low{background:var(--sev-low)} .sev.Info{background:var(--sev-info)}
+  code{background:var(--track);padding:1px 5px;border-radius:4px;font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+  .sevrow{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .sevchip{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:8px 14px;background:var(--panel)}
+  .sevchip b{font-size:20px} .sevchip span{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .sevchip i{width:10px;height:10px;border-radius:50%}
+
+  .check{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:8px}
+  .check li{display:flex;gap:10px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-size:13px}
+  .check .mk{font-weight:800;flex:none;width:18px;text-align:center}
+  .mk.ok{color:var(--up)} .mk.no{color:var(--down)} .mk.part{color:var(--grade-c)}
+  .ctl{font-size:11px;color:var(--muted);display:block}
+
+  .rec{counter-reset:r;list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
+  .rec li{position:relative;padding:12px 14px 12px 48px;background:var(--panel);border:1px solid var(--line);border-radius:10px;font-size:13.5px}
+  .rec li::before{counter-increment:r;content:counter(r);position:absolute;left:12px;top:12px;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center}
+  .rec .pri{font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:.05em;padding:1px 7px;border-radius:5px;margin-right:6px;color:#fff}
+  .pri.P0{background:var(--sev-critical)} .pri.P1{background:var(--sev-high)} .pri.P2{background:var(--sev-medium)}
+  .isschip{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;text-decoration:none;color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);border-radius:5px;padding:1px 6px;margin:1px 2px;white-space:nowrap;background:color-mix(in srgb,var(--accent) 8%,transparent)}
+  .isschip:hover{background:color-mix(in srgb,var(--accent) 18%,transparent)}
+  .isschip.done{color:var(--up);border-color:color-mix(in srgb,var(--up) 35%,transparent);background:color-mix(in srgb,var(--up) 8%,transparent)}
+  .isschip.back{color:var(--muted);border-color:var(--line);background:transparent;font-weight:600;cursor:default}
+  .init{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+  .initcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);border-top:3px solid var(--ic)}
+  .initcard h3{margin:0 0 2px;font-size:15px;letter-spacing:-.01em}
+  .initcard .meta{font-size:11.5px;color:var(--muted);margin-bottom:6px}
+  .barmini{height:6px;border-radius:4px;background:var(--track);overflow:hidden;margin:6px 0 12px}
+  .barmini>i{display:block;height:100%;background:var(--ic)}
+  .initcard .il{display:flex;flex-direction:column;gap:8px}
+  .initcard .ir{display:flex;align-items:center;gap:9px;font-size:12.7px;line-height:1.35}
+  .initcard .ir .sev{flex:none}
+  .initcard .ir .txt{color:var(--muted)}
+  .pill{flex:none;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--track);color:var(--muted);border:1px solid var(--line);white-space:nowrap;text-transform:uppercase;letter-spacing:.03em}
+  .foot{color:var(--muted);font-size:12px;margin-top:40px;border-top:1px solid var(--line);padding-top:18px;line-height:1.7}
+  .tag{display:inline-block;font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 7px;margin:2px 4px 2px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div>
+      <h1>Quality Engineering Report</h1>
+      <div class="sub">open-prompt-manager · v3.5.1 · assessed 2026-07-03 · 9-agent QE swarm</div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <span class="badge warn"><span class="dot"></span>SECURITY: WARNING</span>
+      <button class="themebtn" onclick="tgl()">◑ Theme</button>
+    </div>
+  </div>
+
+  <div class="panel hero">
+    <div class="ring">
+      <svg width="150" height="150" viewBox="0 0 150 150">
+        <circle cx="75" cy="75" r="66" fill="none" stroke="var(--track)" stroke-width="14"/>
+        <circle cx="75" cy="75" r="66" fill="none" stroke="var(--grade-b)" stroke-width="14"
+          stroke-linecap="round" stroke-dasharray="414.7" stroke-dashoffset="103.7"/>
+      </svg>
+      <div class="val"><b>75</b><span>OVERALL · B</span></div>
+    </div>
+    <div>
+      <div class="between">
+        <div>
+          <div style="font-size:14px;font-weight:650">Overall Quality Score — <span class="delta up">▲ +4</span> vs. Jun 5 (71)</div>
+          <div class="sub" style="margin-top:4px;max-width:560px">Weighted average across 9 domains (Security &amp; Compliance carries 20% weight). Engineering fundamentals — code health, delivery, security, and UX — are strong and improving. The drag is <strong>detection &amp; response</strong>: observability and SIEM/SOC2 both sit at grade D.</div>
+        </div>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><b>9</b><span>domains scored</span></div>
+        <div class="kpi"><b>3</b><span>critical gaps</span></div>
+        <div class="kpi"><b>0</b><span>critical app-layer vulns</span></div>
+        <div class="kpi"><b>7&nbsp;/&nbsp;8</b><span>domains improved</span></div>
+      </div>
+    </div>
+  </div>
+
+  <h2><span class="num">01</span>Executive Summary</h2>
+  <div class="panel">
+    <p style="margin-top:0">The full 9-agent QE swarm assessed <strong>open-prompt-manager</strong> (FastAPI backend, React/TS frontend, MCP node package, Terraform/AWS infra). Overall quality rose from <strong>71 → 75 (B)</strong>, with 7 of 8 repeat domains improving. Application-layer security is genuinely strong — <strong>no Critical or High code vulnerabilities</strong>, in-memory access tokens, httpOnly refresh cookies with DB-backed revocation, KMS encryption everywhere, and a disciplined SAST/SCA exception register that fails CI on expiry.</p>
+    <p><strong>The security badge is WARNING, not PASS</strong>, because the gap is <em>operational security</em>, not code: there is no CloudTrail, no alerting/paging, and no application audit logging. Auth failures are neither logged nor alerted, so credential-stuffing is currently undetectable — this drives three <strong>Critical SOC 2 control gaps</strong> and pins both Operational Excellence (55) and SIEM/SOC2 (56) at grade D. Closing the detection-and-response gap is the single highest-leverage investment for the next cycle.</p>
+    <p style="margin-bottom:0"><strong>Biggest wins this cycle:</strong> User-Centric Quality +18 (secure auth UX, 8 full E2E journeys), Codebase Health +12 (MI rank A, 1.63% duplication, zero debt markers), Security +8, Delivery/DORA +7 (elite cadence). <strong>Cross-cutting theme in ~5 domains:</strong> the in-memory, per-instance rate limiter weakens throttling and abuse-detection once ECS scales past one task.</p>
+  </div>
+
+  <h2><span class="num">02</span>Per-Domain Score Cards</h2>
+  <div class="grid" id="cards"></div>
+
+  <h2><span class="num">03</span>Before / After Comparison</h2>
+  <div class="panel">
+    <div class="cmp" id="cmp"></div>
+    <div class="sub" style="margin-top:14px">Grey = Jun 5 baseline · colored = current. SIEM &amp; SOC2 is newly added this cycle (no prior baseline).</div>
+  </div>
+
+  <h2><span class="num">04</span>Security Findings <span class="sub" style="font-weight:400">— aggregated across all agents, click a header to sort</span></h2>
+  <div class="sevrow" id="sevrow"></div>
+  <div class="tablewrap">
+    <table id="ftbl">
+      <thead><tr>
+        <th data-k="sev">Severity</th>
+        <th data-k="ref">CWE / Control</th>
+        <th data-k="title">Finding</th>
+        <th data-k="loc">Location</th>
+        <th data-k="src">Agent</th>
+        <th data-k="iss">Tracked by</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div class="sub" style="margin-top:10px">All secret values redacted at source. Only <code>.env</code> key <em>names</em> were observed (JWT_SECRET, DD_API_KEY, DD_APP_KEY, ADMIN_EMAILS) — the file is gitignored, untracked, and absent from git history. No secrets found in code or history.</div>
+
+  <h2><span class="num">05</span>SOC 2 Compliance Checklist</h2>
+  <ul class="check" id="check"></ul>
+
+  <h2><span class="num">06</span>Prioritized Recommendations</h2>
+  <ol class="rec" id="rec"></ol>
+
+  <h2><span class="num">07</span>Projects &amp; Initiatives <span class="sub" style="font-weight:400">— findings → GitHub issues traceability</span></h2>
+  <div class="panel" style="margin-bottom:16px">
+    <div style="font-size:14px;font-weight:650"><span id="covpct">71%</span> of findings mapped to planned work — <span id="covnum">17 of 24</span> tracked by a GitHub issue</div>
+    <div class="barmini" style="--ic:var(--grade-a);margin-top:10px"><i id="covbar" style="width:71%"></i></div>
+    <div class="sub">Every <strong>Critical, High and Medium</strong> finding has an owning issue across four initiatives (including a proactive <strong>Observability &amp; OpenTelemetry</strong> program). The remaining items are Low/Info, held in the backlog below.</div>
+  </div>
+  <div class="init" id="init"></div>
+  <div class="panel" style="margin-top:16px">
+    <strong>Untracked backlog</strong> <span class="sub">— Low/Info findings from §04 not yet issue-tracked:</span>
+    <ul id="backlog" style="margin:10px 0 0;padding-left:20px;color:var(--muted);font-size:13px;line-height:1.75"></ul>
+  </div>
+
+  <div class="foot">
+    <strong>Methodology.</strong> Nine specialist agents scored their domain 0–100 (A ≥90 · B 75–89 · C 60–74 · D 40–59 · F &lt;40). Overall = weighted mean with Security &amp; Compliance at 20% and the remaining eight domains at 10% each → <strong>75/100</strong>. "Before" = the Jun 5, 2026 assessment; SIEM/SOC2 is new this cycle.
+    <br><br>
+    <strong>Audit trail.</strong> Assessment run 2026-07-03 via QE master orchestrator + 9 parallel sub-agents (architecture, codebase-health, security, siem-soc2, reliability, operational, delivery-flow, user-centric, workflow). Sources: static analysis, IaC/Terraform review, git &amp; release history, CI/CD workflow inspection. No code was modified. Secrets and PII redacted at collection.
+    <br><br>
+    <span class="tag">OWASP Top 10</span><span class="tag">CWE</span><span class="tag">SOC 2 TSC</span><span class="tag">DORA</span><span class="tag">Read-only assessment</span>
+  </div>
+</div>
+
+<script>
+const GH="https://github.com/ale-sanchez-g/open-prompt-manager/issues/";
+const issChips=arr=>(!arr||!arr.length)
+ ? '<span class="isschip back">backlog</span>'
+ : arr.map(n=>`<a class="isschip" href="${GH}${n}" target="_blank" rel="noopener">#${n}</a>`).join('');
+const DOMAINS=[
+ {t:"Codebase Health & Maintainability",now:84,was:72,g:"B",s:"MI rank A across modules, 1.63% duplication, zero TODO/FIXME, ~1:1 test ratio. Watch: ApiDocs.jsx (1,057 LOC)."},
+ {t:"Security & Compliance",now:84,was:76,g:"B",s:"Strong auth, secrets & encryption; no Critical/High. Gaps: missing HTTP security headers, BOLA on prompt CRUD, WAF off."},
+ {t:"Delivery Flow & DORA",now:83,was:76,g:"B",s:"Elite cadence (~every 2.7d), OIDC, deep SAST/SCA. Held back by ungated auto-apply deploy & unrestricted dependabot majors."},
+ {t:"User-Centric Quality",now:80,was:62,g:"B",s:"8 full E2E journeys, in-memory tokens + httpOnly refresh, strong password policy. Gaps: a11y error announcements, no 404/ErrorBoundary."},
+ {t:"Reliability & Production Stability",now:77,was:74,g:"B",s:"Good probes, redundancy, backups & k6 SLOs. Single-AZ RDS is top SPOF; no pool_pre_ping; no deploy circuit breaker."},
+ {t:"Workflow & Engineering Efficiency",now:77,was:70,g:"B",s:"20.7h avg time-to-merge, minimal WIP. Bus-factor 1, bot-only reviews, 28 stale branches, some >500 LOC PRs."},
+ {t:"Architecture & System Design",now:70,was:62,g:"C",s:"Low coupling & strong network trust boundaries. Near-absent timeouts/retries/circuit breakers; Helm↔ECS scaling drift."},
+ {t:"SIEM & SOC2 Audit",now:56,was:null,g:"D",s:"NEW. Good log plumbing & CI scanning, but no CloudTrail, no alerting, zero app audit logging — detection is blind."},
+ {t:"Operational Excellence & Observability",now:55,was:57,g:"D",s:"Solid infra telemetry, but zero alarms/SNS, no app logging, no tracing, 0% runbook coverage. TTD is customer-driven."},
+];
+const GC={A:"--grade-a",B:"--grade-b",C:"--grade-c",D:"--grade-d",F:"--grade-f"};
+
+document.getElementById('cards').innerHTML=DOMAINS.map(d=>{
+ const dv=d.was==null?'<span class="was">new domain</span>'
+   :`<span class="was">was ${d.was} · <span class="delta ${d.now>d.was?'up':d.now<d.was?'down':'flat'}">${d.now>d.was?'▲ +'+(d.now-d.was):d.now<d.was?'▼ '+(d.now-d.was):'– 0'}</span></span>`;
+ const mark=d.was==null?'':`<u style="left:${d.was}%"></u>`;
+ return `<div class="card" style="--gc:var(${GC[d.g]})">
+   <div class="chead"><span class="title">${d.t}</span><span class="grade">${d.g}</span></div>
+   <div class="scoreline"><span class="now">${d.now}</span>${dv}</div>
+   <div class="track"><i style="width:${d.now}%"></i>${mark}</div>
+   <div class="summ">${d.s}</div></div>`;
+}).join('');
+
+document.getElementById('cmp').innerHTML=DOMAINS.map(d=>{
+ const diff=d.was==null?'<span class="d sub">new</span>'
+   :`<span class="d delta ${d.now>d.was?'up':d.now<d.was?'down':'flat'}">${d.now>d.was?'+'+(d.now-d.was):d.now<d.was?(d.now-d.was):'0'}</span>`;
+ return `<div>
+   <div class="lbl"><span>${d.t}</span>${diff}</div>
+   <div class="bars">${d.was!=null?`<div class="before" style="width:${d.was}%"></div>`:''}
+     <div class="after" style="width:${d.now}%;--gc:var(${GC[d.g]})">${d.now}</div></div>
+ </div>`;
+}).join('');
+
+const F=[
+ {sev:"Critical",ref:"SOC2 CC6.1/CC7.2",title:"No CloudTrail — no AWS control-plane audit trail; cannot answer 'who changed what'",loc:"terraform/*.tf (absent)",src:"siem",iss:["330"]},
+ {sev:"Critical",ref:"SOC2 CC7.2/CC7.3",title:"No automated alerting on security/ops events — failures surface only via customers",loc:"terraform (no alarms/SNS)",src:"siem/operational",iss:["331"]},
+ {sev:"Critical",ref:"SOC2 CC7.2/CC6.1",title:"No application audit logging of auth/privileged actions — no forensic trail",loc:"backend/app/** (no logging)",src:"siem/operational",iss:["332"]},
+ {sev:"High",ref:"CWE-778 / CC7.1",title:"Auth failures unlogged & unalerted — credential-stuffing/brute-force undetectable",loc:"backend/app/services/auth_service.py",src:"operational",iss:["332","331"]},
+ {sev:"High",ref:"CWE-1188 / IaC",title:"Prod RDS Multi-AZ & deletion_protection OFF — data-availability SPOF & destroy risk",loc:"terraform/rds.tf",src:"reliability",iss:["206"]},
+ {sev:"High",ref:"Supply-chain",title:"Dependabot auto-merge has no update-type restriction — majors merge unattended",loc:".github/workflows/dependabot-auto-merge.yml",src:"delivery",iss:["338"]},
+ {sev:"High",ref:"SOC2 CC7.1",title:"No threat detection / config-drift monitoring (GuardDuty, AWS Config, Security Hub)",loc:"terraform (absent)",src:"siem",iss:["333"]},
+ {sev:"High",ref:"SOC2 CC7.4/CC7.5",title:"No documented incident-response runbook — 0% runbook coverage",loc:"docs/ , operations/ (absent)",src:"siem/operational",iss:["334"]},
+ {sev:"Medium",ref:"CWE-693 / A05",title:"No HTTP security headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options)",loc:"backend/main.py:132",src:"security",iss:["335"]},
+ {sev:"Medium",ref:"CWE-639 / API1 BOLA",title:"No object-level authz on prompts CRUD — any user can read/update/delete any prompt by ID",loc:"backend/app/api/prompts.py:125,142,179",src:"security",iss:["336"]},
+ {sev:"Medium",ref:"CWE-693 / CKV2_AWS_28",title:"WAF not attached to ALB — no L7 filtering of injection/bot traffic",loc:"terraform / .sast-exceptions.json",src:"security",iss:["204"]},
+ {sev:"Medium",ref:"CWE-770",title:"Rate limiter is in-memory & per-instance — effective limit multiplies by replica count (abuse/DoS)",loc:"backend/app/middleware/rate_limit.py",src:"arch/reliability/security/siem",iss:["337"]},
+ {sev:"Medium",ref:"CWE-400",title:"MCP outbound fetch has no timeout/AbortController — hung upstream stalls process",loc:"mcp-package-node/lib/helpers.js",src:"arch",iss:[]},
+ {sev:"Medium",ref:"Pipeline",title:"Deploy is ungated & auto-applied (terraform apply -auto-approve, no CI gate/approval/rollback)",loc:".github/workflows/deploy.yml",src:"delivery",iss:["338"]},
+ {sev:"Medium",ref:"Supply-chain",title:"No container image scanning (Trivy/Grype) before push to ECR",loc:".github/workflows (absent)",src:"delivery",iss:["338"]},
+ {sev:"Low",ref:"CWE-942",title:"CORS allow_credentials=true with methods/headers='*' — broad; safe only while origins non-wildcard",loc:"backend/main.py:132-138",src:"security",iss:[]},
+ {sev:"Low",ref:"CWE-348",title:"Client IP derived from spoofable X-Forwarded-For — rate-limit bypass via forged header",loc:"backend/app/middleware/rate_limit.py:93",src:"security",iss:["337"]},
+ {sev:"Low",ref:"CWE-200",title:"/api/health exposes version, rate-limit config & CORS origins to unauthenticated callers",loc:"backend/main.py:195",src:"security/arch/operational",iss:[]},
+ {sev:"Low",ref:"Control drift",title:"21 accepted Checkov exceptions (Multi-AZ off, ALB deletion protection off, mutable ECR tags, HTTP listener)",loc:".sast-exceptions.json",src:"security/codehealth",iss:["204","205","206","207","202"]},
+ {sev:"Low",ref:"CWE-636",title:"Missing DATABASE_URL fails open to local SQLite instead of failing closed in prod",loc:"backend/app/database/base.py:6",src:"arch",iss:[]},
+ {sev:"Low",ref:"Shift-left",title:"No pre-commit/pre-push hooks — secrets caught only post-push in CI",loc:".husky / .pre-commit-config (absent)",src:"workflow",iss:[]},
+ {sev:"Low",ref:"Governance",title:"Bot/self-only PR review satisfies branch protection on substantial changes (bus-factor 1)",loc:".github branch protection",src:"workflow",iss:[]},
+ {sev:"Low",ref:"Supply-chain",title:"Mutable :latest tag pushed to ECR; no SBOM generation",loc:".github/workflows/deploy.yml",src:"delivery",iss:["205","338"]},
+ {sev:"Info",ref:"CWE-1032",title:"gitleaks allowlist excludes all test dirs — secrets pasted into tests would go undetected",loc:".gitleaks.toml",src:"security",iss:[]},
+];
+const RANK={Critical:0,High:1,Medium:2,Low:3,Info:4};
+let cur={k:"sev",dir:1};
+const sortKey=(f,k)=> k==="sev" ? RANK[f.sev]
+   : k==="iss" ? (f.iss&&f.iss.length ? +f.iss[0] : 99999) : f[k];
+function draw(){
+ F.sort((a,b)=>{const x=sortKey(a,cur.k),y=sortKey(b,cur.k);return (x>y?1:x<y?-1:0)*cur.dir;});
+ document.querySelector('#ftbl tbody').innerHTML=F.map(f=>`<tr>
+   <td><span class="sev ${f.sev}">${f.sev}</span></td>
+   <td><code>${f.ref}</code></td><td>${f.title}</td>
+   <td><code>${f.loc}</code></td><td>${f.src}</td>
+   <td>${issChips(f.iss)}</td></tr>`).join('');
+}
+document.querySelectorAll('#ftbl th').forEach(th=>th.onclick=()=>{
+ const k=th.dataset.k; cur.dir=(cur.k===k)?-cur.dir:1; cur.k=k; draw();
+});
+draw();
+
+const counts=F.reduce((m,f)=>(m[f.sev]=(m[f.sev]||0)+1,m),{});
+const SEVV={Critical:"--sev-critical",High:"--sev-high",Medium:"--sev-medium",Low:"--sev-low",Info:"--sev-info"};
+document.getElementById('sevrow').innerHTML=["Critical","High","Medium","Low","Info"].map(s=>
+ `<div class="sevchip"><i style="background:var(${SEVV[s]})"></i><b>${counts[s]||0}</b><span>${s}</span></div>`).join('');
+
+const CHECK=[
+ ["no","Control-plane audit trail (CloudTrail)","CC6.1 / CC7.2"],
+ ["no","Security & ops alerting / paging","CC7.2 / CC7.3"],
+ ["no","Application audit logging (auth/admin)","CC7.2 / CC6.1"],
+ ["no","Threat detection (GuardDuty / Config)","CC7.1"],
+ ["no","Incident-response runbook","CC7.4 / CC7.5"],
+ ["part","Distributed, logged rate limiting","CC6.6"],
+ ["ok","Encryption at rest (RDS + KMS)","CC6.1"],
+ ["ok","Encryption in transit (TLS 1.2)","CC6.7"],
+ ["ok","Secrets management (Secrets Manager + KMS)","CC6.1"],
+ ["ok","Access control — JWT + bcrypt(12) + revocation","CC6.1 / CC6.3"],
+ ["ok","Change mgmt — required checks + PR review","CC8.1"],
+ ["ok","Vulnerability mgmt — SAST/SCA in CI, expiring exceptions","CC7.1"],
+ ["ok","Log retention (365-day default)","CC7.2"],
+ ["part","Network monitoring (VPC flow logs, no analysis)","CC7.1"],
+];
+const MK={ok:["ok","✓"],no:["no","✗"],part:["part","◐"]};
+document.getElementById('check').innerHTML=CHECK.map(([st,txt,ctl])=>
+ `<li><span class="mk ${MK[st][0]}">${MK[st][1]}</span><span>${txt}<span class="ctl">${ctl}</span></span></li>`).join('');
+
+const REC=[
+ ["P0","Establish detection & response baseline","Add multi-region CloudTrail → encrypted S3/CloudWatch, GuardDuty + AWS Config, and CloudWatch alarms + SNS paging (ALB 5xx/latency, ECS health, RDS CPU/connections, auth-failure spikes). Closes 2 Critical + 2 High gaps at once.",["330","331","333"]],
+ ["P0","Add structured application audit logging","Introduce JSON logging with correlation IDs and explicit auth-event logging (login success/failure, lockout, token issue/revoke, admin actions) shipped to CloudWatch. Enables both forensics (SOC 2) and brute-force detection.",["332"]],
+ ["P1","Enforce object-level authorization on prompts","Add owner/role checks on GET/PUT/DELETE /prompts/{id} (created_by is set but never enforced) or explicitly document the shared-workspace model. Prevents cross-tenant tamper/delete (BOLA).",["336"]],
+ ["P1","Harden production infrastructure (IaC drift)","Enable RDS Multi-AZ + deletion_protection, ALB deletion protection, ECS deployment_circuit_breaker{rollback=true}, and immutable ECR tags. Removes the top availability SPOF and adds auto-rollback.",["206","204","205"]],
+ ["P1","Add HTTP security headers middleware","CSP, HSTS, X-Frame-Options=DENY, X-Content-Type-Options=nosniff, Referrer-Policy at the app layer. Low effort, closes clickjacking/MIME-sniff exposure.",["335"]],
+ ["P1","Gate & de-risk the deploy pipeline","Require a GitHub environment approval + CI success (needs/workflow_run) before deploy; restrict dependabot auto-merge to patch/minor; add a Trivy image scan and post-deploy smoke check.",["338"]],
+ ["P2","Move rate limiting to a shared store","Redis/ElastiCache-backed limiter with trusted-proxy IP derivation and violation logging — restores throttling & abuse detection across scaled ECS tasks (cross-cutting across 5 domains).",["337"]],
+ ["P2","Author runbooks & write on-call docs","Cover DB-unavailable, deploy-rollback, and auth-outage failure modes with named owners under docs/. Raises Operational & SIEM scores and formalizes MTTR.",["334"]],
+ ["P2","Close frontend/a11y & resilience gaps","Add role=alert/aria-live to auth errors, a real 404 page + global ErrorBoundary; add fetch/axios timeouts and DB pool_pre_ping/pool_recycle; decompose ApiDocs.jsx (1,057 LOC).",[]],
+];
+document.getElementById('rec').innerHTML=REC.map(([p,t,b,iss])=>
+ `<li><span class="pri ${p}">${p}</span><strong>${t}.</strong> ${b} ${issChips(iss)}</li>`).join('');
+
+// initiatives / traceability
+const INIT=[
+ {name:"SAST Exceptions — 12-Week Plan",ms:"Milestone #1",prog:7,tot:12,color:"--grade-a",
+  scope:"Infrastructure / Checkov control-drift burndown (7 of 12 done).",
+  issues:[
+   {n:"206",sev:"High",t:"RDS Multi-AZ + deletion protection"},
+   {n:"204",sev:"Medium",t:"WAF + ALB deletion protection"},
+   {n:"207",sev:"Low",t:"HTTPS-only listeners"},
+   {n:"205",sev:"Low",t:"ECR immutable tags, PG/Route53 logging, DNSSEC"},
+   {n:"202",sev:"Info",t:"Secrets rotation + IAM DB auth"},
+  ]},
+ {name:"Detection & Response Baseline",ms:"Milestone #2 · new",prog:0,tot:5,color:"--sev-critical",
+  scope:"Audit trail, alerting, threat detection & incident response — closes the 3 Critical + 2 High SOC 2 gaps.",
+  issues:[
+   {n:"330",sev:"Critical",t:"CloudTrail control-plane audit trail"},
+   {n:"331",sev:"Critical",t:"CloudWatch alarms + SNS paging"},
+   {n:"332",sev:"Critical",t:"Application audit logging"},
+   {n:"333",sev:"High",t:"GuardDuty + AWS Config threat detection"},
+   {n:"334",sev:"High",t:"Incident-response runbooks & on-call docs"},
+  ]},
+ {name:"Application Security & Pipeline",ms:"Standalone · new",prog:0,tot:4,color:"--grade-c",
+  scope:"App-layer & supply-chain hardening not covered by the infra plan.",
+  issues:[
+   {n:"335",sev:"Medium",t:"HTTP security headers middleware"},
+   {n:"336",sev:"Medium",t:"Object-level authz on prompts (BOLA)"},
+   {n:"337",sev:"Medium",t:"Distributed rate limiting + trusted-proxy IP"},
+   {n:"338",sev:"Medium",t:"Deploy pipeline hardening (gate/dependabot/scan)"},
+  ]},
+ {name:"Observability & OpenTelemetry",ms:"Milestone #3 · new",prog:0,tot:8,color:"--grade-b",
+  scope:"Vendor-neutral OpenTelemetry across all stacks + Grafana/SigNoz evaluation to select an APM. Directly lifts Operational Excellence (55) and SIEM/SOC2 (56).",
+  issues:[
+   {n:"339",tag:"Foundation",t:"OpenTelemetry Collector on ECS (Terraform)"},
+   {n:"340",tag:"Backend",t:"Instrument FastAPI — traces, metrics, logs"},
+   {n:"341",tag:"Frontend",t:"Instrument React/TS — Real User Monitoring"},
+   {n:"342",tag:"Infra",t:"ECS/RDS/host telemetry via Collector"},
+   {n:"343",tag:"DevOps",t:"CI/CD traces & deployment markers"},
+   {n:"344",tag:"Spike",t:"Evaluate Grafana LGTM + Faro"},
+   {n:"345",tag:"Spike",t:"Evaluate SigNoz"},
+   {n:"346",tag:"Decision",t:"Select platform — ADR"},
+  ]},
+];
+document.getElementById('init').innerHTML=INIT.map(g=>`<div class="initcard" style="--ic:var(${g.color})">
+   <h3>${g.name}</h3>
+   <div class="meta">${g.ms} · ${g.prog}/${g.tot} complete</div>
+   <div class="barmini" style="--ic:var(${g.color})"><i style="width:${Math.round(g.prog/g.tot*100)}%"></i></div>
+   <div class="sub" style="font-size:12.5px;margin-bottom:12px">${g.scope}</div>
+   <div class="il">${g.issues.map(i=>`<div class="ir">
+     <a class="isschip" href="${GH}${i.n}" target="_blank" rel="noopener">#${i.n}</a>
+     ${i.sev?`<span class="sev ${i.sev}">${i.sev}</span>`:`<span class="pill">${i.tag}</span>`}<span class="txt">${i.t}</span></div>`).join('')}</div>
+ </div>`).join('');
+
+const BACKLOG=[
+ ["Medium","MCP outbound fetch has no timeout/AbortController","mcp-package-node/lib/helpers.js"],
+ ["Low","CORS allow_credentials with methods/headers='*'","backend/main.py:132-138"],
+ ["Low","/api/health exposes version & config unauthenticated","backend/main.py:195"],
+ ["Low","DATABASE_URL fails open to SQLite instead of failing closed","backend/app/database/base.py:6"],
+ ["Low","No pre-commit/pre-push hooks (secrets caught only post-push)",".pre-commit-config (absent)"],
+ ["Low","Bot/self-only PR review on substantial changes",".github branch protection"],
+ ["Info","gitleaks allowlist excludes all test dirs",".gitleaks.toml"],
+];
+document.getElementById('backlog').innerHTML=BACKLOG.map(([s,t,l])=>
+ `<li><span class="sev ${s}" style="font-size:10px">${s}</span> ${t} — <code>${l}</code></li>`).join('');
+
+function tgl(){
+ const r=document.documentElement;
+ const isDark = r.getAttribute('data-theme')==='dark' || (r.getAttribute('data-theme')!=='light' && window.matchMedia('(prefers-color-scheme:dark)').matches);
+ r.setAttribute('data-theme', isDark?'light':'dark');
+}
+</script>
 </body>
 </html>
