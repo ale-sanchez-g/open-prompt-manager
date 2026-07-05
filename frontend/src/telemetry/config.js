@@ -39,7 +39,7 @@ function parseRatio(value, fallback) {
 }
 
 function readEnv() {
-  return (typeof import.meta !== 'undefined' && import.meta.env) || {};
+  return import.meta?.env ?? {};
 }
 
 /**
@@ -66,7 +66,7 @@ export function getTelemetryConfig(env = readEnv()) {
 }
 
 function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return value.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }
 
 /**

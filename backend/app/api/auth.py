@@ -65,7 +65,7 @@ router = APIRouter(prefix='/auth', tags=['auth'])
     response_description='The newly created user identifier.',
     responses={409: {'description': 'Email already registered.'}, 422: {'description': 'Password or email validation failed.'}},
 )
-def register(payload: AuthRequest, request: Request, db: Session = Depends(get_db)) -> RegisterResponse:
+def register(payload: AuthRequest, request: Request, db: Annotated[Session, Depends(get_db)]) -> RegisterResponse:
     normalized_email = normalize_email(payload.email)
     if not validate_email(normalized_email):
         raise AuthError(status_code=422, error='Invalid email address')
@@ -91,7 +91,7 @@ def register(payload: AuthRequest, request: Request, db: Session = Depends(get_d
     response_description='Bearer access token details. Refresh token is returned via cookie only.',
     responses={401: {'description': 'Invalid credentials.'}},
 )
-def login(payload: AuthRequest, request: Request, response: Response, db: Session = Depends(get_db)) -> TokenResponse:
+def login(payload: AuthRequest, request: Request, response: Response, db: Annotated[Session, Depends(get_db)]) -> TokenResponse:
     normalized_email = normalize_email(payload.email)
 
     if is_login_locked_out(normalized_email):
@@ -132,7 +132,7 @@ def login(payload: AuthRequest, request: Request, response: Response, db: Sessio
     response_description='Fresh bearer access token details.',
     responses={401: {'description': 'Refresh token is missing, expired, or invalid.'}},
 )
-def refresh(request: Request, db: Session = Depends(get_db)) -> TokenResponse | JSONResponse:
+def refresh(request: Request, db: Annotated[Session, Depends(get_db)]) -> TokenResponse | JSONResponse:
     refresh_cookie = request.cookies.get(REFRESH_COOKIE_NAME)
     if not refresh_cookie:
         audit_event(EVENT_TOKEN_REFRESH_FAILURE, request=request, outcome='failure', reason='missing_cookie')
@@ -165,7 +165,7 @@ def refresh(request: Request, db: Session = Depends(get_db)) -> TokenResponse | 
     description='Revokes the current refresh token if present, clears the cookie, and ends the authenticated browser session.',
     response_description='No content.',
 )
-def logout(request: Request, db: Session = Depends(get_db)) -> Response:
+def logout(request: Request, db: Annotated[Session, Depends(get_db)]) -> Response:
     refresh_cookie = request.cookies.get(REFRESH_COOKIE_NAME)
     revoked = revoke_refresh_token_from_cookie(db, refresh_cookie)
     if revoked is not None:

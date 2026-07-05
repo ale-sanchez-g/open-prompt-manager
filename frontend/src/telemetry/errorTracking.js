@@ -4,9 +4,9 @@ import { sanitizeSpanAttributes, sanitizeUrl } from './sanitize';
 function recordError(tracer, spanName, error, extraAttributes = {}) {
   const span = tracer.startSpan(spanName, { startTime: new Date() });
 
-  span.setAttribute('exception.type', error && error.name ? error.name : 'Error');
-  span.setAttribute('exception.message', error && error.message ? String(error.message) : String(error));
-  if (error && error.stack) {
+  span.setAttribute('exception.type', error?.name ? error.name : 'Error');
+  span.setAttribute('exception.message', error?.message ? String(error.message) : String(error));
+  if (error?.stack) {
     span.setAttribute('exception.stacktrace', String(error.stack));
   }
   for (const [key, value] of Object.entries(extraAttributes)) {
@@ -23,8 +23,14 @@ function recordError(tracer, spanName, error, extraAttributes = {}) {
  * error spans, so a crash on a page is visible in the same trace backend as
  * the page-load / fetch spans around it. Returns an unsubscribe function.
  */
+function toError(reason) {
+  if (reason instanceof Error) return reason;
+  if (typeof reason === 'string') return new Error(reason);
+  return new Error('Unhandled promise rejection');
+}
+
 export function startErrorTracking(tracer) {
-  if (typeof window === 'undefined') return () => {};
+  if (typeof globalThis.window === 'undefined') return () => {};
 
   const handleError = (event) => {
     const error = event.error instanceof Error ? event.error : new Error(event.message || 'Unknown error');
@@ -36,16 +42,14 @@ export function startErrorTracking(tracer) {
   };
 
   const handleRejection = (event) => {
-    const reason = event.reason;
-    const error = reason instanceof Error ? reason : new Error(typeof reason === 'string' ? reason : 'Unhandled promise rejection');
-    recordError(tracer, 'unhandled-rejection', error);
+    recordError(tracer, 'unhandled-rejection', toError(event.reason));
   };
 
-  window.addEventListener('error', handleError);
-  window.addEventListener('unhandledrejection', handleRejection);
+  globalThis.addEventListener('error', handleError);
+  globalThis.addEventListener('unhandledrejection', handleRejection);
 
   return () => {
-    window.removeEventListener('error', handleError);
-    window.removeEventListener('unhandledrejection', handleRejection);
+    globalThis.removeEventListener('error', handleError);
+    globalThis.removeEventListener('unhandledrejection', handleRejection);
   };
 }

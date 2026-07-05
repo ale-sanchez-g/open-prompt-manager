@@ -1,5 +1,5 @@
 from collections import deque
-from typing import Optional
+from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
@@ -97,12 +97,12 @@ def _build_list_responses(prompts: list[Prompt], db: Session) -> list[PromptList
     response_description='Paginated array of prompt summaries.',
 )
 def list_prompts(
+    db: Annotated[Session, Depends(get_db)],
     search: Optional[str] = Query(None, description='Full-text search against prompt name and description.'),
     tag_id: Optional[int] = Query(None, description='Filter to prompts that carry this tag ID.'),
     agent_id: Optional[int] = Query(None, description='Filter to prompts associated with this agent ID.'),
     skip: int = Query(0, ge=0, description='Number of records to skip (for pagination).'),
     limit: int = Query(50, ge=1, le=200, description='Maximum number of records to return (1–200).'),
-    db: Session = Depends(get_db),
 ):
     query = db.query(Prompt)
     if search:
@@ -130,7 +130,7 @@ def list_prompts(
     ),
     response_description='The newly created prompt including auto-assigned `id`, timestamps, and computed `is_latest`.',
 )
-def create_prompt(payload: PromptCreate, request: Request, db: Session = Depends(get_db)):
+def create_prompt(payload: PromptCreate, request: Request, db: Annotated[Session, Depends(get_db)]):
     db_prompt = Prompt(
         name=payload.name,
         description=payload.description,
@@ -158,7 +158,7 @@ def create_prompt(payload: PromptCreate, request: Request, db: Session = Depends
     response_description='Full prompt detail including tags, agents, variables, and quality metrics.',
     responses={404: {'description': 'Prompt not found.'}},
 )
-def get_prompt(prompt_id: int, db: Session = Depends(get_db)):
+def get_prompt(prompt_id: int, db: Annotated[Session, Depends(get_db)]):
     prompt = _get_prompt_or_404(prompt_id, db)
     return _build_prompt_response(prompt, db)
 
@@ -178,7 +178,7 @@ def get_prompt(prompt_id: int, db: Session = Depends(get_db)):
         404: {'description': 'Prompt not found.'},
     },
 )
-def update_prompt(prompt_id: int, payload: PromptUpdate, request: Request, db: Session = Depends(get_db)):
+def update_prompt(prompt_id: int, payload: PromptUpdate, request: Request, db: Annotated[Session, Depends(get_db)]):
     prompt = _get_prompt_or_404(prompt_id, db)
     _require_owner_or_admin(prompt, request)
     if payload.name is not None:
@@ -217,7 +217,7 @@ def update_prompt(prompt_id: int, payload: PromptUpdate, request: Request, db: S
         404: {'description': 'Prompt not found.'},
     },
 )
-def delete_prompt(prompt_id: int, request: Request, db: Session = Depends(get_db)):
+def delete_prompt(prompt_id: int, request: Request, db: Annotated[Session, Depends(get_db)]):
     prompt = _get_prompt_or_404(prompt_id, db)
     _require_owner_or_admin(prompt, request)
     db.delete(prompt)
@@ -242,7 +242,7 @@ def delete_prompt(prompt_id: int, request: Request, db: Session = Depends(get_db
         404: {'description': 'Parent prompt not found.'},
     },
 )
-def create_version(prompt_id: int, payload: VersionCreate, request: Request, db: Session = Depends(get_db)):
+def create_version(prompt_id: int, payload: VersionCreate, request: Request, db: Annotated[Session, Depends(get_db)]):
     parent = _get_prompt_or_404(prompt_id, db)
     _require_owner_or_admin(parent, request)
     new_version = payload.version or _increment_version(parent.version)
@@ -283,7 +283,7 @@ def create_version(prompt_id: int, payload: VersionCreate, request: Request, db:
     response_description='All versions in the lineage, ordered root-first.',
     responses={404: {'description': 'Prompt not found or ancestry is inconsistent.'}},
 )
-def get_versions(prompt_id: int, db: Session = Depends(get_db)):
+def get_versions(prompt_id: int, db: Annotated[Session, Depends(get_db)]):
     prompt = _get_prompt_or_404(prompt_id, db)
     # Collect the full ancestry chain
     root = prompt
@@ -323,7 +323,7 @@ def get_versions(prompt_id: int, db: Session = Depends(get_db)):
         422: {'description': 'Missing required variable or circular component reference detected.'},
     },
 )
-def render(prompt_id: int, payload: RenderRequest, db: Session = Depends(get_db)):
+def render(prompt_id: int, payload: RenderRequest, db: Annotated[Session, Depends(get_db)]):
     prompt = _get_prompt_or_404(prompt_id, db)
     try:
         rendered, vars_used, components = render_prompt(prompt, payload.variables, db)
@@ -350,7 +350,7 @@ def render(prompt_id: int, payload: RenderRequest, db: Session = Depends(get_db)
     response_description='The recorded execution with its auto-assigned `id` and `timestamp`.',
     responses={404: {'description': 'Prompt not found.'}},
 )
-def create_execution(prompt_id: int, payload: ExecutionCreate, db: Session = Depends(get_db)):
+def create_execution(prompt_id: int, payload: ExecutionCreate, db: Annotated[Session, Depends(get_db)]):
     _get_prompt_or_404(prompt_id, db)
     execution = PromptExecution(
         prompt_id=prompt_id,
@@ -382,9 +382,9 @@ def create_execution(prompt_id: int, payload: ExecutionCreate, db: Session = Dep
 )
 def get_executions(
     prompt_id: int,
+    db: Annotated[Session, Depends(get_db)],
     skip: int = Query(0, ge=0, description='Number of records to skip.'),
     limit: int = Query(50, ge=1, le=200, description='Maximum records to return (1–200).'),
-    db: Session = Depends(get_db),
 ):
     _get_prompt_or_404(prompt_id, db)
     return (
@@ -410,7 +410,7 @@ def get_executions(
     response_description='The newly recorded metric with its auto-assigned `id` and `timestamp`.',
     responses={404: {'description': 'Prompt not found.'}},
 )
-def add_metric(prompt_id: int, payload: MetricCreate, db: Session = Depends(get_db)):
+def add_metric(prompt_id: int, payload: MetricCreate, db: Annotated[Session, Depends(get_db)]):
     _get_prompt_or_404(prompt_id, db)
     metric = PromptMetric(
         prompt_id=prompt_id,
@@ -432,7 +432,7 @@ def add_metric(prompt_id: int, payload: MetricCreate, db: Session = Depends(get_
     response_description='Array of metric records.',
     responses={404: {'description': 'Prompt not found.'}},
 )
-def get_metrics(prompt_id: int, db: Session = Depends(get_db)):
+def get_metrics(prompt_id: int, db: Annotated[Session, Depends(get_db)]):
     _get_prompt_or_404(prompt_id, db)
     return (
         db.query(PromptMetric)

@@ -1,5 +1,5 @@
 import { getTelemetryConfig, buildPropagateTraceHeaderUrls } from './config';
-import { sanitizeSpanAttributes, sanitizeUrl } from './sanitize';
+import { sanitizeSpanAttributes } from './sanitize';
 
 let initPromise = null;
 
@@ -82,7 +82,7 @@ async function setupTelemetry(config) {
 
   const propagateTraceHeaderCorsUrls = buildPropagateTraceHeaderUrls(config);
   // Never re-trace the exporter's own uploads to the collector.
-  const ignoreUrls = [new RegExp(`^${config.exporterUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`)];
+  const ignoreUrls = [new RegExp(`^${config.exporterUrl.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}`)];
 
   registerInstrumentations({
     tracerProvider: provider,
@@ -98,7 +98,7 @@ async function setupTelemetry(config) {
         // Never let a form field's value or a password input leak into span
         // attributes/names via the DOM element itself.
         shouldPreventSpanCreation: (eventType, element, span) => {
-          const type = (element && element.getAttribute && element.getAttribute('type')) || '';
+          const type = element?.getAttribute?.('type') || '';
           if (type.toLowerCase() === 'password') return true;
           sanitizeSpanAttributes(span);
           return false;
@@ -134,7 +134,7 @@ async function setupTelemetry(config) {
 
 // Exposed for sanitize/URL reuse by consumers that want the same PII rules
 // applied to telemetry-adjacent logging (e.g. an app-level error boundary).
-export { sanitizeUrl };
+export { sanitizeUrl } from './sanitize';
 
 /** Test-only: resets module-level init state between test cases. */
 export function __resetTelemetryForTests() {
