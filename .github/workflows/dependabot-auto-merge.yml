@@ -106,7 +106,10 @@ jobs:
         run: npm test
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # Auto-merge: squash-merge the PR after both test jobs succeed
+  # Auto-merge: squash-merge the PR after both test jobs succeed, but only for
+  # semver-patch/semver-minor updates. Major updates (and anything that isn't
+  # clearly patch/minor) are left for a human — they get a label and a comment
+  # instead of being merged unattended.
   # ─────────────────────────────────────────────────────────────────────────────
   auto-merge:
     name: Auto-Merge
@@ -116,6 +119,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      issues: write  # required to add a label via the Issues API
 
     steps:
       - name: Fetch Dependabot metadata
@@ -124,8 +128,33 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Merge pull request
+      - name: Auto-merge patch/minor updates
+        if: >-
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor'
         run: gh pr merge --squash --auto "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Flag major/unclassified updates for manual review
+        # Fail-safe default: anything that isn't explicitly patch or minor
+        # (majors, or an update-type we don't recognize) requires a human.
+        if: >-
+          steps.metadata.outputs.update-type != 'version-update:semver-patch' &&
+          steps.metadata.outputs.update-type != 'version-update:semver-minor'
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEP_NAMES: ${{ steps.metadata.outputs.dependency-names }}
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+        run: |
+          set -euo pipefail
+          gh pr edit "$PR_URL" --add-label "needs-manual-review" \
+            || echo "::warning::Could not add the 'needs-manual-review' label — create it once under the repository's Issues > Labels settings."
+          gh pr comment "$PR_URL" --body "$(cat <<EOF
+          This update (\`${DEP_NAMES}\`) is **${UPDATE_TYPE:-not a recognized semver patch/minor update}** and will **not** be auto-merged.
+
+          Major version bumps can include breaking changes — please review the changelog/release notes and merge manually once satisfied.
+          EOF
+          )"
