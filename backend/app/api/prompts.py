@@ -12,8 +12,24 @@ from app.models.schemas import (
     MetricCreate, MetricResponse,
 )
 from app.services.prompt_service import render_prompt, update_prompt_stats, _increment_version
+from app.services.auth_service import ROLE_ADMIN
 
 router = APIRouter(prefix='/api/prompts', tags=['prompts'])
+
+
+# ── Object-level authorization model ───────────────────────────────────────────
+# Prompts live in a shared workspace: any authenticated user may READ and LIST
+# every prompt (and its versions, executions, and metrics). MUTATIONS, however,
+# are owner-scoped — only the prompt's creator (``created_by``) or an admin may
+# update a prompt, delete it, or create a new version/child from it. This closes
+# the BOLA gap (CWE-639 / OWASP API1) where any authenticated user could modify
+# arbitrary prompts by ID.
+#
+# A non-owner mutation attempt returns 403 Forbidden (not 404). Because reads are
+# shared, the object's existence is already discoverable, so hiding it behind a
+# 404 would add no confidentiality while making legitimate clients harder to
+# debug. 403 is therefore both honest and consistent with the auth layer's
+# existing ``admin_required`` (403) response.
 
 
 def _get_prompt_or_404(prompt_id: int, db: Session) -> Prompt:
@@ -21,6 +37,26 @@ def _get_prompt_or_404(prompt_id: int, db: Session) -> Prompt:
     if not prompt:
         raise HTTPException(status_code=404, detail=f'Prompt {prompt_id} not found')
     return prompt
+
+
+def _require_owner_or_admin(prompt: Prompt, request: Request) -> None:
+    """Authorize a mutating action against a prompt.
+
+    Allows the request only when the caller owns the prompt (``created_by``
+    matches the authenticated user's email) or holds the admin role. Raises
+    403 otherwise. The authenticated identity is populated on ``request.state``
+    by the auth middleware.
+    """
+    user_role = getattr(request.state, 'user_role', None)
+    if user_role == ROLE_ADMIN:
+        return
+    user_email = getattr(request.state, 'user_email', None)
+    if prompt.created_by is not None and prompt.created_by == user_email:
+        return
+    raise HTTPException(
+        status_code=403,
+        detail='You do not have permission to modify this prompt.',
+    )
 
 
 def _is_latest(prompt_id: int, db: Session) -> bool:
@@ -137,10 +173,14 @@ def get_prompt(prompt_id: int, db: Session = Depends(get_db)):
         'Supplying `tag_ids` or `agent_ids` **replaces** the full association list.'
     ),
     response_description='The updated prompt.',
-    responses={404: {'description': 'Prompt not found.'}},
+    responses={
+        403: {'description': 'Caller is not the prompt owner or an admin.'},
+        404: {'description': 'Prompt not found.'},
+    },
 )
-def update_prompt(prompt_id: int, payload: PromptUpdate, db: Session = Depends(get_db)):
+def update_prompt(prompt_id: int, payload: PromptUpdate, request: Request, db: Session = Depends(get_db)):
     prompt = _get_prompt_or_404(prompt_id, db)
+    _require_owner_or_admin(prompt, request)
     if payload.name is not None:
         prompt.name = payload.name
     if payload.description is not None:
@@ -173,11 +213,13 @@ def update_prompt(prompt_id: int, payload: PromptUpdate, db: Session = Depends(g
     ),
     responses={
         204: {'description': 'Prompt deleted successfully.'},
+        403: {'description': 'Caller is not the prompt owner or an admin.'},
         404: {'description': 'Prompt not found.'},
     },
 )
-def delete_prompt(prompt_id: int, db: Session = Depends(get_db)):
+def delete_prompt(prompt_id: int, request: Request, db: Session = Depends(get_db)):
     prompt = _get_prompt_or_404(prompt_id, db)
+    _require_owner_or_admin(prompt, request)
     db.delete(prompt)
     db.commit()
 
@@ -195,10 +237,14 @@ def delete_prompt(prompt_id: int, db: Session = Depends(get_db)):
         'Tags and agents are inherited from the parent.'
     ),
     response_description='The newly created version with `parent_id` pointing to the source prompt.',
-    responses={404: {'description': 'Parent prompt not found.'}},
+    responses={
+        403: {'description': 'Caller is not the parent prompt owner or an admin.'},
+        404: {'description': 'Parent prompt not found.'},
+    },
 )
-def create_version(prompt_id: int, payload: VersionCreate, db: Session = Depends(get_db)):
+def create_version(prompt_id: int, payload: VersionCreate, request: Request, db: Session = Depends(get_db)):
     parent = _get_prompt_or_404(prompt_id, db)
+    _require_owner_or_admin(parent, request)
     new_version = payload.version or _increment_version(parent.version)
     new_prompt = Prompt(
         name=parent.name,
