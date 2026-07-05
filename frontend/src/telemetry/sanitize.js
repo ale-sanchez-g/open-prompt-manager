@@ -19,7 +19,7 @@ const SENSITIVE_KEY_PATTERN = /(authorization|cookie|token|secret|password|api[-
 export function sanitizeUrl(rawUrl) {
   if (!rawUrl || typeof rawUrl !== 'string') return rawUrl;
 
-  const base = typeof globalThis.window !== 'undefined' && globalThis.location ? globalThis.location.origin : 'http://localhost';
+  const base = globalThis.window !== undefined && globalThis.location ? globalThis.location.origin : 'http://localhost';
 
   try {
     const parsed = new URL(rawUrl, base);

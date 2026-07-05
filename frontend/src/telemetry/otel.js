@@ -82,7 +82,8 @@ async function setupTelemetry(config) {
 
   const propagateTraceHeaderCorsUrls = buildPropagateTraceHeaderUrls(config);
   // Never re-trace the exporter's own uploads to the collector.
-  const ignoreUrls = [new RegExp(`^${config.exporterUrl.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}`)];
+  const escapedExporterUrl = config.exporterUrl.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  const ignoreUrls = [new RegExp(`^${escapedExporterUrl}`)];
 
   registerInstrumentations({
     tracerProvider: provider,
