@@ -311,13 +311,16 @@ def test_formatter_redacts_token_and_hash_fields():
         name='audit', level=logging.INFO, pathname=__file__, lineno=1,
         msg='auth.token.issued', args=None, exc_info=None,
     )
-    record.access_token = 'eyJhbGciOi.header.payload.signature'
-    record.password_hash = '$2b$12$abcdefghijklmnopqrstuv'
+    # Deliberately fake, non-credential-shaped values: the redactor strips by
+    # key name, so the content is irrelevant, and realistic-looking JWT/bcrypt
+    # literals trip secret scanners (GitGuardian/gitleaks) on every scan.
+    record.access_token = 'fake-access-token-value-for-redaction-test'
+    record.password_hash = 'fake-password-hash-value-for-redaction-test'
 
     output = formatter.format(record)
 
-    assert 'eyJhbGciOi' not in output
-    assert '$2b$12$' not in output
+    assert 'fake-access-token-value' not in output
+    assert 'fake-password-hash-value' not in output
     assert output.count('***REDACTED***') == 2
 
 

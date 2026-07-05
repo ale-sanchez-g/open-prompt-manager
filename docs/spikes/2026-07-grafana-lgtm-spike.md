@@ -132,7 +132,9 @@ services:
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: lgtm
-      MINIO_ROOT_PASSWORD: lgtm12345
+      # Set a throwaway value before running the sandbox; placeholder kept
+      # non-credential-shaped so secret scanners don't flag this doc.
+      MINIO_ROOT_PASSWORD: CHANGEME_SANDBOX_ONLY
     ports: ["9000:9000", "9001:9001"]
     volumes: ["minio-data:/data"]
 
@@ -141,7 +143,7 @@ services:
     depends_on: [minio]
     entrypoint: >
       /bin/sh -c "
-      until mc alias set local http://minio:9000 lgtm lgtm12345; do sleep 1; done;
+      until mc alias set local http://minio:9000 lgtm CHANGEME_SANDBOX_ONLY; do sleep 1; done;
       mc mb -p local/loki-data local/tempo-data local/mimir-data;
       exit 0;"
 
