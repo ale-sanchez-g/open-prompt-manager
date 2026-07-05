@@ -1,6 +1,6 @@
 # Spike: Grafana LGTM + Faro as the OTel Backend
 
-**Issue:** [#344 \[Spike\] Evaluate Grafana LGTM + Faro as the OTel backend](../../)
+**Issue:** [#344 \[Spike\] Evaluate Grafana LGTM + Faro as the OTel backend](https://github.com/ale-sanchez-g/open-prompt-manager/issues/344)
 **Paired spike:** #345 (SigNoz, identical rubric) · **Decision:** #346 (ADR)
 **Date:** 2026-07-05
 **Author:** Lane L6 (Eval & Docs)

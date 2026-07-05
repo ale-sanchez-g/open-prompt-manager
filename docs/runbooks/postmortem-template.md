@@ -7,7 +7,7 @@ Use this template for all P1 incidents and significant P2 incidents. Schedule a 
 ## Incident Summary
 
 **Incident Title:** [Descriptive title]  
-**Incident ID:** [YYYY-MM-DD-HHMM] (e.g., 2024-07-05-1430)  
+**Incident ID:** [YYYY-MM-DD-HHMM] (e.g., 2026-07-05-1430)  
 **Severity:** [P1 / P2]  
 **Duration:** [HH:MM] (from detection to resolution)  
 **Participants:** [Names of incident responders]  
@@ -322,7 +322,7 @@ The incident was caused by:
 
 [Link to CloudWatch logs, error traces, or other relevant logs]
 
-- CloudWatch Logs: `/ecs/open-prompt-manager/backend` (2024-07-05 14:30-15:05)
+- CloudWatch Logs: `/ecs/open-prompt-manager/backend` (2026-07-05 14:30-15:05)
 - RDS Events: [Link to event history]
 - ALB Access Logs: [Link to S3 logs]
 

@@ -42,7 +42,8 @@ export function initTelemetry() {
 
 async function setupTelemetry(config) {
   const [
-    { WebTracerProvider, BatchSpanProcessor, ParentBasedSampler, TraceIdRatioBasedSampler },
+    { WebTracerProvider },
+    { BatchSpanProcessor, ParentBasedSampler, TraceIdRatioBasedSampler },
     { OTLPTraceExporter },
     { resourceFromAttributes },
     { registerInstrumentations },
@@ -53,6 +54,7 @@ async function setupTelemetry(config) {
     { ZoneContextManager },
   ] = await Promise.all([
     import('@opentelemetry/sdk-trace-web'),
+    import('@opentelemetry/sdk-trace-base'),
     import('@opentelemetry/exporter-trace-otlp-http'),
     import('@opentelemetry/resources'),
     import('@opentelemetry/instrumentation'),

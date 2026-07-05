@@ -1,7 +1,7 @@
 # On-Call & Escalation Policy
 
 **Version:** 1.0  
-**Last Updated:** 2024-07-05  
+**Last Updated:** 2026-07-05  
 **Owner:** Engineering Lead / Incident Commander — TODO: fill name
 
 ---
@@ -157,7 +157,7 @@ Fix during planned maintenance window
 Create a Slack thread for each incident:
 
 ```
-Title: [P1] Database Unavailable - 2024-07-05 14:30 UTC
+Title: [P1] Database Unavailable - 2026-07-05 14:30 UTC
 Severity: P1
 Status: Investigating
 Assigned: @alice (On-Call)
