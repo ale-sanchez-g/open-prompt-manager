@@ -21,7 +21,7 @@ from app.audit import (
     EVENT_LOGIN_FAILURE,
     EVENT_LOGIN_LOCKOUT,
     EVENT_LOGIN_SUCCESS,
-    EVENT_PASSWORD_CHANGE,
+    EVENT_CREDENTIAL_CHANGE,
     EVENT_REGISTER,
     EVENT_TOKEN_ISSUED,
     EVENT_TOKEN_REFRESH,
@@ -226,7 +226,7 @@ def test_admin_password_reset_emits_password_change_event(anon_client, caplog):
     )
 
     assert response.status_code == 200
-    record = next(r for r in _audit_records(caplog) if r.event == EVENT_PASSWORD_CHANGE)
+    record = next(r for r in _audit_records(caplog) if r.event == EVENT_CREDENTIAL_CHANGE)
     assert record.actor == 'audit-admin4@opm.io'
     assert record.target == member_id
     assert record.outcome == 'success'

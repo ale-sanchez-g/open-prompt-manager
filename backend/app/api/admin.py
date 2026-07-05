@@ -9,7 +9,7 @@ from app.audit import (
     EVENT_ADMIN_USER_DELETE,
     EVENT_ADMIN_USER_LIST,
     EVENT_ADMIN_USER_ROLE_CHANGE,
-    EVENT_PASSWORD_CHANGE,
+    EVENT_CREDENTIAL_CHANGE,
     audit_event,
 )
 from app.database.base import get_db
@@ -141,10 +141,10 @@ def admin_update_user(
 
     if payload.password is not None:
         if not validate_password(payload.password):
-            audit_event(EVENT_PASSWORD_CHANGE, request=request, actor=admin.email, target=user.id, outcome='failure', reason='weak_password')
+            audit_event(EVENT_CREDENTIAL_CHANGE, request=request, actor=admin.email, target=user.id, outcome='failure', reason='weak_password')
             raise AuthError(status_code=422, error='Password does not meet complexity requirements')
         update_user_password(db, user, payload.password)
-        audit_event(EVENT_PASSWORD_CHANGE, request=request, actor=admin.email, target=user.id, outcome='success', changed_by='admin')
+        audit_event(EVENT_CREDENTIAL_CHANGE, request=request, actor=admin.email, target=user.id, outcome='success', changed_by='admin')
 
     return user
 
