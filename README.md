@@ -182,13 +182,19 @@ Optional flags:
 
 `/.github/workflows/deploy.yml` runs automatically on pushes to release tags matching `v*.*.*` (for example `v1.4.2`), uses AWS OIDC (`aws-actions/configure-aws-credentials`) with no static AWS access keys, then:
 
-1. Bootstraps ECR repositories via Terraform
-2. Builds and pushes backend + frontend Docker images tagged with the release tag (and `latest`)
-3. Runs full `terraform apply` with those image URIs
+1. Verifies the tagged commit has a passing CI run (`ci-gate` job — a tag without green CI does not deploy)
+2. Waits for approval on the `prod` GitHub environment (when required reviewers are configured)
+3. Bootstraps ECR repositories via Terraform
+4. Builds backend + frontend Docker images, scans them with Trivy (fails on HIGH/CRITICAL CVEs), generates SBOM artifacts, then pushes the images tagged with the release tag (and `latest`)
+5. Runs full `terraform apply` with those image URIs
+6. Smoke-tests the deployment by polling `<application_url>/api/ready` for up to 5 minutes
+
+**Rollback:** trigger the workflow manually (`workflow_dispatch`) with the `rollback_to_tag` input set to a previously deployed `vX.Y.Z` tag — it re-points the infrastructure at that tag's already-built images and re-runs the smoke test. See [`docs/runbooks/deploy-rollback.md`](docs/runbooks/deploy-rollback.md) for the full procedure.
 
 Required repository configuration:
 
 - Secret: `AWS_DEPLOY_ROLE_ARN` (IAM role trusted by GitHub OIDC). The role needs `kms:Decrypt` on the `alias/<project>-secrets` key so re-deploys can read the existing `JWT_SECRET`. See [`terraform/install.md`](terraform/install.md#prerequisites) for the full permission list.
+- Environment: create a `prod` environment (Settings → Environments) and add required reviewers to enable the manual approval gate.
 - Optional variables: `AWS_REGION`, `PROJECT_NAME`, `ENVIRONMENT` (defaults: `ap-southeast-2`, `open-prompt-manager`, `prod`)
 
 ### Domain Registration Script (Route 53 Domains)
@@ -248,14 +254,20 @@ Full interactive documentation is available at runtime:
 
 ### Prompts
 
+Prompts follow a **shared-workspace read / owner-scoped write** model: every
+authenticated user can list and read any prompt, but `PUT`, `DELETE`, and
+`POST /versions` require the caller to be the prompt's creator (`created_by`)
+or an `admin`. Non-owner mutation attempts receive
+`403 {"detail": "You do not have permission to modify this prompt."}`.
+
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/prompts/` | List prompts. Query params: `search`, `tag_id`, `agent_id`, `skip`, `limit` |
 | POST | `/api/prompts/` | Create a new root prompt |
 | GET | `/api/prompts/{id}` | Get full prompt detail including tags, agents, variables and quality metrics |
-| PUT | `/api/prompts/{id}` | Partial update — only supplied fields are changed; `tag_ids`/`agent_ids` replace the full list |
-| DELETE | `/api/prompts/{id}` | Permanently delete a prompt and its executions/metrics |
-| POST | `/api/prompts/{id}/versions` | Create a child version; omitted fields are inherited from the parent |
+| PUT | `/api/prompts/{id}` | Partial update — only supplied fields are changed; `tag_ids`/`agent_ids` replace the full list. Owner or admin only |
+| DELETE | `/api/prompts/{id}` | Permanently delete a prompt and its executions/metrics. Owner or admin only |
+| POST | `/api/prompts/{id}/versions` | Create a child version; omitted fields are inherited from the parent. Owner or admin only |
 | GET | `/api/prompts/{id}/versions` | Get the full version lineage (root + all descendants) |
 | POST | `/api/prompts/{id}/render` | Render the template with supplied variables and resolve component references |
 | POST | `/api/prompts/{id}/executions` | Record an LLM execution; prompt stats are recalculated automatically |
@@ -323,6 +335,8 @@ Circular component references are detected and rejected with HTTP 422.
 | Status | Meaning |
 |--------|---------|
 | 400 | Bad request — invalid input |
+| 401 | Missing/expired credentials, or login blocked by the temporary lockout |
+| 403 | Forbidden — caller is not the prompt's owner/admin (prompt mutations) or not an admin (`admin_required`) |
 | 404 | Resource not found |
 | 409 | Conflict — duplicate name (tags, agents) |
 | 422 | Validation error — missing required field or circular component reference |
@@ -493,6 +507,13 @@ helm install prompt-manager ./helm/prompt-manager \
   --set ingress.hosts[0].host=prompt-manager.yourdomain.com
 ```
 
+## Operations & Observability
+
+- **Incident-response runbooks** live in [`docs/runbooks/`](docs/runbooks/) — database unavailable, deploy rollback, auth outage / credential stuffing, ALB 5xx spike, and RDS failover, plus the on-call/escalation policy and a postmortem template.
+- **Telemetry pipeline:** AWS deployments run an OpenTelemetry Collector (AWS Distro) as a sidecar in the backend ECS task (`terraform/otel.tf`). It receives OTLP on `localhost:4317` (gRPC) / `localhost:4318` (HTTP) and forwards to a configurable exporter — the default is a no-op `debug` exporter until an observability backend is selected. The collector config is stored as an SSM SecureString parameter (`/<project>/<env>/otel/collector-config`), so the exporter target can be flipped without rebuilding images. Backend containers receive `OTEL_EXPORTER_OTLP_*` env vars automatically for future instrumentation.
+- **Backend selection:** evaluation spikes for Grafana LGTM and SigNoz are in [`docs/spikes/`](docs/spikes/); the platform decision is tracked in issue #346.
+- **Audit trail:** structured JSON audit events (see [Audit Logging](#audit-logging)) ship to CloudWatch via the `awslogs` driver, ready for metric-filter alarms.
+
 ## Environment Variables
 
 ### Backend
@@ -506,6 +527,9 @@ helm install prompt-manager ./helm/prompt-manager \
 | `RATE_LIMIT_ENABLED` | `true` | Set to `false` to disable rate limiting entirely (not recommended for production). |
 | `RATE_LIMIT_PER_MINUTE` | `200` | Maximum API requests per minute per client IP (all non-auth, non-health endpoints). |
 | `RATE_LIMIT_AUTH_PER_MINUTE` | `60` | Maximum auth requests per minute per client IP (`/auth/*` endpoints). Lower limit defends against brute-force login attempts. |
+| `LOG_LEVEL` | `INFO` | Root log level for the structured JSON logs written to stdout. |
+| `LOGIN_LOCKOUT_THRESHOLD` | `5` | Failed login attempts per account within the window before further logins are temporarily blocked (emits an `auth.login.lockout` audit event). |
+| `LOGIN_LOCKOUT_WINDOW_SECONDS` | `900` | Sliding window (seconds) for counting failed logins; also how long a lockout lasts. In-memory per process — use a shared store for multi-replica deployments. |
 
 #### Rate Limiting
 
@@ -531,10 +555,35 @@ Content-Type: application/json
 
 `X-Forwarded-For` is honoured so that the original client IP is used when the backend sits behind nginx or AWS ALB. See `docs/adr-rate-limiting.md` for the architecture decision record.
 
+#### Audit Logging
+
+The backend emits structured single-line JSON logs to stdout (shipped to
+CloudWatch by the `awslogs` driver in AWS deployments). Security-relevant
+actions produce audit events with stable dotted names — `auth.register`,
+`auth.login.success`/`auth.login.failure`/`auth.login.lockout`,
+`auth.token.issued`/`auth.token.refresh`/`auth.token.refresh_failure`/`auth.token.revoke`,
+`auth.password.change`, and `admin.user.*` for admin user management. Each
+event carries `actor`, `outcome`, `target`, `source_ip`, and a `request_id`
+correlated via the `X-Request-ID` header (honoured inbound, echoed on every
+response). Values under sensitive keys (password, token, hash, …) are
+redacted before emission and again at format time; see
+`backend/app/audit.py` for the full event schema.
+
 ### Frontend
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `VITE_API_URL` | `` (same origin) | Backend API base URL — leave empty when deploying behind a reverse proxy or ALB. Set to the full backend URL (e.g. `http://localhost:8000`) only for standalone local development. |
+| `VITE_OTEL_ENABLED` | `false` | Enable browser Real User Monitoring via the OpenTelemetry Web SDK. Telemetry only activates when this is truthy **and** `VITE_OTEL_EXPORTER_URL` is set. |
+| `VITE_OTEL_EXPORTER_URL` | _(empty)_ | OTLP/HTTP traces endpoint the browser exports to (e.g. the OTel Collector's `/v1/traces` route). |
+| `VITE_OTEL_SERVICE_NAME` | `open-prompt-manager-frontend` | `service.name` resource attribute on exported spans. |
+| `VITE_OTEL_ENVIRONMENT` | Vite `MODE` | `deployment.environment.name` resource attribute. |
+| `VITE_OTEL_PROPAGATE_URLS` | _(empty)_ | Comma-separated extra trusted origins that receive W3C `traceparent` headers (same-origin and `VITE_API_URL` are always included). |
+| `VITE_OTEL_SAMPLE_RATIO` | `1` | Trace sampling ratio in `[0, 1]`. |
+
+When enabled, the frontend captures page loads, Web Vitals (LCP/CLS/INP),
+unhandled JS errors, and fetch/XHR spans, with query strings and
+credential-shaped attributes scrubbed before export. The OTel code is
+dynamically imported, so disabled environments pay no bundle cost.
 
 ## Version Control
 

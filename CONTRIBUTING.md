@@ -112,6 +112,11 @@ Copy and adjust as needed — defaults work for local development out of the box
 | `CORS_ORIGINS` | `http://localhost,http://localhost:80,http://localhost:3000,vscode-file://vscode-app` | Allowed CORS origins. Include `vscode-file://vscode-app` for VS Code MCP clients. |
 | `MCP_ALLOWED_HOSTS` | `localhost,localhost:8000,127.0.0.1,127.0.0.1:8000,vscode-app` | Hosts allowed to connect to the MCP endpoint. `vscode-app` is required for VS Code MCP clients. |
 
+The full backend/frontend variable reference — including rate limiting, login
+lockout, structured audit logging (`LOG_LEVEL`), and the optional OpenTelemetry
+browser RUM settings (`VITE_OTEL_*`) — lives in the
+[README's Environment Variables section](README.md#environment-variables).
+
 **Frontend** (`frontend/`):
 
 | Variable | Default | Description |
