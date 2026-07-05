@@ -80,15 +80,15 @@ variable "frontend_image" {
 }
 
 variable "backend_cpu" {
-  description = "vCPU units reserved for the backend Fargate task (1024 = 1 vCPU)."
+  description = "vCPU units reserved for the backend Fargate task (1024 = 1 vCPU). Sized to fit the backend container plus the otel-collector sidecar (#339, see var.otel_collector_memory) when var.otel_collector_enabled is true."
   type        = number
-  default     = 512
+  default     = 768
 }
 
 variable "backend_memory" {
-  description = "Memory (MiB) reserved for the backend Fargate task."
+  description = "Memory (MiB) reserved for the backend Fargate task. Sized to fit the backend container plus the otel-collector sidecar (#339, see var.otel_collector_memory) when var.otel_collector_enabled is true."
   type        = number
-  default     = 1024
+  default     = 1280
 }
 
 variable "frontend_cpu" {
