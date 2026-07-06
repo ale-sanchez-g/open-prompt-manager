@@ -35,6 +35,8 @@ from app.services.auth_service import (
 
 router = APIRouter(prefix='/api/admin', tags=['admin'])
 
+USER_NOT_FOUND_ERROR = 'User not found'
+
 
 def _build_user_response(user: User) -> UserResponse:
     response = UserResponse.model_validate(user)
@@ -44,7 +46,6 @@ def _build_user_response(user: User) -> UserResponse:
 
 @router.get(
     '/users',
-    response_model=list[UserResponse],
     summary='List all users',
     description='Returns every registered user with their role. Requires an admin access token.',
     response_description='Array of user accounts ordered by creation time.',
@@ -62,7 +63,6 @@ def admin_list_users(
 
 @router.post(
     '/users',
-    response_model=UserResponse,
     status_code=201,
     summary='Create a user',
     description=(
@@ -103,7 +103,6 @@ def admin_create_user(
 
 @router.patch(
     '/users/{user_id}',
-    response_model=UserResponse,
     summary='Update a user',
     description=(
         "Updates a user's role and/or password. Admins cannot remove their own admin role, "
@@ -127,7 +126,7 @@ def admin_update_user(
 ) -> UserResponse:
     user = get_user_by_id(db, user_id)
     if user is None:
-        raise AuthError(status_code=404, error='User not found')
+        raise AuthError(status_code=404, error=USER_NOT_FOUND_ERROR)
 
     if payload.role is not None:
         if not validate_role(payload.role):
@@ -183,7 +182,7 @@ def admin_delete_user(
     user = get_user_by_id(db, user_id)
     if user is None:
         audit_event(EVENT_ADMIN_USER_DELETE, request=request, actor=admin.email, target=user_id, outcome='failure', reason='not_found')
-        raise AuthError(status_code=404, error='User not found')
+        raise AuthError(status_code=404, error=USER_NOT_FOUND_ERROR)
     if user.id == admin.id:
         audit_event(EVENT_ADMIN_USER_DELETE, request=request, actor=admin.email, target=user.id, outcome='blocked', reason='self_delete')
         raise AuthError(status_code=400, error='Admins cannot delete their own account')
@@ -194,7 +193,6 @@ def admin_delete_user(
 
 @router.post(
     '/users/{user_id}/unlock',
-    response_model=UserResponse,
     summary="Clear a user's login lockout",
     description=(
         'Clears the temporary login lockout applied after repeated failed password attempts '
@@ -219,7 +217,7 @@ def admin_unlock_user(
     user = get_user_by_id(db, user_id)
     if user is None:
         audit_event(EVENT_ADMIN_USER_UNLOCK, request=request, actor=admin.email, target=user_id, outcome='failure', reason='not_found')
-        raise AuthError(status_code=404, error='User not found')
+        raise AuthError(status_code=404, error=USER_NOT_FOUND_ERROR)
     was_locked_out = is_login_locked_out(user.email)
     reset_login_attempts(user.email)
     audit_event(
