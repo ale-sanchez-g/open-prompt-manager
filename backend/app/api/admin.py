@@ -9,6 +9,7 @@ from app.audit import (
     EVENT_ADMIN_USER_DELETE,
     EVENT_ADMIN_USER_LIST,
     EVENT_ADMIN_USER_ROLE_CHANGE,
+    EVENT_ADMIN_USER_UNLOCK,
     EVENT_CREDENTIAL_CHANGE,
     audit_event,
 )
@@ -21,8 +22,10 @@ from app.services.auth_service import (
     delete_user,
     get_user_by_email,
     get_user_by_id,
+    is_login_locked_out,
     list_users,
     normalize_email,
+    reset_login_attempts,
     update_user_password,
     update_user_role,
     validate_email,
@@ -31,6 +34,12 @@ from app.services.auth_service import (
 )
 
 router = APIRouter(prefix='/api/admin', tags=['admin'])
+
+
+def _build_user_response(user: User) -> UserResponse:
+    response = UserResponse.model_validate(user)
+    response.is_locked = is_login_locked_out(user.email)
+    return response
 
 
 @router.get(
@@ -45,10 +54,10 @@ def admin_list_users(
     request: Request,
     _admin: Annotated[User, Depends(require_admin)],
     db: Annotated[Session, Depends(get_db)],
-) -> list[User]:
+) -> list[UserResponse]:
     users = list_users(db)
     audit_event(EVENT_ADMIN_USER_LIST, request=request, actor=_admin.email, outcome='success', count=len(users))
-    return users
+    return [_build_user_response(u) for u in users]
 
 
 @router.post(
@@ -73,7 +82,7 @@ def admin_create_user(
     request: Request,
     _admin: Annotated[User, Depends(require_admin)],
     db: Annotated[Session, Depends(get_db)],
-) -> User:
+) -> UserResponse:
     normalized_email = normalize_email(payload.email)
     if not validate_email(normalized_email):
         audit_event(EVENT_ADMIN_USER_CREATE, request=request, actor=_admin.email, target=normalized_email, outcome='failure', reason='invalid_email')
@@ -89,7 +98,7 @@ def admin_create_user(
         raise AuthError(status_code=409, error='Email already registered')
     user = create_user(db, normalized_email, payload.password, role=payload.role)
     audit_event(EVENT_ADMIN_USER_CREATE, request=request, actor=_admin.email, target=user.id, outcome='success', role=payload.role)
-    return user
+    return _build_user_response(user)
 
 
 @router.patch(
@@ -115,7 +124,7 @@ def admin_update_user(
     request: Request,
     admin: Annotated[User, Depends(require_admin)],
     db: Annotated[Session, Depends(get_db)],
-) -> User:
+) -> UserResponse:
     user = get_user_by_id(db, user_id)
     if user is None:
         raise AuthError(status_code=404, error='User not found')
@@ -146,7 +155,7 @@ def admin_update_user(
         update_user_password(db, user, payload.password)
         audit_event(EVENT_CREDENTIAL_CHANGE, request=request, actor=admin.email, target=user.id, outcome='success', changed_by='admin')
 
-    return user
+    return _build_user_response(user)
 
 
 @router.delete(
@@ -181,3 +190,45 @@ def admin_delete_user(
     target_email = user.email
     delete_user(db, user)
     audit_event(EVENT_ADMIN_USER_DELETE, request=request, actor=admin.email, target=user_id, outcome='success', target_email=target_email)
+
+
+@router.post(
+    '/users/{user_id}/unlock',
+    response_model=UserResponse,
+    summary="Clear a user's login lockout",
+    description=(
+        'Clears the temporary login lockout applied after repeated failed password attempts '
+        '(see the credential-stuffing defense in `/auth/login`), letting the user try again '
+        'immediately without waiting out the lockout window. Does not change the password or '
+        'role, and has no effect if the account is not currently locked out. Requires an admin '
+        'access token.'
+    ),
+    response_description='The user account, with `is_locked` now false.',
+    responses={
+        401: {'description': 'Authentication required.'},
+        403: {'description': 'Admin role required.'},
+        404: {'description': 'User not found.'},
+    },
+)
+def admin_unlock_user(
+    user_id: str,
+    request: Request,
+    admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+) -> UserResponse:
+    user = get_user_by_id(db, user_id)
+    if user is None:
+        audit_event(EVENT_ADMIN_USER_UNLOCK, request=request, actor=admin.email, target=user_id, outcome='failure', reason='not_found')
+        raise AuthError(status_code=404, error='User not found')
+    was_locked_out = is_login_locked_out(user.email)
+    reset_login_attempts(user.email)
+    audit_event(
+        EVENT_ADMIN_USER_UNLOCK,
+        request=request,
+        actor=admin.email,
+        target=user.id,
+        outcome='success',
+        target_email=user.email,
+        was_locked_out=was_locked_out,
+    )
+    return _build_user_response(user)

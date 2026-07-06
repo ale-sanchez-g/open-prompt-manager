@@ -19,6 +19,7 @@ beforeEach(() => {
   adminApi.createUser.mockResolvedValue({ data: { id: 'usr_new', email: 'new@opm.io', role: 'user' } });
   adminApi.updateUser.mockResolvedValue({ data: {} });
   adminApi.deleteUser.mockResolvedValue({});
+  adminApi.unlockUser.mockResolvedValue({ data: {} });
 });
 
 afterEach(() => {
@@ -109,5 +110,47 @@ describe('UserManagement', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add User' }));
 
     expect(await screen.findByText('Email already registered')).toBeInTheDocument();
+  });
+
+  it('does not show an Unlock button or lockout badge for users that are not locked out', async () => {
+    renderPage();
+    await screen.findByText('member@opm.io');
+
+    expect(screen.queryByLabelText('Unlock member@opm.io')).not.toBeInTheDocument();
+    expect(screen.queryByText('Locked out')).not.toBeInTheDocument();
+  });
+
+  it('shows an Unlock button for a locked-out user and clears the lockout', async () => {
+    const lockedUsers = [
+      mockUsers[0],
+      { ...mockUsers[1], is_locked: true },
+    ];
+    adminApi.listUsers.mockResolvedValue({ data: lockedUsers });
+    renderPage();
+    await screen.findByText('member@opm.io');
+
+    expect(screen.getByText('Locked out')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Unlock member@opm.io'));
+
+    await waitFor(() => {
+      expect(adminApi.unlockUser).toHaveBeenCalledWith('usr_member');
+    });
+    // Refetches the user list after unlocking.
+    expect(adminApi.listUsers).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows an error when unlocking a user fails', async () => {
+    const lockedUsers = [
+      mockUsers[0],
+      { ...mockUsers[1], is_locked: true },
+    ];
+    adminApi.listUsers.mockResolvedValue({ data: lockedUsers });
+    adminApi.unlockUser.mockRejectedValue({ response: { data: { error: 'User not found' } } });
+    renderPage();
+    await screen.findByText('member@opm.io');
+
+    fireEvent.click(screen.getByLabelText('Unlock member@opm.io'));
+
+    expect(await screen.findByText('User not found')).toBeInTheDocument();
   });
 });

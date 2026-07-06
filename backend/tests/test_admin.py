@@ -70,6 +70,8 @@ def test_admin_can_list_users(anon_client):
     roles = {u['email']: u['role'] for u in users}
     assert roles['admin@opm.io'] == 'admin'
     assert roles['member@opm.io'] == 'user'
+    # Neither account has a login lockout yet.
+    assert all(u['is_locked'] is False for u in users)
 
 
 def test_non_admin_cannot_list_users(anon_client):
@@ -226,6 +228,69 @@ def test_admin_cannot_delete_self(anon_client):
     response = anon_client.delete(f'/api/admin/users/{admin_id}', headers=_auth(token))
     assert response.status_code == 400
     assert response.json() == {'error': 'Admins cannot delete their own account'}
+
+
+def test_admin_can_unlock_a_locked_out_user(anon_client, monkeypatch):
+    monkeypatch.setenv('LOGIN_LOCKOUT_THRESHOLD', '3')
+    _register(anon_client, 'admin@opm.io')
+    member_id = _register(anon_client, 'member@opm.io')
+    admin_token = _login(anon_client, 'admin@opm.io')
+
+    for _ in range(3):
+        response = anon_client.post('/auth/login', json={'email': 'member@opm.io', 'password': 'WrongPass123!'})
+        assert response.status_code == 401
+
+    # Even the correct password is now blocked while locked out.
+    blocked = anon_client.post('/auth/login', json={'email': 'member@opm.io', 'password': STRONG_PASSWORD})
+    assert blocked.status_code == 401
+
+    listing = anon_client.get('/api/admin/users', headers=_auth(admin_token))
+    locked_flags = {u['id']: u['is_locked'] for u in listing.json()}
+    assert locked_flags[member_id] is True
+
+    response = anon_client.post(f'/api/admin/users/{member_id}/unlock', headers=_auth(admin_token))
+    assert response.status_code == 200
+    assert response.json()['is_locked'] is False
+
+    # The account can now authenticate again immediately.
+    unblocked = anon_client.post('/auth/login', json={'email': 'member@opm.io', 'password': STRONG_PASSWORD})
+    assert unblocked.status_code == 200
+
+
+def test_admin_unlock_is_a_no_op_for_an_unlocked_user(anon_client):
+    _register(anon_client, 'admin@opm.io')
+    member_id = _register(anon_client, 'member@opm.io')
+    admin_token = _login(anon_client, 'admin@opm.io')
+
+    response = anon_client.post(f'/api/admin/users/{member_id}/unlock', headers=_auth(admin_token))
+    assert response.status_code == 200
+    assert response.json()['is_locked'] is False
+
+
+def test_admin_unlock_missing_user_returns_404(anon_client):
+    _register(anon_client, 'admin@opm.io')
+    token = _login(anon_client, 'admin@opm.io')
+
+    response = anon_client.post('/api/admin/users/usr_doesnotexist/unlock', headers=_auth(token))
+    assert response.status_code == 404
+    assert response.json() == {'error': 'User not found'}
+
+
+def test_non_admin_cannot_unlock_user(anon_client):
+    _register(anon_client, 'admin@opm.io')
+    member_id = _register(anon_client, 'member@opm.io')
+    member_token = _login(anon_client, 'member@opm.io')
+
+    response = anon_client.post(f'/api/admin/users/{member_id}/unlock', headers=_auth(member_token))
+    assert response.status_code == 403
+    assert response.json() == {'error': 'admin_required'}
+
+
+def test_non_admin_cannot_unlock_without_authentication(anon_client):
+    member_id = _register(anon_client, 'member@opm.io')
+
+    response = anon_client.post(f'/api/admin/users/{member_id}/unlock')
+    assert response.status_code == 401
 
 
 def test_admin_emails_env_grants_admin_to_non_first_user(anon_client, monkeypatch):

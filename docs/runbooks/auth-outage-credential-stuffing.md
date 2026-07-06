@@ -329,6 +329,43 @@ terraform apply strict_limits.tfplan
 # This is a manual step; no AWS CLI command available
 ```
 
+#### 5. Unlock a Legitimate User Caught by the Lockout
+
+The backend also self-defends against credential stuffing with a per-account
+login lockout (`LOGIN_LOCKOUT_THRESHOLD` failed attempts within
+`LOGIN_LOCKOUT_WINDOW_SECONDS` — defaults 5 / 15 minutes; see the
+[README's Login Lockout & Admin Unlock section](../../README.md#login-lockout--admin-unlock)).
+A user who mistypes their password repeatedly (or is themself the target of
+an attack) is locked out the same way an attacker would be, and cannot
+self-recover — only an admin can clear it, or they can wait out the window.
+
+```bash
+# 1. Confirm the user is actually locked out (not some other auth issue):
+#    have them (or you, via a scratch curl) attempt login with the correct
+#    password — a locked-out account returns 401 even with valid credentials.
+curl -s -X POST "${APPLICATION_URL}/auth/login" \
+  -H 'Content-Type: application/json' \
+  -d '{"email": "user@example.com", "password": "<correct password>"}' | jq .
+
+# 2. As an admin, list users to find the account's id and confirm
+#    "is_locked": true:
+curl -s "${APPLICATION_URL}/api/admin/users" \
+  -H "Authorization: Bearer ${ADMIN_ACCESS_TOKEN}" | jq '.[] | select(.email == "user@example.com")'
+
+# 3. Clear the lockout (does not change the user's password or role):
+curl -s -X POST "${APPLICATION_URL}/api/admin/users/<user_id>/unlock" \
+  -H "Authorization: Bearer ${ADMIN_ACCESS_TOKEN}" | jq .
+
+# This can also be done from the User Management page in the app (admin
+# role required) — locked-out accounts show a "Locked out" badge with an
+# inline Unlock button.
+```
+
+An `admin.user.unlock` audit event is emitted either way, so repeated
+unlock requests for the same account are visible in the audit trail —
+useful signal if an admin is unlocking the same user over and over
+(possibly still under active attack).
+
 ---
 
 ## Rollback
@@ -376,7 +413,7 @@ To reduce credential stuffing attacks:
 1. **Implement MFA** — Require multi-factor authentication for user accounts
 2. **Use CAPTCHA** — Add CAPTCHA to login forms
 3. **Monitor failed logins** — Track failed login patterns and alert on anomalies
-4. **Implement account lockout** — Lock accounts after N failed login attempts
+4. ~~Implement account lockout~~ — **Done**: per-account login lockout is enforced after `LOGIN_LOCKOUT_THRESHOLD` failed attempts (see Step 5 above for admin unlock)
 5. **Enable AWS WAF** — Deploy WAF rules to detect and block brute-force patterns
 6. **Use AWS Secrets Manager rotation** — Automatically rotate JWT_SECRET periodically
 7. **Scan for compromised credentials** — Use AWS Secrets Manager password rotation or third-party tools

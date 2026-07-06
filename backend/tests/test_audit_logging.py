@@ -18,6 +18,7 @@ from app.audit import (
     EVENT_ADMIN_USER_DELETE,
     EVENT_ADMIN_USER_LIST,
     EVENT_ADMIN_USER_ROLE_CHANGE,
+    EVENT_ADMIN_USER_UNLOCK,
     EVENT_LOGIN_FAILURE,
     EVENT_LOGIN_LOCKOUT,
     EVENT_LOGIN_SUCCESS,
@@ -252,6 +253,31 @@ def test_admin_delete_user_emits_audit_event(anon_client, caplog):
     assert record.actor == 'audit-admin5@opm.io'
     assert record.target == member_id
     assert record.outcome == 'success'
+
+
+def test_admin_unlock_user_emits_audit_event(anon_client, caplog, monkeypatch):
+    monkeypatch.setenv('LOGIN_LOCKOUT_THRESHOLD', '3')
+    token = _register_and_login(anon_client, 'audit-admin6@opm.io')
+    member_id = anon_client.post(
+        '/api/admin/users',
+        headers={'Authorization': f'Bearer {token}'},
+        json={'email': 'audit-member5@opm.io', 'password': OTHER_PASSWORD, 'role': 'user'},
+    ).json()['id']
+
+    for _ in range(3):
+        anon_client.post('/auth/login', json={'email': 'audit-member5@opm.io', 'password': 'WrongPass123!'})
+
+    caplog.set_level(logging.INFO)
+    caplog.clear()
+
+    response = anon_client.post(f'/api/admin/users/{member_id}/unlock', headers={'Authorization': f'Bearer {token}'})
+
+    assert response.status_code == 200
+    record = next(r for r in _audit_records(caplog) if r.event == EVENT_ADMIN_USER_UNLOCK)
+    assert record.actor == 'audit-admin6@opm.io'
+    assert record.target == member_id
+    assert record.outcome == 'success'
+    assert record.was_locked_out is True
 
 
 # ── X-Request-ID correlation middleware ───────────────────────────────────────

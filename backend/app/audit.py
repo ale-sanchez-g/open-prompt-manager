@@ -54,6 +54,7 @@ events rather than repurposing an existing name.
     admin.user.role_change      - an admin changed (or attempted to change)
                                    a user's role
     admin.user.delete           - an admin deleted a user account
+    admin.user.unlock           - an admin cleared a user's login lockout
 
 Each event carries ``outcome`` in {"success", "failure", "blocked"} (plus a
 free-form ``reason`` on failure/blocked outcomes), ``actor`` (the acting
@@ -95,6 +96,7 @@ EVENT_ADMIN_USER_LIST = 'admin.user.list'
 EVENT_ADMIN_USER_CREATE = 'admin.user.create'
 EVENT_ADMIN_USER_ROLE_CHANGE = 'admin.user.role_change'
 EVENT_ADMIN_USER_DELETE = 'admin.user.delete'
+EVENT_ADMIN_USER_UNLOCK = 'admin.user.unlock'
 
 # ── Redaction (defense in depth) ─────────────────────────────────────────────
 

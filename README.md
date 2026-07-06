@@ -309,10 +309,11 @@ Every endpoint below requires a bearer access token belonging to an `admin` user
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/admin/users` | List all users with their roles |
+| GET | `/api/admin/users` | List all users with their roles. Each user includes `is_locked`, reflecting an active login lockout (see [Login lockout](#login-lockout--admin-unlock)) |
 | POST | `/api/admin/users` | Create a user with a chosen role (`admin` or `user`) |
 | PATCH | `/api/admin/users/{id}` | Update a user's `role` and/or `password`. Admins cannot demote themselves |
 | DELETE | `/api/admin/users/{id}` | Delete a user. Admins cannot delete their own account |
+| POST | `/api/admin/users/{id}/unlock` | Clear a user's login lockout so they can immediately retry, without changing their password or role |
 
 ### Health
 
@@ -554,6 +555,12 @@ Content-Type: application/json
 ```
 
 `X-Forwarded-For` is honoured so that the original client IP is used when the backend sits behind nginx or AWS ALB. See `docs/adr-rate-limiting.md` for the architecture decision record.
+
+#### Login Lockout & Admin Unlock
+
+After `LOGIN_LOCKOUT_THRESHOLD` failed password attempts for the same account within `LOGIN_LOCKOUT_WINDOW_SECONDS`, further logins for that account — including with the correct password — are rejected with `401 {"error": "Invalid credentials"}` until the window elapses. This defends against credential-stuffing/brute-force attempts but can also lock out a legitimate user (e.g. after mistyping their password repeatedly).
+
+An admin can clear the lockout immediately without resetting the user's password: `POST /api/admin/users/{id}/unlock`. `GET /api/admin/users` reports each account's current lockout status via `is_locked`, so the admin UI (User Management page) can surface a "Locked out" badge with an Unlock action. Unlocking emits an `admin.user.unlock` audit event and has no effect on an account that isn't currently locked out. Lockout state is in-memory per process — restarting the backend or unlocking via the API are the only ways to clear it early, and a multi-replica deployment would need a shared store (e.g. Redis) to enforce lockout consistently across replicas.
 
 #### Audit Logging
 
