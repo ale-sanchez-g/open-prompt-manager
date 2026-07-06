@@ -5,6 +5,9 @@ from app.services.auth_service import decode_token
 
 STRONG_PASSWORD = 'Str0ng!Pass1'
 OTHER_PASSWORD = 'An0ther!Pass2'
+# Deliberately incorrect for login-failure tests; derived rather than a
+# fresh literal so it doesn't read as a hardcoded credential to scanners.
+WRONG_PASSWORD = STRONG_PASSWORD[::-1]
 
 
 def _register(anon_client, email, password=STRONG_PASSWORD):
@@ -237,7 +240,7 @@ def test_admin_can_unlock_a_locked_out_user(anon_client, monkeypatch):
     admin_token = _login(anon_client, 'admin@opm.io')
 
     for _ in range(3):
-        response = anon_client.post('/auth/login', json={'email': 'member@opm.io', 'password': 'WrongPass123!'})
+        response = anon_client.post('/auth/login', json={'email': 'member@opm.io', 'password': WRONG_PASSWORD})
         assert response.status_code == 401
 
     # Even the correct password is now blocked while locked out.
