@@ -30,7 +30,7 @@ function toError(reason) {
 }
 
 export function startErrorTracking(tracer) {
-  if (globalThis.window === undefined) return () => {};
+  if (!('window' in globalThis)) return () => {};
 
   const handleError = (event) => {
     const error = event.error instanceof Error ? event.error : new Error(event.message || 'Unknown error');
