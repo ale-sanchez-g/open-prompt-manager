@@ -1,3 +1,4 @@
+import logging
 import os
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -5,6 +6,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 import app.database.base as db_module
+from app.audit import RequestIDMiddleware, configure_logging
 from app.database.base import create_tables
 from app.api.auth import router as auth_router
 from app.api.admin import router as admin_router
@@ -12,7 +14,12 @@ from app.api.prompts import router as prompts_router
 from app.api.tags_agents import tags_router, agents_router
 from app import __version__
 from app.middleware.rate_limit import RateLimitMiddleware
-from app.services.auth_service import AuthError, TokenValidationError, decode_token
+from app.services.auth_service import AuthError, TokenValidationError, decode_token, reset_login_lockout_state
+
+# Configure structured JSON logging on stdout as early as possible so it
+# covers startup and every request the awslogs Docker log driver ships.
+_log_level = getattr(logging, os.getenv('LOG_LEVEL', 'INFO').upper(), logging.INFO)
+configure_logging(level=_log_level)
 
 # Ensure data directory exists for SQLite
 os.makedirs('./data', exist_ok=True)
@@ -107,6 +114,16 @@ def create_app() -> FastAPI:
             },
         ],
     )
+
+    # Reset in-memory login-lockout counters for this application instance.
+    # In production create_app() runs once at process startup; the test
+    # suite calls it once per test (see tests/conftest.py's `app` fixture),
+    # which keeps lockout state from leaking between test cases.
+    reset_login_lockout_state()
+
+    # Assigns/propagates X-Request-ID for correlating audit log lines with a
+    # single request, even deep inside service functions.
+    application.add_middleware(RequestIDMiddleware)
 
     # Rate limiting
     rate_limit_enabled = os.getenv('RATE_LIMIT_ENABLED', 'true').lower() not in ('false', '0', 'no')

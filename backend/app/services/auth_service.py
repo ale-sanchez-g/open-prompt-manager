@@ -1,5 +1,7 @@
 import os
 import re
+import threading
+import time
 from uuid import uuid4
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -19,6 +21,9 @@ REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60
 DEFAULT_BCRYPT_ROUNDS = 12
 MIN_BCRYPT_ROUNDS = 4
 MAX_BCRYPT_ROUNDS = 31
+
+DEFAULT_LOGIN_LOCKOUT_THRESHOLD = 5
+DEFAULT_LOGIN_LOCKOUT_WINDOW_SECONDS = 15 * 60
 
 ROLE_ADMIN = 'admin'
 ROLE_USER = 'user'
@@ -169,6 +174,97 @@ def authenticate_user(db: Session, email: str, password: str) -> User | None:
     return user
 
 
+# ── Login lockout tracking (credential-stuffing / brute-force defense) ──────
+#
+# In-memory, per-process, sliding-window counter of failed login attempts
+# keyed by normalized email. Env vars are read lazily (not cached at import
+# time) so operators can tune them without a restart-sensitive constant, and
+# so tests can monkeypatch them per-case.
+
+
+def get_login_lockout_threshold() -> int:
+    try:
+        return int(os.getenv('LOGIN_LOCKOUT_THRESHOLD', str(DEFAULT_LOGIN_LOCKOUT_THRESHOLD)))
+    except ValueError:
+        return DEFAULT_LOGIN_LOCKOUT_THRESHOLD
+
+
+def get_login_lockout_window_seconds() -> int:
+    try:
+        return int(os.getenv('LOGIN_LOCKOUT_WINDOW_SECONDS', str(DEFAULT_LOGIN_LOCKOUT_WINDOW_SECONDS)))
+    except ValueError:
+        return DEFAULT_LOGIN_LOCKOUT_WINDOW_SECONDS
+
+
+class _LoginAttemptTracker:
+    """Thread-safe sliding-window counter of failed login attempts per key."""
+
+    def __init__(self) -> None:
+        self._failures: dict[str, list[float]] = {}
+        self._lock = threading.Lock()
+
+    def _prune(self, key: str, now: float) -> list[float]:
+        window_start = now - get_login_lockout_window_seconds()
+        attempts = [t for t in self._failures.get(key, []) if t >= window_start]
+        self._failures[key] = attempts
+        return attempts
+
+    def record_failure(self, key: str) -> int:
+        """Record a failed attempt for ``key`` and return the attempt count within the window."""
+        now = time.monotonic()
+        with self._lock:
+            attempts = self._prune(key, now)
+            attempts.append(now)
+            return len(attempts)
+
+    def is_locked(self, key: str) -> bool:
+        now = time.monotonic()
+        with self._lock:
+            return len(self._prune(key, now)) >= get_login_lockout_threshold()
+
+    def reset(self, key: str) -> None:
+        with self._lock:
+            self._failures.pop(key, None)
+
+    def reset_all(self) -> None:
+        with self._lock:
+            self._failures.clear()
+
+
+_login_attempt_tracker = _LoginAttemptTracker()
+
+
+def reset_login_lockout_state() -> None:
+    """Clear all tracked failed-login counters.
+
+    Called once per application instance (see ``main.create_app``) so state
+    starts fresh for each process; in tests this keeps lockout counters from
+    leaking between test cases, since the test suite builds a fresh app per
+    test.
+    """
+    _login_attempt_tracker.reset_all()
+
+
+def record_failed_login(email: str) -> bool:
+    """Record a failed login attempt for ``email``.
+
+    Returns ``True`` if this attempt trips the lockout threshold.
+    """
+    key = normalize_email(email)
+    count = _login_attempt_tracker.record_failure(key)
+    return count >= get_login_lockout_threshold()
+
+
+def is_login_locked_out(email: str) -> bool:
+    """Return True if ``email`` currently has too many recent failed attempts."""
+    return _login_attempt_tracker.is_locked(normalize_email(email))
+
+
+def reset_login_attempts(email: str) -> None:
+    """Clear the failed-attempt counter for ``email`` (called on successful login)."""
+    _login_attempt_tracker.reset(normalize_email(email))
+
+
 def _build_token_payload(user: User, expires_in: int, token_type: str, token_id: str | None = None) -> dict[str, Any]:
     now = datetime.now(timezone.utc)
     payload: dict[str, Any] = {
@@ -238,13 +334,23 @@ def revoke_refresh_token(db: Session, token_id: str) -> None:
     db.commit()
 
 
-def revoke_refresh_token_from_cookie(db: Session, token: str | None) -> None:
+def revoke_refresh_token_from_cookie(db: Session, token: str | None) -> dict[str, Any] | None:
+    """Revoke the refresh token embedded in ``token`` cookie, if any.
+
+    Returns a dict with ``user_id`` and ``email`` (taken from the token
+    payload) when a revocation was attempted against a syntactically valid
+    refresh token, or ``None`` when there was no cookie, or the cookie
+    could not be decoded as a valid refresh token. Used by the ``/auth/logout``
+    endpoint to emit an ``auth.token.revoke`` audit event.
+    """
     if not token:
-        return
+        return None
     try:
         payload = decode_token(token, expected_type='refresh')
     except TokenValidationError:
-        return
+        return None
     token_id = payload.get('jti')
-    if token_id:
-        revoke_refresh_token(db, token_id)
+    if not token_id:
+        return None
+    revoke_refresh_token(db, token_id)
+    return {'user_id': payload.get('sub'), 'email': payload.get('email')}
