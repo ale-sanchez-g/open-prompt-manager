@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, ShieldCheck, Trash2, User as UserIcon } from 'lucide-react';
+import { Lock, Plus, ShieldCheck, Trash2, User as UserIcon } from 'lucide-react';
 
 import { adminApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -14,6 +14,7 @@ export default function UserManagement() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [listError, setListError] = useState('');
+  const [unlockingId, setUnlockingId] = useState(null);
 
   const fetchUsers = () =>
     adminApi
@@ -58,6 +59,18 @@ export default function UserManagement() {
       await fetchUsers();
     } catch (err) {
       setListError(err.response?.data?.error || 'Failed to delete user');
+    }
+  };
+
+  const handleUnlock = async (id) => {
+    setUnlockingId(id);
+    try {
+      await adminApi.unlockUser(id);
+      await fetchUsers();
+    } catch (err) {
+      setListError(err.response?.data?.error || 'Failed to unlock user');
+    } finally {
+      setUnlockingId(null);
     }
   };
 
@@ -145,8 +158,23 @@ export default function UserManagement() {
                     )}
                     <span className="text-white font-medium">{u.email}</span>
                     {isSelf && <span className="text-xs text-blue-300">(you)</span>}
+                    {u.is_locked && (
+                      <span className="text-xs text-red-400 bg-red-900/30 px-2 py-0.5 rounded-full">Locked out</span>
+                    )}
                   </div>
                   <div className="flex items-center gap-3">
+                    {u.is_locked && (
+                      <button
+                        type="button"
+                        aria-label={`Unlock ${u.email}`}
+                        title="Clear login lockout"
+                        disabled={unlockingId === u.id}
+                        onClick={() => { void handleUnlock(u.id); }}
+                        className="flex items-center gap-1 text-amber-400 hover:text-amber-300 disabled:opacity-50 text-xs font-medium transition-colors"
+                      >
+                        <Lock size={14} /> {unlockingId === u.id ? 'Unlocking…' : 'Unlock'}
+                      </button>
+                    )}
                     <select
                       aria-label={`Role for ${u.email}`}
                       className="bg-gray-800 text-white px-2 py-1 rounded-lg text-sm border border-gray-600 focus:outline-none focus:border-blue-500 disabled:opacity-50"

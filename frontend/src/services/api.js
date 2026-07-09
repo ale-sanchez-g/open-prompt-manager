@@ -130,6 +130,7 @@ export const adminApi = {
   createUser: (data) => api.post('/api/admin/users', data),
   updateUser: (id, data) => api.patch(`/api/admin/users/${assertSafeId(id)}`, data),
   deleteUser: (id) => api.delete(`/api/admin/users/${assertSafeId(id)}`),
+  unlockUser: (id) => api.post(`/api/admin/users/${assertSafeId(id)}/unlock`),
 };
 
 // ── Prompts ───────────────────────────────────────────────────────────────────

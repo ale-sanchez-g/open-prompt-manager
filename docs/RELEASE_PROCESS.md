@@ -26,6 +26,13 @@ This repository supports manually requested releases through the GitHub Actions 
    - Tag the commit as `vX.Y.Z`.
    - Publish a GitHub Release.
 
+Pushing the `vX.Y.Z` tag triggers the production deploy workflow
+(`.github/workflows/deploy.yml`). The deploy is gated: it verifies the tagged
+commit has a passing CI run, waits for approval on the `prod` GitHub
+environment (when required reviewers are configured), Trivy-scans the built
+images (failing on HIGH/CRITICAL CVEs) before pushing to ECR, and smoke-tests
+`/api/ready` after `terraform apply`.
+
 ## Release Scripts
 
 - `scripts/release/build_release_notes.sh <use_ai_notes> <draft_file> <final_file>`
@@ -61,3 +68,9 @@ If a bad release is created:
    - `git tag -d vX.Y.Z`
    - `git push origin :refs/tags/vX.Y.Z`
 4. Run the release workflow again with the correct version bump.
+
+If the bad release already **deployed to AWS**, roll the infrastructure back
+by running the deploy workflow manually (`workflow_dispatch`) with the
+`rollback_to_tag` input set to the last known-good `vX.Y.Z` tag. The full
+procedure, including manual fallbacks, is documented in
+[`docs/runbooks/deploy-rollback.md`](runbooks/deploy-rollback.md).
