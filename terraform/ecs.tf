@@ -76,78 +76,100 @@ resource "aws_ecs_task_definition" "backend" {
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
   task_role_arn            = aws_iam_role.ecs_task.arn
 
-  container_definitions = jsonencode([
-    {
-      name      = "backend"
-      image     = local.backend_image_uri
-      essential = true
+  container_definitions = jsonencode(concat(
+    [
+      {
+        name      = "backend"
+        image     = local.backend_image_uri
+        essential = true
 
-      portMappings = [
-        {
-          containerPort = var.backend_port
-          protocol      = "tcp"
+        portMappings = [
+          {
+            containerPort = var.backend_port
+            protocol      = "tcp"
+          }
+        ]
+
+        environment = [
+          {
+            name  = "CORS_ORIGINS"
+            value = local.cors_allowed_origins
+          },
+          {
+            # Allow MCP clients connecting through the ALB.  The default only
+            # permits localhost, which would cause 403s in production.
+            name  = "MCP_ALLOWED_HOSTS"
+            value = local.mcp_allowed_hosts
+          },
+          {
+            # VS Code's MCP client sends Origin: vscode-file://vscode-app.
+            name  = "MCP_ALLOWED_ORIGINS"
+            value = local.mcp_allowed_origins
+          },
+          {
+            name  = "RATE_LIMIT_ENABLED"
+            value = tostring(var.rate_limit_enabled)
+          },
+          {
+            name  = "RATE_LIMIT_PER_MINUTE"
+            value = tostring(var.rate_limit_per_minute)
+          },
+          {
+            name  = "RATE_LIMIT_AUTH_PER_MINUTE"
+            value = tostring(var.rate_limit_auth_per_minute)
+          },
+          {
+            # otel-collector (#339) is a sidecar in this same task, sharing
+            # its network namespace, so it is reachable over localhost.
+            # These are provided so backend instrumentation (#340) has a
+            # known, stable endpoint to export OTLP to without needing
+            # another change to this file.
+            name  = "OTEL_EXPORTER_OTLP_ENDPOINT"
+            value = "http://localhost:4318"
+          },
+          {
+            name  = "OTEL_EXPORTER_OTLP_PROTOCOL"
+            value = "http/protobuf"
+          },
+          {
+            name  = "OTEL_SERVICE_NAME"
+            value = "${var.project_name}-backend"
+          }
+        ]
+
+        secrets = [
+          {
+            name      = "DATABASE_URL"
+            valueFrom = aws_secretsmanager_secret.db_url.arn
+          },
+          {
+            name      = "JWT_SECRET"
+            valueFrom = aws_secretsmanager_secret.jwt_secret.arn
+          }
+        ]
+
+        logConfiguration = {
+          logDriver = "awslogs"
+          options = {
+            "awslogs-group"         = aws_cloudwatch_log_group.backend.name
+            "awslogs-region"        = var.aws_region
+            "awslogs-stream-prefix" = "backend"
+          }
         }
-      ]
 
-      environment = [
-        {
-          name  = "CORS_ORIGINS"
-          value = local.cors_allowed_origins
-        },
-        {
-          # Allow MCP clients connecting through the ALB.  The default only
-          # permits localhost, which would cause 403s in production.
-          name  = "MCP_ALLOWED_HOSTS"
-          value = local.mcp_allowed_hosts
-        },
-        {
-          # VS Code's MCP client sends Origin: vscode-file://vscode-app.
-          name  = "MCP_ALLOWED_ORIGINS"
-          value = local.mcp_allowed_origins
-        },
-        {
-          name  = "RATE_LIMIT_ENABLED"
-          value = tostring(var.rate_limit_enabled)
-        },
-        {
-          name  = "RATE_LIMIT_PER_MINUTE"
-          value = tostring(var.rate_limit_per_minute)
-        },
-        {
-          name  = "RATE_LIMIT_AUTH_PER_MINUTE"
-          value = tostring(var.rate_limit_auth_per_minute)
-        }
-      ]
-
-      secrets = [
-        {
-          name      = "DATABASE_URL"
-          valueFrom = aws_secretsmanager_secret.db_url.arn
-        },
-        {
-          name      = "JWT_SECRET"
-          valueFrom = aws_secretsmanager_secret.jwt_secret.arn
-        }
-      ]
-
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          "awslogs-group"         = aws_cloudwatch_log_group.backend.name
-          "awslogs-region"        = var.aws_region
-          "awslogs-stream-prefix" = "backend"
+        healthCheck = {
+          command     = ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:${var.backend_port}/api/ready')\" || exit 1"]
+          interval    = 30
+          timeout     = 10
+          retries     = 3
+          startPeriod = 15
         }
       }
-
-      healthCheck = {
-        command     = ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:${var.backend_port}/api/ready')\" || exit 1"]
-        interval    = 30
-        timeout     = 10
-        retries     = 3
-        startPeriod = 15
-      }
-    }
-  ])
+    ],
+    # otel-collector (#339): OTLP fan-in sidecar, defined in otel.tf so
+    # everything about the Collector lives in one self-contained file.
+    var.otel_collector_enabled ? [local.otel_sidecar_container_definition] : []
+  ))
 
   tags = {
     Name        = "${var.project_name}-backend-task"
@@ -180,6 +202,8 @@ resource "aws_ecs_service" "backend" {
     aws_iam_role_policy_attachment.ecs_task_execution,
     aws_iam_role_policy.ecs_execution_secrets,
     aws_secretsmanager_secret_version.db_url,
+    aws_iam_role_policy.ecs_execution_otel_config,
+    aws_ssm_parameter.otel_collector_config,
   ]
 
   tags = {

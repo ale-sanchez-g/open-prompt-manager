@@ -36,6 +36,15 @@ class UserResponse(BaseModel):
     email: str = Field(..., description='Email address that identifies the user.', examples=[constants['EXAMPLE_EMAIL']])
     role: str = Field(..., description='Access role. One of: admin, user.', examples=['admin'])
     created_at: datetime = Field(..., description='UTC timestamp when the account was created.')
+    is_locked: bool = Field(
+        False,
+        description=(
+            'Whether the account currently has an active login lockout from too many recent '
+            'failed password attempts. Lockout state is in-memory (per process) and not persisted; '
+            'an admin can clear it via POST /api/admin/users/{id}/unlock.'
+        ),
+        examples=[False],
+    )
 
     model_config = {'from_attributes': True}
 

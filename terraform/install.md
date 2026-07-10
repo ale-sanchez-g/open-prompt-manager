@@ -70,7 +70,8 @@ Internet
 | **Security Groups** | Five security groups: `alb-sg` (HTTPS from `0.0.0.0/0`; HTTP port 80 only from `var.alb_http_ingress_cidrs`, empty by default), `frontend-sg` / `backend-sg` (from ALB only; egress restricted to in-VPC AWS endpoints, S3 prefix list, RDS, and DNS — no `0.0.0.0/0`), `rds-sg` (port 5432 from backend SG only, no egress), `vpce-sg` (HTTPS from the VPC CIDR to the interface endpoints). |
 | **VPC Endpoints** | Interface endpoints (ECR api/dkr, CloudWatch Logs, Secrets Manager, STS, KMS) plus an S3 gateway endpoint keep ECS task traffic to AWS APIs inside the VPC, so the application security groups need no unrestricted egress. |
 | **ACM Certificate** | Optional TLS certificate created via `certificate.tf` with DNS validation. Automatically adds `www.` SAN for apex domains. Can be provided externally via `acm_certificate_arn`. |
-| **ECS Fargate** | Serverless container runtime. Runs backend (512 CPU / 1024 MB, 2 tasks) and frontend (256 CPU / 512 MB, 2 tasks) in private subnets. Cluster has Container Insights enabled and supports both `FARGATE` and `FARGATE_SPOT`. |
+| **ECS Fargate** | Serverless container runtime. Runs backend (1024 CPU / 2048 MB, 2 tasks — sized to fit the OTel Collector sidecar) and frontend (256 CPU / 512 MB, 2 tasks) in private subnets. Cluster has Container Insights enabled and supports both `FARGATE` and `FARGATE_SPOT`. |
+| **OTel Collector (sidecar)** | AWS Distro for OpenTelemetry Collector runs as a sidecar in the backend task (`otel.tf`, image pinned by digest, toggle via `otel_collector_enabled`). Receives OTLP on `localhost:4317`/`4318`; exporter defaults to `debug` (no-op) until `otel_exporter_otlp_endpoint` is set. Config is rendered by Terraform into the SSM SecureString parameter `/<project>/<env>/otel/collector-config` and injected as `AOT_CONFIG_CONTENT`, so the exporter target flips without a new task-definition image. Logs to `/ecs/<project>/otel-collector`. |
 | **ECR** | Private container image registry with lifecycle policies for backend and frontend Docker images. Image layers are encrypted at rest with a dedicated customer-managed KMS key (`alias/<project>-ecr`). |
 | **RDS PostgreSQL 16** | `db.t4g.micro` with 20 GiB gp3 storage, encrypted at rest, in the private subnets. Multi-AZ disabled by default (enable via `db_multi_az = true`). |
 | **Secrets Manager** | Stores the auto-generated PostgreSQL `DATABASE_URL` at `<project>/<env>/database-url` and the `JWT_SECRET`, both encrypted with a dedicated customer-managed KMS key (`alias/<project>-secrets`). Injected into the backend ECS container at task start — never a plain-text env var. |
@@ -92,7 +93,7 @@ Before you begin, ensure you have the following installed and configured:
 | [Docker](https://docs.docker.com/get-docker/) | 24.x | See official docs |
 
 You also need:
-- An **AWS account** with permissions to create VPCs, ECS, ECR, IAM, KMS, Secrets Manager, ALB, and CloudWatch resources.
+- An **AWS account** with permissions to create VPCs, ECS, ECR, IAM, KMS, Secrets Manager, SSM Parameter Store, ALB, and CloudWatch resources.
 - AWS credentials configured locally (`aws configure` or environment variables).
 - **`kms:Decrypt` on the secrets CMK for the deploy principal.** The deploy script reads the existing `JWT_SECRET` from Secrets Manager on every run. Because that secret is encrypted with the customer-managed `alias/<project>-secrets` key, the principal running `deploy.sh` (or the GitHub OIDC `AWS_DEPLOY_ROLE_ARN`) must be able to decrypt with that key. Admin/broad credentials already satisfy this; tightly-scoped deploy roles must add `kms:Decrypt` on the key to their IAM policy. (First-time deploys are unaffected — the secret is read before it is migrated to the CMK.)
 

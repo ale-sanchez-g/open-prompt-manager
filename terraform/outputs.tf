@@ -91,3 +91,31 @@ output "jwt_secret_arn" {
   description = "ARN of the Secrets Manager secret that holds JWT_SECRET for backend token signing."
   value       = aws_secretsmanager_secret.jwt_secret.arn
 }
+
+# ─────────────────────────────────────────────
+# OpenTelemetry Outputs (#339)
+# ─────────────────────────────────────────────
+output "otel_collector_config_parameter_name" {
+  description = "Name of the SecureString SSM parameter holding the Collector's YAML config. Update its value and force a new ECS deployment to flip the exporter target -- no Terraform apply or image change required."
+  value       = aws_ssm_parameter.otel_collector_config.name
+}
+
+output "otel_collector_config_parameter_arn" {
+  description = "ARN of the SSM parameter holding the Collector config."
+  value       = aws_ssm_parameter.otel_collector_config.arn
+}
+
+output "otel_collector_log_group_name" {
+  description = "CloudWatch Log Group for the otel-collector sidecar container."
+  value       = aws_cloudwatch_log_group.otel_collector.name
+}
+
+output "otel_local_otlp_grpc_endpoint" {
+  description = "OTLP/gRPC endpoint reachable from other containers in the same ECS task as the otel-collector sidecar (shared network namespace). Use this to configure in-task app instrumentation (#340)."
+  value       = "http://localhost:4317"
+}
+
+output "otel_local_otlp_http_endpoint" {
+  description = "OTLP/HTTP endpoint reachable from other containers in the same ECS task as the otel-collector sidecar. Use this to configure in-task app instrumentation (#340)."
+  value       = "http://localhost:4318"
+}

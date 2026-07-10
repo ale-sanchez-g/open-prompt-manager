@@ -128,8 +128,11 @@ test.describe('Auth UI Tests', () => {
     await page.getByLabel('Password').fill(STRONG_PASSWORD);
     await page.getByRole('button', { name: 'Create account' }).click();
 
-    // expect: server error about duplicate email
-    await expect(page.getByText(/already registered/i)).toBeVisible();
+    // expect: server error about duplicate email. Must be an exact match: the
+    // page footer always contains "Already registered? Sign in", so a broad
+    // /already registered/i regex resolves to two elements (Playwright strict
+    // mode violation) the moment the real error renders.
+    await expect(page.getByText('Email already registered', { exact: true })).toBeVisible();
   });
 
   // ── Login flow ─────────────────────────────────────────────────────────────
