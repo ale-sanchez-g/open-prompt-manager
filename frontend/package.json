@@ -1,6 +1,6 @@
 {
   "name": "prompt-management-frontend",
-  "version": "3.5.1",
+  "version": "3.6.0",
   "private": true,
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",
