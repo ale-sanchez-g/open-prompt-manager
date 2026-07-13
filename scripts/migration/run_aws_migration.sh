@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # run_aws_migration.sh — Reusable runner for backend DB schema migrations on AWS.
 #
-# Runs one or more migration modules as one-off ECS Fargate tasks using the
-# backend service's existing task definition (same image, secrets, and private
-# networking), so the migration runs inside the VPC with access to RDS.
+# Runs one or more migration modules as one-off ECS Fargate tasks using a
+# migration-only task definition derived from the backend service definition.
+# The derived definition keeps only the backend container (same image, secrets,
+# and private networking) so optional sidecars that may rely on internet-only
+# registries do not block schema upgrades in private-only egress environments.
 #
 # Usage:
 #   AWS_REGION=us-east-1 ./run_aws_migration.sh migrations.add_user_role
@@ -67,6 +69,98 @@ if [[ -z "$TASK_DEFINITION_ARN" || "$TASK_DEFINITION_ARN" == "None" ]]; then
 	echo "Could not resolve task definition for service $SERVICE_NAME in cluster $CLUSTER_NAME" >&2
 	exit 1
 fi
+
+echo "Preparing migration-only task definition from service task definition..."
+
+MIGRATION_TASK_DEFINITION_ARN="$({
+	BASE_TASK_DEFINITION_ARN="$TASK_DEFINITION_ARN" \
+	CONTAINER_NAME="$CONTAINER_NAME" \
+	AWS_REGION="$AWS_REGION" \
+	python3 - <<'PY'
+import json
+import os
+import subprocess
+import sys
+
+base_task_definition_arn = os.environ['BASE_TASK_DEFINITION_ARN']
+container_name = os.environ['CONTAINER_NAME']
+aws_region = os.environ['AWS_REGION']
+
+describe_cmd = [
+	'aws', 'ecs', 'describe-task-definition',
+	'--region', aws_region,
+	'--task-definition', base_task_definition_arn,
+	'--query', 'taskDefinition',
+	'--output', 'json',
+]
+
+try:
+	describe_proc = subprocess.run(describe_cmd, check=True, capture_output=True, text=True)
+except subprocess.CalledProcessError as exc:
+	sys.stderr.write(exc.stderr or 'Failed to describe task definition\n')
+	sys.exit(1)
+
+task_definition = json.loads(describe_proc.stdout)
+backend_containers = [c for c in task_definition.get('containerDefinitions', []) if c.get('name') == container_name]
+
+if not backend_containers:
+	sys.stderr.write(f"Container '{container_name}' was not found in task definition {base_task_definition_arn}\n")
+	sys.exit(1)
+
+register_payload = {
+	'family': f"{task_definition['family']}-migration",
+	'networkMode': task_definition['networkMode'],
+	'containerDefinitions': backend_containers,
+	'requiresCompatibilities': task_definition.get('requiresCompatibilities', []),
+	'cpu': task_definition.get('cpu'),
+	'memory': task_definition.get('memory'),
+	'taskRoleArn': task_definition.get('taskRoleArn'),
+	'executionRoleArn': task_definition.get('executionRoleArn'),
+	'volumes': task_definition.get('volumes', []),
+}
+
+if task_definition.get('runtimePlatform'):
+	register_payload['runtimePlatform'] = task_definition['runtimePlatform']
+if task_definition.get('ephemeralStorage'):
+	register_payload['ephemeralStorage'] = task_definition['ephemeralStorage']
+if task_definition.get('proxyConfiguration'):
+	register_payload['proxyConfiguration'] = task_definition['proxyConfiguration']
+if task_definition.get('pidMode'):
+	register_payload['pidMode'] = task_definition['pidMode']
+if task_definition.get('ipcMode'):
+	register_payload['ipcMode'] = task_definition['ipcMode']
+
+# Remove null/empty values that AWS rejects in register-task-definition input.
+register_payload = {
+	key: value
+	for key, value in register_payload.items()
+	if value not in (None, '', [])
+}
+
+register_cmd = [
+	'aws', 'ecs', 'register-task-definition',
+	'--region', aws_region,
+	'--cli-input-json', json.dumps(register_payload),
+	'--query', 'taskDefinition.taskDefinitionArn',
+	'--output', 'text',
+]
+
+try:
+	register_proc = subprocess.run(register_cmd, check=True, capture_output=True, text=True)
+except subprocess.CalledProcessError as exc:
+	sys.stderr.write(exc.stderr or 'Failed to register migration task definition\n')
+	sys.exit(1)
+
+print(register_proc.stdout.strip())
+PY
+})"
+
+if [[ -z "$MIGRATION_TASK_DEFINITION_ARN" || "$MIGRATION_TASK_DEFINITION_ARN" == "None" ]]; then
+	echo "Could not register migration task definition" >&2
+	exit 1
+fi
+
+echo "Using migration task definition: ${MIGRATION_TASK_DEFINITION_ARN}"
 
 SUBNETS_RAW="$({
 	aws ecs describe-services \
@@ -152,7 +246,7 @@ print(json.dumps({
 PY
 	})"
 
-	echo "Running one-off migration task: ${migration_module} (task definition: ${TASK_DEFINITION_ARN})"
+	echo "Running one-off migration task: ${migration_module} (task definition: ${MIGRATION_TASK_DEFINITION_ARN})"
 
 	local run_task_output
 	run_task_output="$({
@@ -160,7 +254,7 @@ PY
 			--region "$AWS_REGION" \
 			--cluster "$CLUSTER_NAME" \
 			--launch-type FARGATE \
-			--task-definition "$TASK_DEFINITION_ARN" \
+			--task-definition "$MIGRATION_TASK_DEFINITION_ARN" \
 			--network-configuration "$NETWORK_CONFIGURATION" \
 			--overrides "$overrides" \
 			--count 1 \

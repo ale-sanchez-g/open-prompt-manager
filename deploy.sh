@@ -25,6 +25,7 @@ DESTROY=false
 ENABLE_HTTPS=false
 CREATE_CERTIFICATE=false
 CREATE_ROUTE53_ZONE=false
+OTEL_COLLECTOR_ENABLED=true
 ACM_CERTIFICATE_ARN=""
 ROUTE53_ZONE_ID=""
 PRIMARY_DOMAIN=""
@@ -77,7 +78,7 @@ load_or_generate_jwt_secret() {
 # ─────────────────────────────────────────────
 # Usage / help
 # ─────────────────────────────────────────────
-KNOWN_FLAGS=(--region --env --project --domain --https --http-cidr --route53 --destroy --migrate --help)
+KNOWN_FLAGS=(--region --env --project --domain --https --http-cidr --route53 --disable-otel-collector --destroy --migrate --help)
 
 usage() {
   cat <<'EOF'
@@ -96,6 +97,9 @@ Options:
   --http-cidr <cidr>    Allow plaintext HTTP (port 80) from a trusted CIDR range.
                         Repeat for multiple ranges. 0.0.0.0/0 is rejected.
   --route53             Manage DNS for the domain in Route 53
+  --disable-otel-collector
+                        Disable the OpenTelemetry sidecar for private-only
+                        egress environments that cannot pull public ECR images.
   --destroy             Tear down all infrastructure
   --migrate             Run database migrations
   --help, -h            Show this help and exit
@@ -103,6 +107,7 @@ Options:
 Examples:
   ./deploy.sh --region eu-west-1
   ./deploy.sh --https --domain example.com --route53
+  ./deploy.sh --https --domain example.com --route53 --disable-otel-collector
   ./deploy.sh --http-cidr 203.0.113.0/24
   ./deploy.sh --destroy
 
@@ -156,6 +161,7 @@ while [[ $# -gt 0 ]]; do
     --https)    ENABLE_HTTPS=true;  shift   ;;
     --http-cidr) HTTP_INGRESS_CIDRS+=("$2"); shift 2 ;;
     --route53)  CREATE_ROUTE53_ZONE=true; shift ;;
+    --disable-otel-collector) OTEL_COLLECTOR_ENABLED=false; shift ;;
     --destroy)  DESTROY=true;       shift   ;;
     --migrate)  MIGRATE=true;       shift   ;;
     --help|-h)  usage; exit 0 ;;
@@ -406,6 +412,7 @@ ensure_acm_certificate_is_issued() {
     -var="environment=${ENVIRONMENT}" \
     -var="project_name=${PROJECT_NAME}" \
     -var="jwt_secret=${JWT_SECRET}" \
+    -var="otel_collector_enabled=${OTEL_COLLECTOR_ENABLED}" \
     -var="enable_https=${ENABLE_HTTPS}" \
     -var="create_certificate=${CREATE_CERTIFICATE}" \
     -var="domain_name=${PRIMARY_DOMAIN}" \
@@ -507,6 +514,10 @@ if [[ "${CREATE_ROUTE53_ZONE}" == "true" && -n "${PRIMARY_DOMAIN}" ]]; then
   fi
 fi
 
+if [[ "${OTEL_COLLECTOR_ENABLED}" != "true" ]]; then
+  warn "OpenTelemetry collector sidecar disabled for this deployment (--disable-otel-collector)."
+fi
+
 # ─────────────────────────────────────────────
 # Destroy path
 # ─────────────────────────────────────────────
@@ -519,6 +530,7 @@ if [[ "$DESTROY" == "true" ]]; then
     -var="environment=${ENVIRONMENT}" \
     -var="project_name=${PROJECT_NAME}" \
     -var="jwt_secret=${JWT_SECRET}" \
+    -var="otel_collector_enabled=${OTEL_COLLECTOR_ENABLED}" \
     -var="enable_https=${ENABLE_HTTPS}" \
     -var="create_certificate=${CREATE_CERTIFICATE}" \
     -var="acm_certificate_arn=${ACM_CERTIFICATE_ARN}" \
@@ -549,6 +561,7 @@ terraform plan -out="${PLAN_FILE}.ecr" \
   -var="aws_region=${AWS_REGION}" \
   -var="environment=${ENVIRONMENT}" \
   -var="project_name=${PROJECT_NAME}" \
+  -var="otel_collector_enabled=${OTEL_COLLECTOR_ENABLED}" \
   -var="jwt_secret=${JWT_SECRET}" 2>&1 | tee "${PLAN_FILE}.ecr.log"
 
 log "Applying ECR repository changes with Terraform..."
@@ -625,6 +638,7 @@ terraform plan -out="${PLAN_FILE}" \
   -var="environment=${ENVIRONMENT}" \
   -var="project_name=${PROJECT_NAME}" \
   -var="jwt_secret=${JWT_SECRET}" \
+  -var="otel_collector_enabled=${OTEL_COLLECTOR_ENABLED}" \
   -var="backend_image=${BACKEND_IMAGE_URI}" \
   -var="frontend_image=${FRONTEND_IMAGE_URI}" \
   -var="enable_https=${ENABLE_HTTPS}" \
