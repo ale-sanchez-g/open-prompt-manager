@@ -29,9 +29,15 @@ variable "otel_collector_enabled" {
 }
 
 variable "otel_collector_image" {
-  description = "Container image for the OpenTelemetry Collector sidecar, pinned by digest (AWS Distro for OpenTelemetry Collector -- public.ecr.aws/aws-observability/aws-otel-collector). The default digest below is the multi-arch image index for the ':latest' tag resolved at the time this was written; bump it deliberately after reviewing upstream release notes, never point this at a mutable tag."
+  description = "Container image for the OpenTelemetry Collector sidecar, pinned by digest (AWS Distro for OpenTelemetry Collector -- public.ecr.aws/aws-observability/aws-otel-collector). The default digest below is the multi-arch image index for the ':latest' tag resolved at the time this was written; bump it deliberately after reviewing upstream release notes, never point this at a mutable tag. When otel_collector_ecr_mirror_enabled=true this variable is ignored and the private ECR mirror URI is used instead."
   type        = string
   default     = "public.ecr.aws/aws-observability/aws-otel-collector@sha256:a465f606684ab1ac3c5221c8bffe783b0120c8bd5318e1bf63c90f2cf56af835"
+}
+
+variable "otel_collector_ecr_mirror_enabled" {
+  description = "If true, the OTel Collector sidecar image is pulled from the private ECR mirror repository (aws_ecr_repository.otel_collector) rather than from public.ecr.aws. Required for private-egress environments that block outbound internet access. When enabled, run deploy.sh --mirror-otel-image (or the equivalent docker pull/push) before terraform apply to populate the mirror. The digest embedded in otel_collector_image is re-used so the mirrored image is byte-for-byte identical to the upstream pinned version."
+  type        = bool
+  default     = false
 }
 
 variable "otel_collector_memory" {
@@ -71,6 +77,27 @@ locals {
   # give this container below.
   otel_memory_limiter_limit_mib       = max(floor(var.otel_collector_memory * 0.8), 32)
   otel_memory_limiter_spike_limit_mib = max(floor(var.otel_collector_memory * 0.25), 16)
+
+  # ── Private ECR mirror image resolution (#365) ──────────────────────
+  # When otel_collector_ecr_mirror_enabled=true the sidecar must use the
+  # private ECR repo so that ECS does not reach public.ecr.aws.  The
+  # digest from var.otel_collector_image is preserved, guaranteeing the
+  # running image is byte-for-byte identical to the upstream pinned build.
+  #
+  # Digest extraction: var.otel_collector_image is expected to contain an
+  # "@sha256:<hex>" suffix (the default always does).  regex() with no
+  # capture groups returns the full match as a string; try() falls back to
+  # ":latest" if the image reference has no digest (should never happen in
+  # practice given the pinned default).
+  otel_ecr_image_suffix = try(
+    regex("@sha256:[0-9a-f]+$", var.otel_collector_image),
+    ":latest"
+  )
+  otel_effective_image = (
+    var.otel_collector_ecr_mirror_enabled && length(aws_ecr_repository.otel_collector) > 0
+    ? "${aws_ecr_repository.otel_collector[0].repository_url}${local.otel_ecr_image_suffix}"
+    : var.otel_collector_image
+  )
 
   otel_collector_config = <<-EOT
     extensions:
@@ -212,7 +239,7 @@ resource "aws_iam_role_policy" "ecs_execution_otel_config" {
 locals {
   otel_sidecar_container_definition = {
     name      = "otel-collector"
-    image     = var.otel_collector_image
+    image     = local.otel_effective_image
     essential = false
     memory    = var.otel_collector_memory
 

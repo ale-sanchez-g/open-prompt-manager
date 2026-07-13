@@ -122,3 +122,114 @@ run "frontend_ecr_has_required_tags" {
     error_message = "Frontend ECR repository must have 'Environment' tag."
   }
 }
+
+# ─────────────────────────────────────────────
+# OTel Collector ECR Mirror Repository (#365)
+# ─────────────────────────────────────────────
+run "otel_ecr_repo_not_created_by_default" {
+  command = plan
+
+  # With default variables (otel_collector_ecr_mirror_enabled=false) the
+  # otel_collector repository must NOT be planned.
+  assert {
+    condition     = length(aws_ecr_repository.otel_collector) == 0
+    error_message = "OTel Collector ECR repository must not be created when otel_collector_ecr_mirror_enabled=false."
+  }
+}
+
+run "otel_ecr_repo_created_when_mirror_enabled" {
+  command = plan
+
+  variables {
+    otel_collector_ecr_mirror_enabled = true
+  }
+
+  assert {
+    condition     = length(aws_ecr_repository.otel_collector) == 1
+    error_message = "OTel Collector ECR repository must be created when otel_collector_ecr_mirror_enabled=true."
+  }
+}
+
+run "otel_ecr_repo_name_contains_project" {
+  command = plan
+
+  variables {
+    otel_collector_ecr_mirror_enabled = true
+  }
+
+  assert {
+    condition     = aws_ecr_repository.otel_collector[0].name == "${var.project_name}-otel-collector"
+    error_message = "OTel Collector ECR repository name must be '<project_name>-otel-collector'."
+  }
+}
+
+run "otel_ecr_repo_immutable_tags" {
+  command = plan
+
+  variables {
+    otel_collector_ecr_mirror_enabled = true
+  }
+
+  assert {
+    condition     = aws_ecr_repository.otel_collector[0].image_tag_mutability == "IMMUTABLE"
+    error_message = "OTel Collector ECR repository must use IMMUTABLE image tags to prevent tag overwrites."
+  }
+}
+
+run "otel_ecr_scan_on_push_enabled" {
+  command = plan
+
+  variables {
+    otel_collector_ecr_mirror_enabled = true
+  }
+
+  assert {
+    condition     = aws_ecr_repository.otel_collector[0].image_scanning_configuration[0].scan_on_push == true
+    error_message = "OTel Collector ECR repository must have scan_on_push enabled."
+  }
+}
+
+run "otel_ecr_uses_kms_encryption" {
+  command = plan
+
+  variables {
+    otel_collector_ecr_mirror_enabled = true
+  }
+
+  assert {
+    condition     = aws_ecr_repository.otel_collector[0].encryption_configuration[0].encryption_type == "KMS"
+    error_message = "OTel Collector ECR repository must use KMS (CMK) encryption."
+  }
+}
+
+run "otel_ecr_has_required_tags" {
+  command = plan
+
+  variables {
+    otel_collector_ecr_mirror_enabled = true
+  }
+
+  assert {
+    condition     = aws_ecr_repository.otel_collector[0].tags["Project"] == var.project_name
+    error_message = "OTel Collector ECR repository must have 'Project' tag."
+  }
+
+  assert {
+    condition     = aws_ecr_repository.otel_collector[0].tags["Environment"] == var.environment
+    error_message = "OTel Collector ECR repository must have 'Environment' tag."
+  }
+}
+
+run "otel_ecr_not_created_when_otel_disabled" {
+  command = plan
+
+  variables {
+    otel_collector_enabled            = false
+    otel_collector_ecr_mirror_enabled = true
+  }
+
+  assert {
+    condition     = length(aws_ecr_repository.otel_collector) == 0
+    error_message = "OTel Collector ECR repository must not be created when otel_collector_enabled=false."
+  }
+}

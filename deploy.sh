@@ -31,6 +31,8 @@ PRIMARY_DOMAIN=""
 DOMAIN_NAMES=()
 HTTP_INGRESS_CIDRS=()
 JWT_SECRET=""
+DISABLE_OTEL=false
+MIRROR_OTEL_IMAGE=false
 
 load_or_generate_jwt_secret() {
   local secret_name="${PROJECT_NAME}/${ENVIRONMENT}/jwt-secret"
@@ -77,7 +79,7 @@ load_or_generate_jwt_secret() {
 # ─────────────────────────────────────────────
 # Usage / help
 # ─────────────────────────────────────────────
-KNOWN_FLAGS=(--region --env --project --domain --https --http-cidr --route53 --destroy --migrate --help)
+KNOWN_FLAGS=(--region --env --project --domain --https --http-cidr --route53 --destroy --migrate --disable-otel-collector --mirror-otel-image --help)
 
 usage() {
   cat <<'EOF'
@@ -87,24 +89,35 @@ Usage:
   ./deploy.sh [options]
 
 Options:
-  --region <region>     AWS region to deploy into (default: ap-southeast-2)
-  --env <name>          Environment name (default: prod)
-  --project <name>      Project name (default: open-prompt-manager)
-  --domain <domain>     Enable HTTPS and request/attach an ACM cert for <domain>.
-                        Repeat to add multiple domains (SANs).
-  --https               Enable HTTPS (implied by --domain)
-  --http-cidr <cidr>    Allow plaintext HTTP (port 80) from a trusted CIDR range.
-                        Repeat for multiple ranges. 0.0.0.0/0 is rejected.
-  --route53             Manage DNS for the domain in Route 53
-  --destroy             Tear down all infrastructure
-  --migrate             Run database migrations
-  --help, -h            Show this help and exit
+  --region <region>         AWS region to deploy into (default: ap-southeast-2)
+  --env <name>              Environment name (default: prod)
+  --project <name>          Project name (default: open-prompt-manager)
+  --domain <domain>         Enable HTTPS and request/attach an ACM cert for <domain>.
+                            Repeat to add multiple domains (SANs).
+  --https                   Enable HTTPS (implied by --domain)
+  --http-cidr <cidr>        Allow plaintext HTTP (port 80) from a trusted CIDR range.
+                            Repeat for multiple ranges. 0.0.0.0/0 is rejected.
+  --route53                 Manage DNS for the domain in Route 53
+  --destroy                 Tear down all infrastructure
+  --migrate                 Run database migrations
+  --disable-otel-collector  Deploy with the OTel Collector sidecar disabled.
+                            Use this as an immediate mitigation in private-egress
+                            environments where public.ecr.aws is unreachable.
+                            Sets otel_collector_enabled=false in Terraform.
+  --mirror-otel-image       Pull the pinned OTel Collector image from public ECR,
+                            push it into a private ECR mirror repository, and deploy
+                            using the private URI. Requires internet access once to
+                            seed the mirror; subsequent deploys use only private ECR.
+                            Enables otel_collector_ecr_mirror_enabled=true in Terraform.
+  --help, -h                Show this help and exit
 
 Examples:
   ./deploy.sh --region eu-west-1
   ./deploy.sh --https --domain example.com --route53
   ./deploy.sh --http-cidr 203.0.113.0/24
   ./deploy.sh --destroy
+  ./deploy.sh --disable-otel-collector                     # immediate private-egress fix
+  ./deploy.sh --mirror-otel-image                          # permanent private-egress fix
 
 Note: the ALB security group blocks internet HTTP (port 80) unless trusted
 ranges are supplied via --http-cidr (0.0.0.0/0 is rejected). Without --https,
@@ -158,6 +171,8 @@ while [[ $# -gt 0 ]]; do
     --route53)  CREATE_ROUTE53_ZONE=true; shift ;;
     --destroy)  DESTROY=true;       shift   ;;
     --migrate)  MIGRATE=true;       shift   ;;
+    --disable-otel-collector) DISABLE_OTEL=true; shift ;;
+    --mirror-otel-image)      MIRROR_OTEL_IMAGE=true; shift ;;
     --help|-h)  usage; exit 0 ;;
     *)
       echo "Unknown option: $1" >&2
@@ -508,6 +523,24 @@ if [[ "${CREATE_ROUTE53_ZONE}" == "true" && -n "${PRIMARY_DOMAIN}" ]]; then
 fi
 
 # ─────────────────────────────────────────────
+# Resolve OTel Terraform variable values
+# ─────────────────────────────────────────────
+OTEL_ENABLED_VAR="true"
+OTEL_MIRROR_VAR="false"
+if [[ "${DISABLE_OTEL}" == "true" ]]; then
+  OTEL_ENABLED_VAR="false"
+  warn "OTel Collector sidecar disabled via --disable-otel-collector."
+  warn "This is the immediate mitigation for private-egress environments."
+  warn "Re-enable with --mirror-otel-image once the private ECR mirror is populated."
+fi
+if [[ "${MIRROR_OTEL_IMAGE}" == "true" ]]; then
+  OTEL_MIRROR_VAR="true"
+fi
+if [[ "${DISABLE_OTEL}" == "true" && "${MIRROR_OTEL_IMAGE}" == "true" ]]; then
+  fail "--disable-otel-collector and --mirror-otel-image are mutually exclusive."
+fi
+
+# ─────────────────────────────────────────────
 # Destroy path
 # ─────────────────────────────────────────────
 if [[ "$DESTROY" == "true" ]]; then
@@ -526,7 +559,9 @@ if [[ "$DESTROY" == "true" ]]; then
     -var="domain_names=${DOMAIN_NAMES_ARG}" \
     -var="alb_http_ingress_cidrs=${HTTP_CIDRS_ARG}" \
     -var="route53_zone_id=${ROUTE53_ZONE_ID}" \
-    -var="create_route53_zone=${CREATE_ROUTE53_ZONE}"
+    -var="create_route53_zone=${CREATE_ROUTE53_ZONE}" \
+    -var="otel_collector_enabled=${OTEL_ENABLED_VAR}" \
+    -var="otel_collector_ecr_mirror_enabled=${OTEL_MIRROR_VAR}"
   ok "Infrastructure destroyed."
   exit 0
 fi
@@ -541,15 +576,24 @@ prepare_terraform_workspace
 ensure_ecr_repo_in_state "aws_ecr_repository.backend" "${PROJECT_NAME}-backend"
 ensure_ecr_repo_in_state "aws_ecr_repository.frontend" "${PROJECT_NAME}-frontend"
 
+# Extra Terraform targets needed for the OTEL ECR mirror repository.
+OTEL_ECR_TARGET_ARGS=()
+if [[ "${OTEL_MIRROR_VAR}" == "true" ]]; then
+  OTEL_ECR_TARGET_ARGS+=("-target=aws_ecr_repository.otel_collector[0]" "-target=aws_ecr_lifecycle_policy.otel_collector[0]")
+fi
+
 log "Planning ECR repository changes with Terraform..."
 terraform plan -out="${PLAN_FILE}.ecr" \
   -target=aws_ecr_repository.backend \
   -target=aws_ecr_repository.frontend \
   -target=aws_lb_listener.http \
+  "${OTEL_ECR_TARGET_ARGS[@]+"${OTEL_ECR_TARGET_ARGS[@]}"}" \
   -var="aws_region=${AWS_REGION}" \
   -var="environment=${ENVIRONMENT}" \
   -var="project_name=${PROJECT_NAME}" \
-  -var="jwt_secret=${JWT_SECRET}" 2>&1 | tee "${PLAN_FILE}.ecr.log"
+  -var="jwt_secret=${JWT_SECRET}" \
+  -var="otel_collector_enabled=${OTEL_ENABLED_VAR}" \
+  -var="otel_collector_ecr_mirror_enabled=${OTEL_MIRROR_VAR}" 2>&1 | tee "${PLAN_FILE}.ecr.log"
 
 log "Applying ECR repository changes with Terraform..."
 terraform apply -auto-approve "${PLAN_FILE}.ecr"
@@ -557,6 +601,16 @@ ok "ECR repositories ready."
 
 BACKEND_REPO=$(terraform output -raw backend_ecr_repository_url)
 FRONTEND_REPO=$(terraform output -raw frontend_ecr_repository_url)
+
+# Capture the OTEL mirror repository URL when mirroring is enabled.
+OTEL_ECR_REPO=""
+if [[ "${OTEL_MIRROR_VAR}" == "true" ]]; then
+  OTEL_ECR_REPO=$(terraform output -raw otel_collector_ecr_repository_url 2>/dev/null || true)
+  if [[ -z "${OTEL_ECR_REPO}" ]]; then
+    fail "Could not retrieve otel_collector_ecr_repository_url output from Terraform. Ensure the plan applied successfully."
+  fi
+  ok "OTel Collector ECR mirror repository: ${OTEL_ECR_REPO}"
+fi
 
 # ─────────────────────────────────────────────
 # 2. Authenticate Docker to ECR
@@ -566,6 +620,29 @@ aws ecr get-login-password --region "${AWS_REGION}" \
   | docker login --username AWS --password-stdin \
       "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 ok "Docker authenticated to ECR."
+
+# ─────────────────────────────────────────────
+# 2b. Mirror OTel Collector image to private ECR (if requested)
+# ─────────────────────────────────────────────
+# Pinned public image digest – keep in sync with var.otel_collector_image in otel.tf.
+OTEL_PUBLIC_IMAGE="public.ecr.aws/aws-observability/aws-otel-collector@sha256:a465f606684ab1ac3c5221c8bffe783b0120c8bd5318e1bf63c90f2cf56af835"
+
+if [[ "${MIRROR_OTEL_IMAGE}" == "true" ]]; then
+  log "Step 2b – Mirroring OTel Collector image to private ECR..."
+  log "  Source : ${OTEL_PUBLIC_IMAGE}"
+  log "  Target : ${OTEL_ECR_REPO}"
+
+  # Pull from public ECR (no auth required for public.ecr.aws pulls).
+  docker pull "${OTEL_PUBLIC_IMAGE}"
+
+  # Tag for private ECR.  We use the tag 'latest' for the push operation;
+  # Terraform addresses the image by content digest so the tag is only a
+  # human-readable alias in the private registry.
+  docker tag "${OTEL_PUBLIC_IMAGE}" "${OTEL_ECR_REPO}:latest"
+  docker push "${OTEL_ECR_REPO}:latest"
+  ok "OTel Collector image mirrored to ${OTEL_ECR_REPO}:latest"
+  ok "ECS tasks will pull by digest via the private VPC endpoint."
+fi
 
 # ─────────────────────────────────────────────
 # 3. Build and push Docker images
@@ -634,7 +711,9 @@ terraform plan -out="${PLAN_FILE}" \
   -var="domain_names=${DOMAIN_NAMES_ARG}" \
   -var="alb_http_ingress_cidrs=${HTTP_CIDRS_ARG}" \
   -var="route53_zone_id=${ROUTE53_ZONE_ID}" \
-  -var="create_route53_zone=${CREATE_ROUTE53_ZONE}" 2>&1 | tee "${PLAN_FILE}.log"
+  -var="create_route53_zone=${CREATE_ROUTE53_ZONE}" \
+  -var="otel_collector_enabled=${OTEL_ENABLED_VAR}" \
+  -var="otel_collector_ecr_mirror_enabled=${OTEL_MIRROR_VAR}" 2>&1 | tee "${PLAN_FILE}.log"
 
 ok "Plan saved to: ${PLAN_FILE}"
 ok "Plan log saved to: ${PLAN_FILE}.log"

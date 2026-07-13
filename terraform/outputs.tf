@@ -119,3 +119,8 @@ output "otel_local_otlp_http_endpoint" {
   description = "OTLP/HTTP endpoint reachable from other containers in the same ECS task as the otel-collector sidecar. Use this to configure in-task app instrumentation (#340)."
   value       = "http://localhost:4318"
 }
+
+output "otel_collector_ecr_repository_url" {
+  description = "ECR repository URL for the mirrored OTel Collector image. Only populated when otel_collector_ecr_mirror_enabled=true. Use this URL when pushing the mirrored image with docker push."
+  value       = var.otel_collector_enabled && var.otel_collector_ecr_mirror_enabled ? aws_ecr_repository.otel_collector[0].repository_url : null
+}

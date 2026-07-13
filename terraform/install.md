@@ -71,8 +71,8 @@ Internet
 | **VPC Endpoints** | Interface endpoints (ECR api/dkr, CloudWatch Logs, Secrets Manager, STS, KMS) plus an S3 gateway endpoint keep ECS task traffic to AWS APIs inside the VPC, so the application security groups need no unrestricted egress. |
 | **ACM Certificate** | Optional TLS certificate created via `certificate.tf` with DNS validation. Automatically adds `www.` SAN for apex domains. Can be provided externally via `acm_certificate_arn`. |
 | **ECS Fargate** | Serverless container runtime. Runs backend (1024 CPU / 2048 MB, 2 tasks — sized to fit the OTel Collector sidecar) and frontend (256 CPU / 512 MB, 2 tasks) in private subnets. Cluster has Container Insights enabled and supports both `FARGATE` and `FARGATE_SPOT`. |
-| **OTel Collector (sidecar)** | AWS Distro for OpenTelemetry Collector runs as a sidecar in the backend task (`otel.tf`, image pinned by digest, toggle via `otel_collector_enabled`). Receives OTLP on `localhost:4317`/`4318`; exporter defaults to `debug` (no-op) until `otel_exporter_otlp_endpoint` is set. Config is rendered by Terraform into the SSM SecureString parameter `/<project>/<env>/otel/collector-config` and injected as `AOT_CONFIG_CONTENT`, so the exporter target flips without a new task-definition image. Logs to `/ecs/<project>/otel-collector`. |
-| **ECR** | Private container image registry with lifecycle policies for backend and frontend Docker images. Image layers are encrypted at rest with a dedicated customer-managed KMS key (`alias/<project>-ecr`). |
+| **OTel Collector (sidecar)** | AWS Distro for OpenTelemetry Collector runs as a sidecar in the backend task (`otel.tf`, image pinned by digest, toggle via `otel_collector_enabled`). Receives OTLP on `localhost:4317`/`4318`; exporter defaults to `debug` (no-op) until `otel_exporter_otlp_endpoint` is set. Config is rendered by Terraform into the SSM SecureString parameter `/<project>/<env>/otel/collector-config` and injected as `AOT_CONFIG_CONTENT`, so the exporter target flips without a new task-definition image. Logs to `/ecs/<project>/otel-collector`. In private-egress environments set `otel_collector_ecr_mirror_enabled=true` and run `./deploy.sh --mirror-otel-image` — see [Private-Egress OTel Mirroring](#private-egress-otel-collector-mirroring) below. |
+| **ECR** | Private container image registry with lifecycle policies for backend and frontend Docker images. When `otel_collector_ecr_mirror_enabled=true` a third repository (`<project>-otel-collector`, IMMUTABLE tags) is also created for the mirrored collector image. Image layers are encrypted at rest with a dedicated customer-managed KMS key (`alias/<project>-ecr`). |
 | **RDS PostgreSQL 16** | `db.t4g.micro` with 20 GiB gp3 storage, encrypted at rest, in the private subnets. Multi-AZ disabled by default (enable via `db_multi_az = true`). |
 | **Secrets Manager** | Stores the auto-generated PostgreSQL `DATABASE_URL` at `<project>/<env>/database-url` and the `JWT_SECRET`, both encrypted with a dedicated customer-managed KMS key (`alias/<project>-secrets`). Injected into the backend ECS container at task start — never a plain-text env var. |
 | **KMS** | Customer-managed keys (with automatic rotation) for CloudWatch Logs, Secrets Manager, and ECR image encryption. |
@@ -719,6 +719,7 @@ terraform destroy
 | MCP clients receive `404` on `/mcp` | ALB listener rule for `/mcp` not created | Run `terraform apply`; the `aws_lb_listener_rule.http_backend_mcp` (HTTP) or `aws_lb_listener_rule.https_backend_mcp` (HTTPS) rule (priority 20) must exist |
 | ECS tasks fail to start | Image not found in ECR | Re-push the Docker image (Step 2) |
 | `CannotPullContainerError: image Manifest does not contain descriptor matching platform 'linux/amd64'` | Image built on Apple Silicon (ARM) without `--platform linux/amd64` | Rebuild with `docker buildx build --platform linux/amd64 … --push` (Step 2b/2c) |
+| `CannotPullContainerError: … dial tcp …:443: i/o timeout` on `otel-collector` container | OTel sidecar pulling from `public.ecr.aws` in a private-egress (VPC endpoint-only) environment | **Immediate fix:** redeploy with `./deploy.sh --disable-otel-collector`. **Permanent fix:** mirror the image and redeploy with `./deploy.sh --mirror-otel-image` — see [Private-Egress OTel Mirroring](#private-egress-otel-collector-mirroring). |
 | Tasks stuck in `PENDING` | IAM execution role missing permissions | Check `aws_iam_role.ecs_task_execution` attachments |
 | ALB returns 502 | Container unhealthy or port mismatch | Check CloudWatch Logs and health check settings |
 | `terraform apply` fails on NAT GW | Elastic IP limit reached | Request a limit increase in AWS console |
@@ -734,6 +735,100 @@ aws logs tail /ecs/open-prompt-manager/frontend --follow
 ```
 
 ---
+
+## Private-Egress OTel Collector Mirroring
+
+> **Relevant when:** your ECS tasks run in a VPC that blocks direct outbound internet access (VPC endpoint-only model). The default `otel_collector_image` is pulled from `public.ecr.aws` which is unreachable in such environments, causing `CannotPullContainerError` on the sidecar container.
+
+### Immediate mitigation (disable the sidecar)
+
+If you need a fast rollback to a stable state, redeploy with the sidecar disabled. This removes the pull dependency entirely; all other telemetry configuration is preserved and can be re-enabled later.
+
+```bash
+./deploy.sh --disable-otel-collector
+# or, with additional flags:
+./deploy.sh --region eu-west-1 --env prod --https --domain example.com --disable-otel-collector
+```
+
+### Permanent fix (private ECR mirror)
+
+The recommended long-term solution is to mirror the OTel Collector image into your account's private ECR, where it is reachable through the existing `ecr.dkr` VPC endpoint.
+
+#### One-command approach (recommended)
+
+```bash
+# First-time setup: mirror the image and deploy using the private URI.
+# Requires outbound internet access from the machine running this script
+# (not from the ECS tasks themselves).
+./deploy.sh --mirror-otel-image
+
+# Subsequent deploys keep the mirror enabled automatically:
+./deploy.sh --mirror-otel-image
+```
+
+`deploy.sh --mirror-otel-image` does the following:
+
+1. Creates the `<project>-otel-collector` ECR repository (KMS-encrypted, immutable tags, scan-on-push).
+2. Pulls the pinned public image (`public.ecr.aws/aws-observability/aws-otel-collector@sha256:…`).
+3. Pushes it to the private ECR repository.
+4. Applies Terraform with `otel_collector_ecr_mirror_enabled=true`, which configures ECS to pull by digest from the private ECR instead of `public.ecr.aws`.
+
+#### Manual approach (step-by-step)
+
+If you prefer to mirror the image separately from the deploy:
+
+```bash
+# 1. Bootstrap the private ECR mirror repository via Terraform.
+export AWS_REGION=ap-southeast-2
+export PROJECT_NAME=open-prompt-manager
+export ENVIRONMENT=prod
+
+cd terraform/
+terraform apply \
+  -target=aws_ecr_repository.otel_collector[0] \
+  -target=aws_ecr_lifecycle_policy.otel_collector[0] \
+  -var="otel_collector_enabled=true" \
+  -var="otel_collector_ecr_mirror_enabled=true"
+
+# 2. Authenticate Docker to private ECR.
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+aws ecr get-login-password --region "${AWS_REGION}" \
+  | docker login --username AWS --password-stdin \
+      "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
+# 3. Mirror the image (pull from public, push to private).
+OTEL_PUBLIC="public.ecr.aws/aws-observability/aws-otel-collector@sha256:a465f606684ab1ac3c5221c8bffe783b0120c8bd5318e1bf63c90f2cf56af835"
+OTEL_PRIVATE_REPO=$(terraform output -raw otel_collector_ecr_repository_url)
+
+docker pull "${OTEL_PUBLIC}"
+docker tag  "${OTEL_PUBLIC}" "${OTEL_PRIVATE_REPO}:latest"
+docker push "${OTEL_PRIVATE_REPO}:latest"
+
+# 4. Full apply with mirror enabled — ECS will now pull from private ECR.
+./deploy.sh --mirror-otel-image
+```
+
+#### Updating the mirror to a newer upstream version
+
+When a new ADOT Collector release is pinned in `terraform/otel.tf` (variable `otel_collector_image`):
+
+```bash
+# 1. Update the pinned digest in terraform/otel.tf var.otel_collector_image
+#    AND update OTEL_PUBLIC_IMAGE in deploy.sh to match.
+
+# 2. Re-mirror and redeploy:
+./deploy.sh --mirror-otel-image
+```
+
+> **Keep `OTEL_PUBLIC_IMAGE` in `deploy.sh` in sync with `var.otel_collector_image` in `terraform/otel.tf`.** Both reference the same pinned digest; if they diverge the mirrored image will not match what Terraform expects to pull by digest.
+
+#### Terraform variables reference
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `otel_collector_enabled` | `bool` | `true` | Toggles the OTel Collector sidecar. Set to `false` for the immediate private-egress mitigation. |
+| `otel_collector_ecr_mirror_enabled` | `bool` | `false` | When `true`, creates the private ECR mirror repo and configures ECS to use it. Set alongside `otel_collector_enabled=true` for the permanent fix. |
+| `otel_collector_image` | `string` | `public.ecr.aws/…@sha256:…` | Upstream image URI. The digest is re-used for the private ECR mirror (ECS pulls `<private-repo>@sha256:…`). |
 
 ## MCP Server (AI Agent Connectivity)
 
