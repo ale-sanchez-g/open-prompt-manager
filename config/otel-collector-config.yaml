@@ -24,7 +24,10 @@ receivers:
 processors:
   memory_limiter:
     check_interval: 1s
-    limit_mib: 200
+    # Matches the terraform/otel.tf defaults: otel_collector_memory=256 MiB,
+    # limit_mib = floor(256 * 0.8) = 204, spike_limit_mib = floor(256 * 0.25) = 64.
+    # Update both values together if you change the memory allocation.
+    limit_mib: 204
     spike_limit_mib: 64
   batch:
     timeout: 5s

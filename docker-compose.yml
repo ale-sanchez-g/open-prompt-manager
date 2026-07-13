@@ -50,7 +50,7 @@ services:
   # edited without rebuilding any image.
   otel-collector:
     profiles: ["otel"]
-    image: public.ecr.aws/aws-observability/aws-otel-collector:latest
+    image: public.ecr.aws/aws-observability/aws-otel-collector@sha256:a465f606684ab1ac3c5221c8bffe783b0120c8bd5318e1bf63c90f2cf56af835
     command: ["--config", "/etc/otel/config.yaml"]
     volumes:
       - ./config/otel-collector-config.yaml:/etc/otel/config.yaml:ro
