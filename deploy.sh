@@ -78,7 +78,7 @@ load_or_generate_jwt_secret() {
 # ─────────────────────────────────────────────
 # Usage / help
 # ─────────────────────────────────────────────
-KNOWN_FLAGS=(--region --env --project --domain --https --http-cidr --route53 --disable-otel-collector --destroy --migrate --help)
+KNOWN_FLAGS=(--region --env --project --domain --https --http-cidr --route53 --disable-otel-collector --enable-otel-collector --destroy --migrate --help)
 
 usage() {
   cat <<'EOF'
@@ -100,6 +100,9 @@ Options:
   --disable-otel-collector
                         Disable the OpenTelemetry sidecar for private-only
                         egress environments that cannot pull public ECR images.
+  --enable-otel-collector
+                        Enable the OpenTelemetry sidecar explicitly (useful
+                        for CI scripts that pass flags conditionally).
   --destroy             Tear down all infrastructure
   --migrate             Run database migrations
   --help, -h            Show this help and exit
@@ -108,6 +111,7 @@ Examples:
   ./deploy.sh --region eu-west-1
   ./deploy.sh --https --domain example.com --route53
   ./deploy.sh --https --domain example.com --route53 --disable-otel-collector
+  ./deploy.sh --https --domain example.com --route53 --enable-otel-collector
   ./deploy.sh --http-cidr 203.0.113.0/24
   ./deploy.sh --destroy
 
@@ -162,6 +166,7 @@ while [[ $# -gt 0 ]]; do
     --http-cidr) HTTP_INGRESS_CIDRS+=("$2"); shift 2 ;;
     --route53)  CREATE_ROUTE53_ZONE=true; shift ;;
     --disable-otel-collector) OTEL_COLLECTOR_ENABLED=false; shift ;;
+    --enable-otel-collector) OTEL_COLLECTOR_ENABLED=true; shift ;;
     --destroy)  DESTROY=true;       shift   ;;
     --migrate)  MIGRATE=true;       shift   ;;
     --help|-h)  usage; exit 0 ;;
