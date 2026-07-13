@@ -587,7 +587,7 @@ terraform plan -out="${PLAN_FILE}.ecr" \
   -target=aws_ecr_repository.backend \
   -target=aws_ecr_repository.frontend \
   -target=aws_lb_listener.http \
-  "${OTEL_ECR_TARGET_ARGS[@]+"${OTEL_ECR_TARGET_ARGS[@]}"}" \
+  "${OTEL_ECR_TARGET_ARGS[@]}" \
   -var="aws_region=${AWS_REGION}" \
   -var="environment=${ENVIRONMENT}" \
   -var="project_name=${PROJECT_NAME}" \
@@ -624,7 +624,9 @@ ok "Docker authenticated to ECR."
 # ─────────────────────────────────────────────
 # 2b. Mirror OTel Collector image to private ECR (if requested)
 # ─────────────────────────────────────────────
-# Pinned public image digest – keep in sync with var.otel_collector_image in otel.tf.
+# !! SYNC REQUIRED: this digest MUST match the default value of
+# !! var.otel_collector_image in terraform/otel.tf.  When bumping the
+# !! upstream ADOT Collector version, update BOTH locations together.
 OTEL_PUBLIC_IMAGE="public.ecr.aws/aws-observability/aws-otel-collector@sha256:a465f606684ab1ac3c5221c8bffe783b0120c8bd5318e1bf63c90f2cf56af835"
 
 if [[ "${MIRROR_OTEL_IMAGE}" == "true" ]]; then

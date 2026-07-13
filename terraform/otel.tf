@@ -90,7 +90,7 @@ locals {
   # ":latest" if the image reference has no digest (should never happen in
   # practice given the pinned default).
   otel_ecr_image_suffix = try(
-    regex("@sha256:[0-9a-f]+$", var.otel_collector_image),
+    regex("@sha256:[0-9a-fA-F]+$", var.otel_collector_image),
     ":latest"
   )
   otel_effective_image = (
