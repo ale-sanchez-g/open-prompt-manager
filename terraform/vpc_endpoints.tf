@@ -15,6 +15,7 @@ locals {
     "ecr.api",        # ECR control plane (auth, manifests)
     "ecr.dkr",        # ECR Docker registry (image pulls)
     "logs",           # CloudWatch Logs (awslogs driver)
+    "ssm",            # SSM Parameter Store (otel collector SecureString config)
     "secretsmanager", # DATABASE_URL / JWT secret injection
     "sts",            # Task role credential vending
     "kms",            # Decrypt ECR / Secrets Manager KMS keys
