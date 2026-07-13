@@ -36,6 +36,36 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # OpenTelemetry Collector sidecar — mirrors the ECS sidecar defined in
+  # terraform/otel.tf so the local stack behaves the same as production.
+  # Start with the 'otel' profile:
+  #   docker-compose --profile otel up -d
+  # or via:
+  #   make up-otel
+  #
+  # Telemetry is logged to stdout (debug exporter) by default.
+  # Send OTLP from the backend by setting:
+  #   OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+  # The config is read from config/otel-collector-config.yaml which can be
+  # edited without rebuilding any image.
+  otel-collector:
+    profiles: ["otel"]
+    image: public.ecr.aws/aws-observability/aws-otel-collector:latest
+    command: ["--config", "/etc/otel/config.yaml"]
+    volumes:
+      - ./config/otel-collector-config.yaml:/etc/otel/config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "13133:13133" # health check
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:13133"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
 volumes:
   backend-data:
     driver: local

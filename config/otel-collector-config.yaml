@@ -1,0 +1,55 @@
+# OpenTelemetry Collector config for local development
+#
+# Mirrors the structure rendered by terraform/otel.tf so that local and
+# ECS environments behave identically.  The only difference is the exporter:
+# in production the otlphttp exporter is added when otel_exporter_otlp_endpoint
+# is set; locally we keep the debug exporter so telemetry is visible in
+# `docker-compose logs otel-collector` without needing an external backend.
+#
+# To forward to a real backend locally, add an otlphttp exporter block and
+# set OTEL_EXPORTER_OTLP_ENDPOINT in your .env file.
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 200
+    spike_limit_mib: 64
+  batch:
+    timeout: 5s
+    send_batch_size: 8192
+  resourcedetection:
+    detectors: [env]
+    timeout: 2s
+    override: false
+
+exporters:
+  debug:
+    verbosity: basic
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [debug]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [debug]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [debug]

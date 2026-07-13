@@ -1,4 +1,4 @@
-.PHONY: up down build logs clean help helm-install helm-upgrade helm-uninstall
+.PHONY: up down up-otel down-otel build logs clean help helm-install helm-upgrade helm-uninstall
 
 VERSION ?= $(shell [ -f .version ] && cat .version || echo latest)
 REGISTRY ?= your-registry
@@ -16,9 +16,17 @@ help:
 up:
 	docker-compose up -d
 
+## up-otel: Start all services including the OTel Collector sidecar
+up-otel:
+	docker-compose --profile otel up -d
+
 ## down: Stop all services
 down:
 	docker-compose down
+
+## down-otel: Stop all services including the OTel Collector sidecar
+down-otel:
+	docker-compose --profile otel down
 
 ## build: Build Docker images with version tag
 build:
