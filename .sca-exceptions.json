@@ -1,6 +1,6 @@
 {
   "_note": "Managed SCA exception register. All pip entries require: id (GHSA/CVE/PYSEC), owner (GitHub username), expires (ISO 8601 date), justification. Expired entries BLOCK CI — resolve the vulnerability or renew with a new expiry and updated justification.",
-  "_npm_note": "npm exceptions are managed via <package>/.audit-ci.jsonc (https://github.com/IBM/audit-ci), e.g. frontend/.audit-ci.jsonc — one file per npm workspace that enforces `npm audit`, using the allowlist object form's \"expiry\" field (not an inline comment). This register tracks them for governance purposes only.",
+  "_npm_note": "npm exceptions are managed via <package>/.audit-ci.jsonc, e.g. frontend/.audit-ci.jsonc — one file per npm workspace. Format follows the audit-ci allowlist schema (https://github.com/IBM/audit-ci) using the allowlist object form's \"expiry\" field, but is enforced by scripts/enforce-npm-audit.py against the npm audit --json report already produced in CI, not by invoking the audit-ci binary itself (avoids a second, unreliable call to npm's registry and avoids npx fetching third-party code at CI time). This register tracks them for governance purposes only.",
   "pip": [],
   "npm": {
     "frontend": [
