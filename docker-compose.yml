@@ -15,6 +15,11 @@ services:
       - RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED:-true}
       - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-200}
       - RATE_LIMIT_AUTH_PER_MINUTE=${RATE_LIMIT_AUTH_PER_MINUTE:-60}
+      # Server-side feature flags. Unset by default, which resolves every
+      # backend flag to false — the intended state for local development.
+      - FLAGSMITH_SERVER_KEY=${FLAGSMITH_SERVER_KEY:-}
+      - FLAGSMITH_API_URL=${FLAGSMITH_API_URL:-https://edge.api.flagsmith.com/api/v1/}
+      - FLAGSMITH_REFRESH_INTERVAL_SECONDS=${FLAGSMITH_REFRESH_INTERVAL_SECONDS:-300}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]

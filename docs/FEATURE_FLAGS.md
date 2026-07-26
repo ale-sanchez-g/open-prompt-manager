@@ -1,10 +1,12 @@
-# Feature Flags (Frontend) — Flagsmith
+# Feature Flags — Flagsmith
 
-> **Audience:** AI coding agents and engineers adding or consuming feature flags in
-> the React frontend. Follow the steps in order. Every code block is copy-paste
-> ready and matches the conventions already used in this repo (Vite `VITE_` env
-> vars, the telemetry env-parsing style in `frontend/src/telemetry/config.js`, and
-> the provider/hook shape in `frontend/src/context/AuthContext.jsx`).
+> **Audience:** AI coding agents and engineers adding or consuming feature flags.
+> §1–§11 cover the React frontend; follow those steps in order. Every code block is
+> copy-paste ready and matches the conventions already used in this repo (Vite
+> `VITE_` env vars, the telemetry env-parsing style in
+> `frontend/src/telemetry/config.js`, and the provider/hook shape in
+> `frontend/src/context/AuthContext.jsx`). **§12 covers backend flags**, which work
+> differently enough that reading it is not optional before adding one.
 
 ## 1. What and why
 
@@ -14,9 +16,10 @@ redeploying. Flags let the Release Train Engineer (RTE) decouple **deploy** from
 
 - **Provider:** Flagsmith (SaaS Edge API, or self-hosted).
 - **Flagsmith project:** `opm-dx1`.
-- **SDK:** `@flagsmith/flagsmith` (client-side, evaluated in the browser).
-- **Scope of this doc:** client-side flags in `frontend/`. Backend flags are out of
-  scope.
+- **SDK:** `@flagsmith/flagsmith` (client-side, evaluated in the browser) for the
+  frontend; `flagsmith` (Python, evaluated in-process) for the backend — see §12.
+- **Scope of this doc:** client-side flags in `frontend/` (§1–§11) and server-side
+  flags in `backend/` (§12).
 
 ### Principles
 
@@ -305,14 +308,24 @@ Reference implementations already in the repo:
 
 Every flag needs an owner and an exit. When adding a flag, record it here:
 
-| Flag key                   | Type    | Purpose                        | Owner | Added      | Remove by  |
-| -------------------------- | ------- | ------------------------------ | ----- | ---------- | ---------- |
-| `dashboard_welcome_banner` | boolean | First toggle / reference impl. | RTE   | 2026-07-26 | 2026-09-30 |
+| Flag key                        | Type    | Purpose                                       | Owner        | Added      | Remove by    |
+| ------------------------------- | ------- | --------------------------------------------- | ------------ | ---------- | ------------ |
+| `dashboard_welcome_banner`      | boolean | First toggle / reference impl.                | RTE          | 2026-07-26 | 2026-09-30   |
+| `registration_extended_fields`  | boolean | Extended registration fields (OPM-FLAG-REG-001), frontend + backend | **UNASSIGNED** | 2026-07-26 | **UNSET**    |
+
+> `registration_extended_fields` has no owner or removal date because that is open
+> decision #10 in `docs/features/registration-feature.md` §12. It is recorded here
+> unassigned rather than omitted: an untracked flag is worse than a visibly
+> incomplete row. **It must be filled in before Stage 5 (rollout).**
 
 - **Rollout:** enable Dev → Staging → Prod. Use Flagsmith segments/percentage
   rollout for gradual exposure when needed.
-- **Kill switch:** disabling the flag in Flagsmith is the instant rollback — no
-  redeploy. `VITE_FLAGSMITH_ENABLED=false` is the app-wide off switch.
+- **Kill switch:** disabling the flag in Flagsmith is the rollback — no redeploy.
+  `VITE_FLAGSMITH_ENABLED=false` is the app-wide off switch. **Instant for the
+  frontend only.** Backend flags evaluate against a polled environment document, so
+  a flip reaches the API only after the next poll — up to
+  `FLAGSMITH_REFRESH_INTERVAL_SECONDS` (≥300s). Plan rollbacks of anything
+  server-side around that window; see §12.3.
 - **Cleanup:** once a release toggle is permanently on (or dropped), delete the
   flag in Flagsmith, remove the key from `FLAGS`, delete the branch in the UI, and
   drop the row above. Stale flags are tech debt.
@@ -395,6 +408,116 @@ environment.
 3. Is `VITE_FLAGSMITH_ENVIRONMENT_ID` actually non-empty in the build args /
    `.env`? Empty ⇒ SDK never starts ⇒ flags disabled by design.
 4. Hard-reload the browser — `cacheFlags` serves the previous value first.
+
+## 12. Backend flags (server-side)
+
+> Added by OPM-FLAG-REG-001. Before this, backend flags did not exist in OPM and
+> this doc said so. Everything below is the backend counterpart of §1–§11 — the
+> principles in §1 still hold, the mechanics do not.
+
+### 12.1 How it differs from the frontend
+
+| | Frontend | Backend |
+|---|---|---|
+| SDK | `@flagsmith/flagsmith` | `flagsmith` (Python), `backend/requirements.txt` |
+| Key | `VITE_FLAGSMITH_ENVIRONMENT_ID` — **publishable** | `FLAGSMITH_SERVER_KEY` (`ser.…`) — **secret** |
+| Evaluation | Remote, in the browser | **Local**, in-process against a polled environment document |
+| Freshness | Per page load | Per poll (≥300s) |
+| Unconfigured | SDK never starts ⇒ flags false | SDK never starts ⇒ flags false |
+
+The two keys are **not interchangeable and must never be swapped**. The frontend's
+environment ID is designed to ship in a public bundle; the server key exposes every
+flag and segment rule in the environment and belongs only in backend secrets.
+
+### 12.2 The module
+
+All vendor detail lives in `backend/app/core/flags.py`, mirroring the isolation that
+`frontend/src/featureFlags/config.js` gives the frontend. **Nothing else in the
+backend imports `flagsmith`.** The rest of the app imports a key constant and a
+helper:
+
+```python
+from app.core.flags import extended_enabled
+
+if payload.extended is not None and extended_enabled(payload.session_id):
+    ...
+```
+
+Flag keys must match their frontend counterparts in
+`frontend/src/featureFlags/config.js` character for character. There is no shared
+package between `frontend/` and `backend/`, so that correspondence is enforced by
+`backend/tests/test_registration_contract.py` — add an assertion there for every new
+key.
+
+### 12.3 Local evaluation and the ≥300s poll floor
+
+The backend polls one environment document on a timer and evaluates in-process. It
+does **not** call the Flagsmith API per request. This is a budget constraint, not a
+preference: the plan for `opm-dx1` allows 50,000 API calls per month across every
+consumer, and remote evaluation would spend one call per request *and* create a
+stored Flagsmith identity for every anonymous visitor.
+
+`FLAGSMITH_REFRESH_INTERVAL_SECONDS` defaults to 300 and is **clamped up** to 300 in
+code if set lower. At 60s a single instance burns ~43,200 calls/month and OPM runs
+several ECS tasks; at 300s it is ~8,600 each.
+
+**The cost is propagation delay.** A flag flip — including a rollback — takes effect
+on the backend only after the next poll, so budget up to one interval. If you need a
+faster kill switch than that, a feature flag is the wrong mechanism.
+
+Identity lookups pass `transient=True` so anonymous visitors never accumulate as
+stored Flagsmith identities, even if local evaluation degrades to remote.
+
+### 12.4 Failure semantics: off-safe, always
+
+Principle 1 in §1 is load-bearing on a public endpoint. Concretely:
+
+- The client is built **once**, at startup, by `init_flags()` in
+  `backend/main.py`. Nothing on the request path constructs a client or makes an
+  API call, so a Flagsmith outage cannot add latency to a request.
+- If startup initialisation fails, flags stay off for the life of the process. A
+  redeploy re-attempts. This trades self-healing for a guaranteed-fast request path.
+- `extended_enabled()` returns `False` on *any* problem — no identifier, no client,
+  unknown flag, timeout, any exception — and never raises into a request.
+
+A flag lookup must never be able to turn a working endpoint into a 5xx. If your call
+site cannot tolerate `False`, it is not a flag.
+
+### 12.5 Configuration
+
+| Variable | Default | Notes |
+|---|---|---|
+| `FLAGSMITH_SERVER_KEY` | *(unset)* | Secret. Unset ⇒ all backend flags false. |
+| `FLAGSMITH_API_URL` | `https://edge.api.flagsmith.com/api/v1/` | |
+| `FLAGSMITH_REFRESH_INTERVAL_SECONDS` | `300` | Clamped up to 300. |
+
+Set in `.env.example` and `docker-compose.yml`. **AWS: the ECS task definition needs
+`FLAGSMITH_SERVER_KEY` added as a secret** (Terraform + `deploy.sh`, §11) — it is not
+a build arg, unlike the frontend's environment ID, because the backend reads it at
+runtime rather than baking it into an image.
+
+### 12.6 Testing
+
+`FLAGSMITH_SERVER_KEY` is unset in CI and in the test suite, so `init_flags()` is a
+no-op and every flag resolves false. **The OFF path therefore needs no mocking**,
+which is what makes it a real regression guard rather than a mock asserting itself.
+
+For the ON path, patch the helper *where it is imported*, not in the flags module:
+
+```python
+monkeypatch.setattr('app.api.auth.extended_enabled', lambda session_id: True)
+```
+
+Test both states, and test the outage path explicitly — a fake client that raises
+must still produce the legacy response. See
+`backend/tests/test_registration_extended.py` for the full pattern.
+
+### 12.7 Governance
+
+Backend flags go in the same §10 lifecycle table as frontend ones, with the same
+removal owner and date. A flag gating both a UI and its persistence — as
+`registration_extended_fields` does — is **one** flag with one row, removed from
+both sides together.
 
 ## Appendix — Agent checklist (first toggle)
 
