@@ -3,7 +3,14 @@
   "_npm_note": "npm exceptions are managed via .audit-ci.jsonc (https://github.com/IBM/audit-ci). Add advisory IDs to the allowlist array in that file with an inline expiry comment. This register tracks them for governance purposes only.",
   "pip": [],
   "npm": {
-    "frontend": [],
+    "frontend": [
+      {
+        "id": "GHSA-qwww-vcr4-c8h2",
+        "owner": "ale-sanchez-g",
+        "expires": "2026-10-24",
+        "justification": "react-router CSRF bypass only affects the unstable RSC (React Server Components) APIs; this app is a client-side Vite SPA and does not use RSC mode. No non-breaking fix exists yet: react-router-dom@7.18.1 (latest published) pins react-router to the exact vulnerable 7.18.1 release, and the patched react-router@8.3.0 requires a react-router-dom 8.x release that has not been published. Re-evaluate before expiry and upgrade once react-router-dom ships a compatible release. Allowlisted in frontend/.audit-ci.jsonc."
+      }
+    ],
     "mcp-package-node": []
   }
 }

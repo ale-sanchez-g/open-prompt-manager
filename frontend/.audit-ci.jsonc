@@ -1,0 +1,16 @@
+{
+  "$schema": "https://github.com/IBM/audit-ci/raw/main/docs/schema.json",
+  "high": true,
+  "allowlist": [
+    {
+      "GHSA-qwww-vcr4-c8h2": {
+        "active": true,
+        "notes": "react-router CSRF bypass only affects the unstable RSC (React Server Components) APIs. This app is a client-side Vite SPA and does not use react-router's RSC mode (verified: no unstable_ RSC imports in src/). No non-breaking fix is available — react-router-dom@7.18.1 pins react-router to the exact vulnerable 7.18.1 release, and the patched react-router@8.3.0 requires react-router-dom to publish a compatible 8.x release, which does not yet exist. Tracked in .sca-exceptions.json.",
+        "expiry": "2026-10-24"
+      }
+    }
+  ],
+  "package-manager": "npm",
+  "report-type": "important",
+  "show-found": true
+}
