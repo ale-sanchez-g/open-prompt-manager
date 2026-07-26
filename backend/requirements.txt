@@ -8,3 +8,6 @@ python-multipart==0.0.32
 psycopg2-binary==2.9.11
 bcrypt==5.0.0
 PyJWT==2.13.0
+# Server-side feature flags. Imported only by app/core/flags.py, which degrades
+# to flags-off if the import fails, so a partial install cannot stop the API.
+flagsmith==6.1.0

@@ -7,6 +7,7 @@ from sqlalchemy import text
 
 import app.database.base as db_module
 from app.audit import RequestIDMiddleware, configure_logging
+from app.core.flags import init_flags
 from app.database.base import create_tables
 from app.api.auth import router as auth_router
 from app.api.admin import router as admin_router
@@ -120,6 +121,13 @@ def create_app() -> FastAPI:
     # suite calls it once per test (see tests/conftest.py's `app` fixture),
     # which keeps lockout state from leaking between test cases.
     reset_login_lockout_state()
+
+    # Build the Flagsmith client once, here, so no request ever constructs one
+    # or makes an API call: a Flagsmith outage must not add latency to a
+    # registration. Never raises and needs no configuration — without
+    # FLAGSMITH_SERVER_KEY it is a no-op and every backend flag resolves false.
+    # Idempotent, so the per-test create_app() only pays for it once.
+    init_flags()
 
     # Assigns/propagates X-Request-ID for correlating audit log lines with a
     # single request, even deep inside service functions.
