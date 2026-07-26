@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Edit, Trash2, Check, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { agentsApi } from '../services/api';
 import ConfirmButton from '../components/ConfirmButton';
 import Badge from '../components/Badge';

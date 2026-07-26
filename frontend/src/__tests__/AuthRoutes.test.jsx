@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router';
 
 import { AdminRoute, ProtectedRoute, PublicOnlyRoute } from '../App';
 import * as authContext from '../context/AuthContext';
