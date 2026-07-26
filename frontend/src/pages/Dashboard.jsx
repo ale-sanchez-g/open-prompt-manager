@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { FileText, Tag, Bot, Star, TrendingUp, Clock } from 'lucide-react';
 import { promptsApi, tagsApi, agentsApi } from '../services/api';
 import { useFeatureFlag } from '../featureFlags/FeatureFlagProvider';

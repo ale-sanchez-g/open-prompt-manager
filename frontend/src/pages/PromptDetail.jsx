@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router';
 import {
   ArrowLeft, Edit, Trash2, Copy, Play, Star, Activity, Clock, GitBranch, ArrowLeftRight, Puzzle
 } from 'lucide-react';

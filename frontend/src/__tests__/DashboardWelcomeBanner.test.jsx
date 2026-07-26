@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import Dashboard from '../pages/Dashboard';
 import { promptsApi, tagsApi, agentsApi } from '../services/api';
 import { useFeatureFlag } from '../featureFlags/FeatureFlagProvider';

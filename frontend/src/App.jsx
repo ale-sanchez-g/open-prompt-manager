@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
-import { BrowserRouter as Router, Navigate, Routes, Route, NavLink, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Routes, Route, NavLink, Link } from 'react-router';
 import { BookOpen, Bot, FileText, LayoutDashboard, LogOut, ShieldCheck, Tag } from 'lucide-react';
 
 import { AuthProvider, useAuth } from './context/AuthContext';

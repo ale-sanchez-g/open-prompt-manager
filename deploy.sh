@@ -33,6 +33,14 @@ DOMAIN_NAMES=()
 HTTP_INGRESS_CIDRS=()
 JWT_SECRET=""
 
+# Flagsmith client-side environment key for the frontend. This is PUBLISHABLE
+# (baked into the browser bundle at image-build time) — NOT a secret, so it is a
+# plain build arg rather than a Secrets Manager value. Defaults to the opm-dx1
+# Production environment; override with --flagsmith-env-id or the
+# FLAGSMITH_ENVIRONMENT_ID env var. Empty value => flags disabled (safe default).
+FLAGSMITH_ENVIRONMENT_ID="${FLAGSMITH_ENVIRONMENT_ID:<GET_FROM_FLAGS_API>}"
+FLAGSMITH_API_URL="${FLAGSMITH_API_URL:-https://edge.api.flagsmith.com/api/v1/}"
+
 load_or_generate_jwt_secret() {
   local secret_name="${PROJECT_NAME}/${ENVIRONMENT}/jwt-secret"
   local existing_secret_arn=""
@@ -91,6 +99,11 @@ Options:
   --region <region>     AWS region to deploy into (default: ap-southeast-2)
   --env <name>          Environment name (default: prod)
   --project <name>      Project name (default: open-prompt-manager)
+  --flagsmith-env-id <key>
+                        Flagsmith client-side environment key baked into the
+                        frontend bundle (publishable, not a secret). Defaults to
+                        the opm-dx1 Production environment. Also settable via the
+                        FLAGSMITH_ENVIRONMENT_ID env var. Empty => flags disabled.
   --domain <domain>     Enable HTTPS and request/attach an ACM cert for <domain>.
                         Repeat to add multiple domains (SANs).
   --https               Enable HTTPS (implied by --domain)
@@ -161,6 +174,7 @@ while [[ $# -gt 0 ]]; do
     --region)   AWS_REGION="$2";    shift 2 ;;
     --env)      ENVIRONMENT="$2";   shift 2 ;;
     --project)  PROJECT_NAME="$2";  shift 2 ;;
+    --flagsmith-env-id) FLAGSMITH_ENVIRONMENT_ID="$2"; shift 2 ;;
     --domain)   DOMAIN_NAMES+=("$2"); PRIMARY_DOMAIN="${PRIMARY_DOMAIN:-$2}"; ENABLE_HTTPS=true; CREATE_CERTIFICATE=true; shift 2 ;;
     --https)    ENABLE_HTTPS=true;  shift   ;;
     --http-cidr) HTTP_INGRESS_CIDRS+=("$2"); shift 2 ;;
@@ -595,7 +609,14 @@ docker buildx build --platform linux/amd64 \
 ok "Backend images pushed: ${BACKEND_REPO}:${DEPLOY_TAG}, ${BACKEND_REPO}:latest"
 
 log "           Building and pushing frontend image (linux/amd64)..."
+if [[ -n "${FLAGSMITH_ENVIRONMENT_ID}" ]]; then
+  ok "Flagsmith flags enabled (client-side env key: ${FLAGSMITH_ENVIRONMENT_ID})."
+else
+  warn "FLAGSMITH_ENVIRONMENT_ID is empty — frontend feature flags will be DISABLED."
+fi
 docker buildx build --platform linux/amd64 \
+  --build-arg VITE_FLAGSMITH_ENVIRONMENT_ID="${FLAGSMITH_ENVIRONMENT_ID}" \
+  --build-arg VITE_FLAGSMITH_API_URL="${FLAGSMITH_API_URL}" \
   -t "${FRONTEND_REPO}:${DEPLOY_TAG}" \
   -t "${FRONTEND_REPO}:latest" "${FRONTEND_DIR}" --push
 ok "Frontend images pushed: ${FRONTEND_REPO}:${DEPLOY_TAG}, ${FRONTEND_REPO}:latest"

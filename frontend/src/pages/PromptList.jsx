@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router';
 import { Plus, Search, Star, Activity, Edit } from 'lucide-react';
 import { promptsApi, tagsApi, agentsApi } from '../services/api';
 import Badge from '../components/Badge';
