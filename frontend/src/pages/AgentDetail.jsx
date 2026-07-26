@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router';
 import {
   ArrowLeft, Edit, Trash2, Activity, Clock, Check, X, FileText, RefreshCw,
 } from 'lucide-react';
