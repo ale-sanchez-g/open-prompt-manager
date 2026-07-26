@@ -41,4 +41,8 @@ export function getFlagsmithConfig(env = readEnv()) {
 // truth and no stringly-typed keys scattered across the app.
 export const FLAGS = Object.freeze({
   DASHBOARD_WELCOME_BANNER: 'dashboard_welcome_banner',
+  // Extended registration fields. Must stay byte-identical to
+  // FLAG_REGISTRATION_EXTENDED in backend/app/core/flags.py - both sides evaluate
+  // this same key for the same identity. See docs/features/registration-feature.md §4.1.
+  REGISTRATION_EXTENDED_FIELDS: 'registration_extended_fields',
 });
