@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
-import { BrowserRouter as Router, Navigate, Routes, Route, NavLink, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Routes, Route, NavLink, Link } from 'react-router';
 import { BookOpen, Bot, FileText, LayoutDashboard, LogOut, ShieldCheck, Tag } from 'lucide-react';
 
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { FeatureFlagProvider } from './featureFlags/FeatureFlagProvider';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -146,40 +147,42 @@ export default function App() {
   return (
     <Router>
       <AuthProvider>
-        <Routes>
-          <Route
-            path="/login"
-            element={(
-              <PublicOnlyRoute>
-                <LoginPage />
-              </PublicOnlyRoute>
-            )}
-          />
-          <Route
-            path="/register"
-            element={(
-              <PublicOnlyRoute>
-                <RegisterPage />
-              </PublicOnlyRoute>
-            )}
-          />
-          <Route
-            path="/"
-            element={(
-              <ProtectedRoute>
-                <LandingPage />
-              </ProtectedRoute>
-            )}
-          />
-          <Route
-            path="/*"
-            element={(
-              <ProtectedRoute>
-                <AppLayout />
-              </ProtectedRoute>
-            )}
-          />
-        </Routes>
+        <FeatureFlagProvider>
+          <Routes>
+            <Route
+              path="/login"
+              element={(
+                <PublicOnlyRoute>
+                  <LoginPage />
+                </PublicOnlyRoute>
+              )}
+            />
+            <Route
+              path="/register"
+              element={(
+                <PublicOnlyRoute>
+                  <RegisterPage />
+                </PublicOnlyRoute>
+              )}
+            />
+            <Route
+              path="/"
+              element={(
+                <ProtectedRoute>
+                  <LandingPage />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="/*"
+              element={(
+                <ProtectedRoute>
+                  <AppLayout />
+                </ProtectedRoute>
+              )}
+            />
+          </Routes>
+        </FeatureFlagProvider>
       </AuthProvider>
     </Router>
   );

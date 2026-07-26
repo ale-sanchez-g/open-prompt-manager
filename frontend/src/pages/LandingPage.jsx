@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { FileText, Tag, Bot, TrendingUp, GitBranch, Layers, ArrowRight } from 'lucide-react';
 import { healthApi } from '../services/api';
 

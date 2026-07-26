@@ -1,0 +1,7 @@
+node_modules
+build
+coverage
+# Keep local env files out of the image — Flagsmith/API config is injected
+# via build args (see Dockerfile + docker-compose.yml), not baked-in .env files.
+.env
+.env.*

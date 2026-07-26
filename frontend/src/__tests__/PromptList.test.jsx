@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import PromptList from '../pages/PromptList';
 import { promptsApi, tagsApi, agentsApi } from '../services/api';
 
