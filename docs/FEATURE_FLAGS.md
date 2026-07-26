@@ -41,9 +41,7 @@ Staging, Production):
     like `env_...` / a short opaque string (do not use the server-side `ser_...` key).
 3. Provide that ID to the app via env var `VITE_FLAGSMITH_ENVIRONMENT_ID` (§7).
 
-> Agents: you can also drive Flagsmith through the **Flagsmith MCP server**
-> (`mcp__flagsmith__*` tools) to create/read flags programmatically instead of
-> clicking the dashboard. Authenticate first (`mcp__flagsmith__authenticate`).
+> Agents: if your Copilot environment has a Flagsmith MCP server configured, you may be able to use its `mcp__flagsmith__*` tools to create/read flags programmatically. This repo does not configure a Flagsmith MCP server, so the default is to use the Flagsmith dashboard UI.
 
 ## 3. Install the SDK
 
