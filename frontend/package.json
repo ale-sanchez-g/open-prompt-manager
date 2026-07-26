@@ -18,7 +18,7 @@
     "ajv": "^8.20.0",
     "axios": "^1.18.1",
     "eslint-plugin-react-hooks": "^7.1.0",
-    "lucide-react": "^1.24.0",
+    "lucide-react": "^1.25.0",
     "prop-types": "^15.8.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
