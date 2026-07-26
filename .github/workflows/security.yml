@@ -677,7 +677,7 @@ jobs:
         run: npm audit --json 2>/dev/null > npm-audit-report.json || true
 
       - name: Run npm audit (enforce — fail on high/critical, honoring .audit-ci.jsonc allowlist)
-        run: npx --yes audit-ci@^7 --config .audit-ci.jsonc
+        run: npx --yes audit-ci@7.1.0 --config .audit-ci.jsonc
 
       - name: Upload npm audit report
         uses: actions/upload-artifact@v7
