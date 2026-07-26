@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import UserManagement from '../pages/UserManagement';
 import { adminApi } from '../services/api';
 import * as authContext from '../context/AuthContext';

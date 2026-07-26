@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router';
 import { Plus, Trash2, ArrowLeft, Puzzle } from 'lucide-react';
 import { promptsApi, tagsApi, agentsApi } from '../services/api';
 
