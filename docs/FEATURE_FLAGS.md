@@ -37,8 +37,8 @@ Staging, Production):
 
 1. In Flagsmith, open project **`opm-dx1`**.
 2. Note the **Environment** you are targeting and copy its **client-side
-   Environment ID** (Settings → Keys → *Client-side Environment Key*). It looks
-   like `ser_...` / a short opaque string.
+    Environment ID** (Settings → Keys → *Client-side Environment Key*). It often looks
+    like `env_...` / a short opaque string (do not use the server-side `ser_...` key).
 3. Provide that ID to the app via env var `VITE_FLAGSMITH_ENVIRONMENT_ID` (§7).
 
 > Agents: you can also drive Flagsmith through the **Flagsmith MCP server**
@@ -207,11 +207,15 @@ Vite exposes only `VITE_`-prefixed vars to the browser (same rule as
 
 ¹ Required to *enable* flags; the app is designed to run safely without it.
 
-- **Local dev:** add to `frontend/.env.local` (git-ignored).
-- **Build/deploy:** inject where other `VITE_` vars are set (check `deploy.sh`,
-  `helm/`, `docker-compose.yml`, and the frontend `Dockerfile` build args). These
-  are baked at **build time**, so a new value needs a rebuild of the frontend
-  image.
+- **Local dev (`npm start` in `frontend/`):** add to `frontend/.env.local`
+  (git-ignored). Vite reads env from the `frontend/` dir — **not** the repo-root
+  `.env`.
+- **Docker / AWS:** these `VITE_*` vars are **baked into the JS bundle at build
+  time** (Vite inlines them during `npm run build`), so they are passed as Docker
+  **build args**, and changing the value needs an **image rebuild**. See §11 for
+  the exact wiring. Note: the *flag values themselves* are still fetched from
+  Flagsmith at runtime — only the Environment **ID** is baked, so toggling a flag
+  in Flagsmith takes effect on reload with no rebuild.
 
 ## 8. Create the first flag: `dashboard_welcome_banner`
 
@@ -315,6 +319,85 @@ Every flag needs an owner and an exit. When adding a flag, record it here:
   flag in Flagsmith, remove the key from `FLAGS`, delete the branch in the UI, and
   drop the row above. Stale flags are tech debt.
 
+## 11. Deployment: how the Environment ID reaches each target
+
+The single most common "I enabled the flag but nothing happened" cause is that
+the **Environment ID was never baked into the running bundle**, so the SDK never
+started and every flag stayed at its default. Because Vite inlines `VITE_*` at
+build time, each build target must inject `VITE_FLAGSMITH_ENVIRONMENT_ID` itself.
+
+### Which target reads which environment
+
+| Run target        | Config source                         | Flagsmith env (default) |
+| ----------------- | ------------------------------------- | ----------------------- |
+| `npm start` (dev) | `frontend/.env.local`                 | Development             |
+| `docker compose`  | repo-root `.env` → build arg          | (whatever you set)      |
+| AWS / ECS         | `deploy.sh` → build arg               | Production              |
+
+> They can legitimately differ — that's the point of environments. Local dev
+> reads Development; a Docker/AWS image reads whatever key it was **built** with.
+
+### Docker Compose
+
+`frontend/Dockerfile` declares the build args and exports them as env before the
+build so Vite inlines them:
+
+```dockerfile
+ARG VITE_FLAGSMITH_ENVIRONMENT_ID=""
+ARG VITE_FLAGSMITH_API_URL="https://edge.api.flagsmith.com/api/v1/"
+ENV VITE_FLAGSMITH_ENVIRONMENT_ID=$VITE_FLAGSMITH_ENVIRONMENT_ID
+ENV VITE_FLAGSMITH_API_URL=$VITE_FLAGSMITH_API_URL
+RUN ... npm run build
+```
+
+`docker-compose.yml` feeds them from the repo-root `.env`:
+
+```yaml
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_FLAGSMITH_ENVIRONMENT_ID: ${VITE_FLAGSMITH_ENVIRONMENT_ID:-}
+        VITE_FLAGSMITH_API_URL: ${VITE_FLAGSMITH_API_URL:-https://edge.api.flagsmith.com/api/v1/}
+```
+
+A `frontend/.dockerignore` excludes local `.env*` files so the build args are the
+only source of truth. **Rebuild** after changing the key — a plain restart reuses
+the old image:
+
+```bash
+docker compose up -d --build frontend
+```
+
+### AWS (Terraform + `deploy.sh`)
+
+The frontend image is built and pushed to ECR by `deploy.sh`, which passes the
+same build args to `docker buildx build`. The value comes from (in order): the
+`--flagsmith-env-id` flag, the `FLAGSMITH_ENVIRONMENT_ID` env var, or the
+script's default (the `opm-dx1` **Production** key).
+
+```bash
+./deploy.sh                                   # bakes the Production key
+./deploy.sh --flagsmith-env-id <client-key>   # override per environment
+FLAGSMITH_ENVIRONMENT_ID=<client-key> ./deploy.sh
+```
+
+The ECS **task definition needs no change** — the Environment ID lives inside the
+image; ECS only injects `BACKEND_URL` at runtime (via nginx `envsubst`). So
+after the first deploy, flipping a flag in Flagsmith updates the app on reload
+with **no redeploy**; you only rebuild/redeploy to point at a *different*
+environment.
+
+### Checklist when a flag "doesn't show" in Docker/AWS
+
+1. Is the flag enabled in the **same** Flagsmith environment whose key was baked?
+   (Dev key ⇒ enable it in Development; Production key ⇒ enable in Production.)
+   Verify with the CLI: `flagsmith get <client-key> -p`.
+2. Was the image **rebuilt** after setting the key? (Bundle is built once.)
+3. Is `VITE_FLAGSMITH_ENVIRONMENT_ID` actually non-empty in the build args /
+   `.env`? Empty ⇒ SDK never starts ⇒ flags disabled by design.
+4. Hard-reload the browser — `cacheFlags` serves the previous value first.
+
 ## Appendix — Agent checklist (first toggle)
 
 1. [ ] `npm install @flagsmith/flagsmith` in `frontend/`.
@@ -329,3 +412,5 @@ Every flag needs an owner and an exit. When adding a flag, record it here:
 9. [ ] Record the flag in the lifecycle table (§10).
 10. [ ] Verify: with the flag off the UI is unchanged; toggling it on in Flagsmith
         shows the banner after reload.
+11. [ ] For Docker/AWS, confirm the Environment ID is passed as a build arg and the
+        image is rebuilt (§11) — a flag can only show if its env key was baked in.
