@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FileText, Tag, Bot, Star, TrendingUp, Clock } from 'lucide-react';
 import { promptsApi, tagsApi, agentsApi } from '../services/api';
+import { useFeatureFlag } from '../featureFlags/FeatureFlagProvider';
+import { FLAGS } from '../featureFlags/config';
 
 function StatCard({ icon: Icon, label, value, color }) {
   return (
@@ -22,6 +24,7 @@ export default function Dashboard() {
   const [tags, setTags] = useState([]);
   const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const showWelcomeBanner = useFeatureFlag(FLAGS.DASHBOARD_WELCOME_BANNER, false);
 
   useEffect(() => {
     Promise.all([
@@ -51,6 +54,11 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {showWelcomeBanner && (
+        <div className="rounded-lg bg-blue-600 px-4 py-3 text-white">
+          Welcome to Prompt Manager — this banner is controlled by a feature flag.
+        </div>
+      )}
       <h2 className="text-2xl font-bold text-white">Dashboard</h2>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

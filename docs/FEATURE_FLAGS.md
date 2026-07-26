@@ -258,29 +258,46 @@ reload, since `cacheFlags` serves the previous value first).
 
 ## 9. Testing
 
-Tests must not hit the network. `useFeatureFlag` reads config at module load, so
-control it by mocking the config module (Vitest, matching the repo's setup):
+Tests must not hit the network. There is one repo-specific gotcha that makes this
+important: **Vitest loads `frontend/.env.local`**, so if you have a real
+`VITE_FLAGSMITH_ENVIRONMENT_ID` there, `config.enabled` becomes `true` during
+tests. Any component that reads a flag but is rendered in isolation (no
+`FeatureFlagProvider` ancestor) would then call the live SDK with no context and
+crash.
 
-```jsx
-import { render, screen } from '@testing-library/react';
-import { vi } from 'vitest';
+To prevent that, flags are **forced OFF in test mode** by a committed
+`frontend/.env.test`:
 
-vi.mock('../featureFlags/config', async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    getFlagsmithConfig: () => ({ enabled: false, environmentID: '', api: '' }),
-  };
-});
-
-// With enabled:false, useFeatureFlag returns the default — assert current UI.
+```
+VITE_FLAGSMITH_ENABLED=false
 ```
 
-To test the **on** state, mock `useFlags` from `@flagsmith/flagsmith/react` to
-return `{ dashboard_welcome_banner: { enabled: true } }`, or mock
-`useFeatureFlag` directly. Add tests under `frontend/src/__tests__/` alongside the
-existing suites, and keep `getFlagsmithConfig()` unit tests for the env parsing
-(enabled/disabled/kill-switch cases), mirroring how telemetry config is tested.
+With that in place, `useFeatureFlag` short-circuits to its default in every test,
+so flag-consuming components render safely without a provider. This is the
+baseline; you don't need to mock anything to assert the **off** (current) UI.
+
+To test the **on** state, mock `useFeatureFlag` directly (it bypasses config):
+
+```jsx
+import { useFeatureFlag } from '../featureFlags/FeatureFlagProvider';
+
+jest.mock('../services/api');
+jest.mock('../featureFlags/FeatureFlagProvider', () => ({
+  useFeatureFlag: jest.fn(),
+}));
+
+// in a test:
+useFeatureFlag.mockReturnValue(true);   // assert the banner appears
+useFeatureFlag.mockReturnValue(false);  // assert it does not
+```
+
+Also keep pure `getFlagsmithConfig()` unit tests for the env parsing
+(enabled / disabled / kill-switch / trimming), passing an explicit `env` object so
+they never touch `import.meta.env` — mirroring how telemetry config is tested.
+
+Reference implementations already in the repo:
+- `frontend/src/__tests__/featureFlagsConfig.test.js` — config env-parsing units.
+- `frontend/src/__tests__/DashboardWelcomeBanner.test.jsx` — banner on/off via mock.
 
 ## 10. Lifecycle & governance (RTE)
 
