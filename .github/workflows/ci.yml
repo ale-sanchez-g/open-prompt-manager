@@ -246,6 +246,15 @@ jobs:
       - name: Terraform Validate
         run: terraform validate
 
+      - name: Terraform OTel Image Registry Check
+        run: |
+          set -euo pipefail
+          if grep -nE '^[[:space:]]*default[[:space:]]*=[[:space:]]*"public\.ecr\.aws' otel.tf; then
+            echo '::error file=terraform/otel.tf::otel_collector_image must default to a private ECR image. public.ecr.aws is unreachable from the private-egress VPC and causes CannotPullContainerError on new ECS task placements (issue #365).'
+            exit 1
+          fi
+          echo 'OTel image check passed: no public registry default in terraform/otel.tf.'
+
       - name: Terraform Test
         run: terraform test
 

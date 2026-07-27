@@ -1,0 +1,40 @@
+# Local sandbox for validating the OTel Collector sidecar (terraform/otel.tf)
+# and viewing telemetry, without needing real AWS or app instrumentation.
+# Deliberately NOT merged into docker-compose.yml -- this is an observability
+# testing tool, not something the app needs to start, and it doesn't touch
+# the backend/frontend services at all.
+#
+# Usage:
+#   docker compose -f docker-compose.otel-local.yml up -d
+#
+#   # generate synthetic traces (requires the telemetrygen image):
+#   docker run --rm --network open-prompt-manager_default \
+#     ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest \
+#     traces --otlp-endpoint otel-collector:4317 --otlp-insecure --traces 20
+#
+#   open http://localhost:16686 and search for service "telemetrygen"
+#
+#   docker compose -f docker-compose.otel-local.yml down
+
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686" # Jaeger UI
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+
+  otel-collector:
+    # Exact same image digest running in production (terraform/otel.tf
+    # var.otel_collector_image_digest) so this exercises the real receiver/
+    # processor pipeline, not just "some collector version".
+    image: public.ecr.aws/aws-observability/aws-otel-collector@sha256:a465f606684ab1ac3c5221c8bffe783b0120c8bd5318e1bf63c90f2cf56af835
+    depends_on:
+      - jaeger
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.local.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "13133:13133" # health_check extension

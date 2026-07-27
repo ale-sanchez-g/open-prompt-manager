@@ -1,0 +1,65 @@
+# Local mirror of the rendered config in terraform/otel.tf's `otel_collector_config`
+# local, for sandboxing the Collector sidecar without real AWS or app
+# instrumentation (backend/frontend don't emit OTLP yet). Two deliberate
+# differences from prod:
+#
+#   1. Exporters: traces go to the local Jaeger container (Jaeger's OTLP
+#      endpoint only accepts traces); metrics/logs go to 'debug' so the
+#      pipeline still runs cleanly instead of prod's single 'debug' exporter
+#      for all three signals.
+#   2. resourcedetection only uses the 'env' detector -- 'ecs'/'ec2' would
+#      just time out locally since there's no ECS/EC2 metadata endpoint.
+#
+# Delivery mechanism also differs from prod on purpose: prod injects this via
+# the AOT_CONFIG_CONTENT env var (SSM SecureString, see terraform/otel.tf);
+# here it's mounted as a file and passed via --config for simplicity. Same
+# effective config either way.
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 204
+    spike_limit_mib: 64
+  batch:
+    timeout: 5s
+    send_batch_size: 8192
+  resourcedetection:
+    detectors: [env]
+    timeout: 2s
+    override: false
+
+exporters:
+  otlp_http/jaeger:
+    endpoint: "http://jaeger:4318"
+    tls:
+      insecure: true
+  debug:
+    verbosity: basic
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [otlp_http/jaeger]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [debug]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [debug]
