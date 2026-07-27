@@ -24,6 +24,7 @@ This directory contains runbooks for diagnosing and responding to critical incid
 | [auth-outage-credential-stuffing.md](./auth-outage-credential-stuffing.md) | P1 | Security Lead / Platform Team — TODO: fill name |
 | [alb-5xx-spike.md](./alb-5xx-spike.md) | P1 | Platform Engineer / SRE — TODO: fill name |
 | [rds-failover.md](./rds-failover.md) | P1 | Database Administrator / Maintainer — TODO: fill name |
+| [otel-collector-image-mirror.md](./otel-collector-image-mirror.md) | — (Maintenance / P4) | Platform Engineer / DevOps — TODO: fill name |
 | [on-call-escalation-policy.md](./on-call-escalation-policy.md) | — | Engineering Lead / Incident Commander — TODO: fill name |
 | [postmortem-template.md](./postmortem-template.md) | — | Incident Commander — TODO: fill name |
 

@@ -95,6 +95,11 @@ output "jwt_secret_arn" {
 # ─────────────────────────────────────────────
 # OpenTelemetry Outputs (#339)
 # ─────────────────────────────────────────────
+output "otel_collector_mirror_ecr_repository_url" {
+  description = "ECR repository URL for the private mirror of the OpenTelemetry Collector image (#365). Push the mirrored upstream image here so the sidecar can be pulled from inside the private-egress VPC."
+  value       = aws_ecr_repository.otel_collector_mirror.repository_url
+}
+
 output "otel_collector_config_parameter_name" {
   description = "Name of the SecureString SSM parameter holding the Collector's YAML config. Update its value and force a new ECS deployment to flip the exporter target -- no Terraform apply or image change required."
   value       = aws_ssm_parameter.otel_collector_config.name
