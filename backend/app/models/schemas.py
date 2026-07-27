@@ -34,10 +34,10 @@ class ExtendedRegistrationFields(BaseModel):
     the flag-gated service layer instead, using the limits in
     ``app.core.registration``.
 
-    Known residual deviation: a block with the wrong *types* (e.g.
-    ``companyName: 123``) still fails parsing and returns 422 on the OFF path,
-    where today it would be ignored. Wrong *values* do not. Accepted as a narrow
-    edge case; covered by test rather than left undiscovered.
+    This model is never used to type ``RegisterRequest.extended`` directly (see
+    the comment there): doing so would make FastAPI parse - and reject - a
+    malformed or wrong-shaped block before the flag is even consulted, which is
+    exactly the OFF-path regression guardrail 2 forbids.
     """
 
     company_name: Optional[str] = Field(
@@ -82,7 +82,14 @@ class RegisterRequest(AuthRequest):
         ),
         examples=['b7f1c2de-3a4b-4c5d-8e9f-0a1b2c3d4e5f'],
     )
-    extended: Optional[ExtendedRegistrationFields] = Field(
+    # Deliberately untyped (not ExtendedRegistrationFields). With the flag off,
+    # any value here - including a malformed one, e.g. `"extended": "oops"` -
+    # must be dropped exactly like main drops an unknown field, never a 422
+    # (guardrail 2). Typing this as ExtendedRegistrationFields would make
+    # FastAPI validate (and reject) it before app.api.auth.register ever
+    # checks the flag. The endpoint parses it into ExtendedRegistrationFields
+    # itself, but only once the flag is confirmed on for this sessionId.
+    extended: Optional[Any] = Field(
         None,
         description=(
             'Extended profile fields. Only honoured when registration_extended_fields is '

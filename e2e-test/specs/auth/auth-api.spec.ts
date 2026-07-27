@@ -1,12 +1,16 @@
 // spec: e2e-test/api-test-plan.md
 // seed: e2e-test/seed.spec.ts
 
+import { randomInt } from 'node:crypto';
 import { test, expect, type APIRequestContext } from '@playwright/test';
 
 const STRONG_PASSWORD = 'Test@1234Secure!';
 
+// randomInt (CSPRNG), not Math.random: these values end up in email/sessionId
+// fields that flow into auth and flag-bucketing decisions, which CodeQL flags
+// as a security-sensitive use of an insecure RNG.
 function uniqueEmail(prefix = 'pw-auth'): string {
-  return `${prefix}-${Math.floor(Math.random() * 1000000)}@opm-test.io`;
+  return `${prefix}-${randomInt(1000000)}@opm-test.io`;
 }
 
 async function registerUser(
@@ -47,7 +51,7 @@ const VALID_EXTENDED = {
 
 /** A throwaway identity, so the flag resolves however the segment says it should. */
 function randomSessionId(): string {
-  return `e2e-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+  return `e2e-${Date.now()}-${randomInt(1000000)}`;
 }
 
 test.describe('Auth API Tests', () => {

@@ -92,7 +92,12 @@ def hashed_percentage(object_ids: Iterable[str], iterations: int = 1) -> float:
     """
     ids = list(object_ids) * iterations
     to_hash = ','.join(str(id_) for id_ in ids)
-    hashed = int(hashlib.md5(to_hash.encode('utf-8')).hexdigest(), base=16)
+    # MD5 here is not a security or integrity control - it is the exact
+    # algorithm flag_engine.utils.hashing uses for PERCENTAGE_SPLIT bucketing
+    # (see the module docstring), so matching it bit-for-bit is the whole
+    # point of this check. usedforsecurity=False documents that; NOSONAR
+    # covers scanners that flag any hashlib.md5 use regardless.
+    hashed = int(hashlib.md5(to_hash.encode('utf-8'), usedforsecurity=False).hexdigest(), base=16)  # NOSONAR
     value = ((hashed % 9999) / 9998) * 100
     if value == 100:
         return hashed_percentage(object_ids, iterations + 1)

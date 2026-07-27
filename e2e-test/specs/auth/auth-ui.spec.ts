@@ -1,12 +1,15 @@
 // spec: e2e-test/api-test-plan.md
 // seed: e2e-test/seed.spec.ts
 
+import { randomInt } from 'node:crypto';
 import { test, expect, type Page } from '@playwright/test';
 
 const STRONG_PASSWORD = 'Test@1234Secure!';
 
+// randomInt (CSPRNG), not Math.random: this feeds email/sessionId values used
+// in auth and flag-bucketing decisions - see auth-api.spec.ts for the same fix.
 function uid(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  return `${prefix}-${Date.now()}-${randomInt(10000)}`;
 }
 
 // ── registration_extended_fields (OPM-FLAG-REG-001) ──────────────────────────

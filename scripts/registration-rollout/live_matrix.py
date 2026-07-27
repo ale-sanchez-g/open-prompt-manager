@@ -43,13 +43,18 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets
 import sys
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[2] / 'backend'
 sys.path.insert(0, str(BACKEND))
 
-os.environ.setdefault('JWT_SECRET', 'live-matrix-jwt-secret-32-chars-min')
+# Generated fresh per run, not a fixed literal: this harness's app and its
+# sqlite database both live only for the duration of this process, so nothing
+# needs the value to be stable across runs - and a hardcoded secret-shaped
+# string here is exactly what secret scanners (rightly) flag.
+os.environ.setdefault('JWT_SECRET', secrets.token_hex(32))
 os.environ.setdefault('BCRYPT_ROUNDS', '4')
 
 DEV_ENVIRONMENT_KEY = os.environ.get('OPM_DEV_FLAGSMITH_KEY', 'mGoGnmAiyNzxXCikjAo8Qd')

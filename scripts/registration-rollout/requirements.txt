@@ -1,0 +1,10 @@
+# Dependencies for the OPM-FLAG-REG-001 §8 acceptance-matrix validation
+# scripts in this directory. live_matrix.py imports the backend app directly
+# (see BACKEND = ... / sys.path.insert in that script), so this layers on top
+# of the backend's own requirements rather than duplicating them.
+-r ../../backend/requirements.txt
+
+# Used directly by propagation_probe.py. flagsmith (pulled in via
+# requirements.txt above) also depends on requests transitively, but that
+# should not be relied on implicitly by a second, independent caller.
+requests==2.34.2

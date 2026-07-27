@@ -2,6 +2,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
@@ -20,7 +21,14 @@ from app.audit import (
 from app.core.flags import extended_enabled
 from app.database.base import get_db
 from app.models.auth import User
-from app.models.schemas import AuthRequest, MeResponse, RegisterRequest, RegisterResponse, TokenResponse
+from app.models.schemas import (
+    AuthRequest,
+    ExtendedRegistrationFields,
+    MeResponse,
+    RegisterRequest,
+    RegisterResponse,
+    TokenResponse,
+)
 from app.services.auth_service import (
     ACCESS_TOKEN_TTL_SECONDS,
     AuthError,
@@ -97,7 +105,17 @@ def register(payload: RegisterRequest, request: Request, db: Annotated[Session, 
     # (guardrail 3) rather than failing a public registration.
     extended_values: dict[str, Any] = {}
     if payload.extended is not None and extended_enabled(payload.session_id):
-        extended_values = validate_extended_fields(payload.extended)
+        # payload.extended arrives untyped (see RegisterRequest.extended) so that
+        # a malformed block never 422s while the flag is off. Now that the flag
+        # is confirmed on, parse it for real - a shape that doesn't fit the
+        # contract (wrong type, or not an object at all, e.g. "oops") is exactly
+        # as invalid as a value that fails app.core.registration's rules, so it
+        # gets the same 422 treatment, still before create_user (matrix row 4).
+        try:
+            extended_model = ExtendedRegistrationFields.model_validate(payload.extended)
+        except ValidationError as exc:
+            raise AuthError(status_code=422, error='extended fields are malformed') from exc
+        extended_values = validate_extended_fields(extended_model)
 
     is_admin = count_users(db) == 0 or is_bootstrap_admin(normalized_email)
     role = ROLE_ADMIN if is_admin else ROLE_USER

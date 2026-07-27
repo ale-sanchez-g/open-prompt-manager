@@ -138,6 +138,30 @@ def test_off_does_not_validate_extended_values(anon_client):
     assert _user('off-invalid@opm.io').phone is None
 
 
+@pytest.mark.parametrize(
+    'case,non_object_extended',
+    [('string', 'oops'), ('number', 42), ('list', ['not', 'a', 'dict']), ('bool', True)],
+)
+def test_off_ignores_non_object_extended_block(anon_client, case, non_object_extended):
+    """A wrong-shaped (not just wrong-valued) block is still ignored while off.
+
+    RegisterRequest.extended is deliberately untyped (Any) rather than
+    ExtendedRegistrationFields precisely so that FastAPI never rejects the
+    request body before the flag is consulted. A previous version typed it as
+    ExtendedRegistrationFields directly, which made a non-object `extended`
+    (e.g. a bare string) 422 regardless of the flag - a guardrail 2 regression
+    this guards against.
+    """
+    response = _register(
+        anon_client,
+        f'off-nonobj-{case}@opm.io',
+        sessionId=SESSION_ID,
+        extended=non_object_extended,
+    )
+
+    assert response.status_code == 201
+
+
 def test_off_emits_no_extended_audit_event(anon_client, caplog):
     caplog.set_level(logging.INFO)
 
@@ -247,6 +271,22 @@ def test_on_rejected_registration_can_be_retried(anon_client, flag_on):
 
     second = _register(anon_client, 'on-retry@opm.io', sessionId=SESSION_ID, extended=EXTENDED_BLOCK)
     assert second.status_code == 201
+
+
+@pytest.mark.parametrize('case,non_object_extended', [('string', 'oops'), ('number', 42), ('list', ['x'])])
+def test_on_non_object_extended_returns_422_and_creates_no_user(anon_client, flag_on, case, non_object_extended):
+    """A block that isn't even an object is malformed, same as a bad value.
+
+    Counterpart to test_off_ignores_non_object_extended_block: with the flag
+    on, the same non-object input must 422 - via ExtendedRegistrationFields
+    .model_validate() in app.api.auth.register - and, per matrix row 4, must
+    not leave a user row behind.
+    """
+    email = f'on-nonobj-{case}@opm.io'
+    response = _register(anon_client, email, sessionId=SESSION_ID, extended=non_object_extended)
+
+    assert response.status_code == 422
+    assert _user(email) is None
 
 
 # ── Audit: the event fires, and carries no field values ──────────────────────

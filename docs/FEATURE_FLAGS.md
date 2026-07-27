@@ -321,11 +321,14 @@ Every flag needs an owner and an exit. When adding a flag, record it here:
 - **Rollout:** enable Dev → Staging → Prod. Use Flagsmith segments/percentage
   rollout for gradual exposure when needed.
 - **Kill switch:** disabling the flag in Flagsmith is the rollback — no redeploy.
-  `VITE_FLAGSMITH_ENABLED=false` is the app-wide off switch. **Instant for the
-  frontend only.** Backend flags evaluate against a polled environment document, so
-  a flip reaches the API only after the next poll — up to
-  `FLAGSMITH_REFRESH_INTERVAL_SECONDS` (≥300s). Plan rollbacks of anything
-  server-side around that window; see §12.3.
+  `VITE_FLAGSMITH_ENABLED=false` is the app-wide off switch. **Not instant on
+  either side.** The frontend SDK re-evaluates on its own poll/`identify()`
+  cadence, and `cacheFlags` can briefly serve a stale, locally-cached value on
+  page load before that happens (see §11). Backend flags evaluate against a
+  polled environment document, so a flip reaches the API only after the next
+  poll — up to `FLAGSMITH_REFRESH_INTERVAL_SECONDS` (≥300s), the larger of the
+  two delays. Plan rollbacks of anything server-side around that window; see
+  §12.3.
 - **Cleanup:** once a release toggle is permanently on (or dropped), delete the
   flag in Flagsmith, remove the key from `FLAGS`, delete the branch in the UI, and
   drop the row above. Stale flags are tech debt.
