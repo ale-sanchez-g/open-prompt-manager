@@ -37,6 +37,12 @@ Do not rename or remove an event without updating those filters; add new
 events rather than repurposing an existing name.
 
     auth.register               - a new account was created
+    auth.register.extended      - extended registration fields were accepted
+                                   and stored alongside a new account, because
+                                   registration_extended_fields was on for the
+                                   visitor. Carries ``fields``: the names of
+                                   the columns written, never their values
+                                   (they include a phone number)
     auth.login.success          - successful password authentication
     auth.login.failure          - invalid credentials on /auth/login
     auth.login.lockout          - account temporarily locked after repeated
@@ -79,6 +85,7 @@ AUDIT_LOGGER_NAME = 'audit'
 # ── Stable, documented event names (see module docstring) ───────────────────
 
 EVENT_REGISTER = 'auth.register'
+EVENT_REGISTER_EXTENDED = 'auth.register.extended'
 EVENT_LOGIN_SUCCESS = 'auth.login.success'
 EVENT_LOGIN_FAILURE = 'auth.login.failure'
 EVENT_LOGIN_LOCKOUT = 'auth.login.lockout'

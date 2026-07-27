@@ -33,3 +33,9 @@ paths = [
   '''^terraform/tests/.*$''',
   '''^k6/.*$''',
 ]
+
+[[allowlists]]
+description = "Flagsmith client-side (publishable) Development environment key, used as a convenience default in the registration-rollout validation scripts - see docs/FEATURE_FLAGS.md and frontend/.env.example for why this key is not a secret"
+regexes = [
+  '''mGoGnmAiyNzxXCikjAo8Qd''',
+]
