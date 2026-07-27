@@ -10,7 +10,7 @@
 
 The backend ECS task runs the **AWS Distro for OpenTelemetry (ADOT) Collector** as a sidecar container. Upstream, that image is published to the **ECR Public Gallery** at `public.ecr.aws/aws-observability/aws-otel-collector`. The backend's VPC has **private egress only**: the security group allows outbound traffic to the VPC CIDR on 443 (interface endpoints), the S3 gateway-endpoint prefix list, RDS, and DNS. The `ecr.api` and `ecr.dkr` interface endpoints proxy **private ECR only** — they do not reach the public gallery. So any new ECS task placement that needs to pull the sidecar image times out with `CannotPullContainerError`, while already-running tasks keep working because they never re-pull. This was [issue #365](https://github.com/ale-sanchez-g/open-prompt-manager/issues/365).
 
-The fix is a **mirror**: a private ECR repository, `${PROJECT_NAME}-otel-collector` (Terraform resource `aws_ecr_repository.otel_collector_mirror` in [terraform/otel.tf](../../terraform/otel.tf)), holds a copy of the upstream image. The `otel_collector_image` variable points at that private repository, pinned by digest, so the pull stays inside the VPC.
+The fix is a **mirror**: a private ECR repository, `${PROJECT_NAME}-otel-collector` (Terraform resource `aws_ecr_repository.otel_collector_mirror` in [terraform/otel.tf](../../terraform/otel.tf)), holds a copy of the upstream image. The `local.otel_collector_image` expression points at that private repository (derived from the resource, never hardcoded), pinned by the digest in `var.otel_collector_image_digest`, so the pull stays inside the VPC.
 
 **The mirror is not automated.** Copying the image is a manual step, performed by an operator with AWS credentials. This runbook is that procedure.
 
@@ -146,21 +146,26 @@ aws ecr describe-image-scan-findings \
   --query 'imageScanFindings.findingSeverityCounts'
 ```
 
-### Step 5: Update `otel_collector_image` in Terraform
+### Step 5: Update `otel_collector_image_digest` in Terraform
 
-Edit the `otel_collector_image` variable default in [terraform/otel.tf](../../terraform/otel.tf):
+The registry/repository portion of the image reference is never hand-edited —
+it's derived from `aws_ecr_repository.otel_collector_mirror.repository_url`
+so it's automatically correct in whatever account/region the stack runs in.
+The only thing you update is the digest, in
+[terraform/otel.tf](../../terraform/otel.tf):
 
 ```hcl
-variable "otel_collector_image" {
+variable "otel_collector_image_digest" {
   description = "..."
   type        = string
-  default     = "123456789012.dkr.ecr.ap-southeast-2.amazonaws.com/open-prompt-manager-otel-collector@sha256:<MIRROR_DIGEST>"
+  default     = "sha256:<MIRROR_DIGEST>"
 }
 ```
 
 Rules:
-- **Always pin by digest** (`@sha256:...`), never by tag. A tag reference re-resolves on every task placement; a digest does not.
-- **Never point this at `public.ecr.aws`.** CI enforces this — the `Terraform OTel Image Registry Check` step in [.github/workflows/ci.yml](../../.github/workflows/ci.yml) fails the build if the default matches a public registry.
+- **Always pin by digest** (`sha256:...`), never by tag. A tag reference re-resolves on every task placement; a digest does not.
+- **Never hardcode a registry/account/region string here or anywhere else in this file.** The image reference is built by the `local.otel_collector_image` expression from the mirror repository resource — if you find yourself typing an `<account-id>.dkr.ecr.<region>.amazonaws.com/...` literal, stop and fix the local instead.
+- **Never point this at `public.ecr.aws`.** CI enforces this — the `Terraform OTel Image Registry Check` step in [.github/workflows/ci.yml](../../.github/workflows/ci.yml) fails the build if `otel.tf` defaults any image reference to a public registry.
 - Update the variable's `description` if the upstream version it tracks has changed, so the next operator knows what is pinned.
 - Open this as a normal PR; do not hand-edit Terraform state or the running task definition.
 
@@ -298,14 +303,14 @@ aws ecr describe-images \
   --output table
 ```
 
-Revert the `otel_collector_image` default to the previous digest, then `terraform plan`/`apply` as in Step 6. Do not delete the bad image from ECR until the rollback is confirmed stable.
+Revert the `otel_collector_image_digest` default to the previous digest, then `terraform plan`/`apply` as in Step 6. Do not delete the bad image from ECR until the rollback is confirmed stable.
 
 ---
 
 ## Related Documentation
 
 - [Issue #365](https://github.com/ale-sanchez-g/open-prompt-manager/issues/365) — original bug and acceptance criteria
-- [terraform/otel.tf](../../terraform/otel.tf) — collector sidecar, mirror repository, `otel_collector_image`
+- [terraform/otel.tf](../../terraform/otel.tf) — collector sidecar, mirror repository, `otel_collector_image_digest`
 - [terraform/vpc_endpoints.tf](../../terraform/vpc_endpoints.tf) — the ECR/S3 endpoints that make private pulls work
 - [terraform/security_groups.tf](../../terraform/security_groups.tf) — the private-egress rules that caused the original failure
 - [.github/workflows/ci.yml](../../.github/workflows/ci.yml) — CI guard against a public-registry default

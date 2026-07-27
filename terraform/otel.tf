@@ -28,10 +28,10 @@ variable "otel_collector_enabled" {
   default     = true
 }
 
-variable "otel_collector_image" {
-  description = "Container image for the OpenTelemetry Collector sidecar, pinned by digest (AWS Distro for OpenTelemetry Collector -- public.ecr.aws/aws-observability/aws-otel-collector). The default digest below is the multi-arch image index for the ':latest' tag resolved at the time this was written; bump it deliberately after reviewing upstream release notes, never point this at a mutable tag."
+variable "otel_collector_image_digest" {
+  description = "Digest (sha256:...) of the OpenTelemetry Collector image mirrored into aws_ecr_repository.otel_collector_mirror below. This is the only part of the image reference that changes when re-mirroring a new upstream release -- the registry/repository portion is always derived from the mirror repository resource, never hardcoded, so this stays correct in any account/region. See docs/runbooks/otel-collector-image-mirror.md for the re-mirror procedure. Never point this at a mutable tag."
   type        = string
-  default     = "public.ecr.aws/aws-observability/aws-otel-collector@sha256:a465f606684ab1ac3c5221c8bffe783b0120c8bd5318e1bf63c90f2cf56af835"
+  default     = "sha256:a465f606684ab1ac3c5221c8bffe783b0120c8bd5318e1bf63c90f2cf56af835"
 }
 
 variable "otel_collector_memory" {
@@ -108,6 +108,13 @@ resource "aws_ecr_lifecycle_policy" "otel_collector_mirror" {
       }
     ]
   })
+}
+
+locals {
+  # Built from the mirror repository resource rather than a hardcoded
+  # "<account>.dkr.ecr.<region>.amazonaws.com/..." string so this resolves
+  # correctly in any account/region the stack is deployed to.
+  otel_collector_image = "${aws_ecr_repository.otel_collector_mirror.repository_url}@${var.otel_collector_image_digest}"
 }
 
 # ───────────── Rendered Collector config ─────────────
@@ -263,7 +270,7 @@ resource "aws_iam_role_policy" "ecs_execution_otel_config" {
 locals {
   otel_sidecar_container_definition = {
     name      = "otel-collector"
-    image     = var.otel_collector_image
+    image     = local.otel_collector_image
     essential = false
     memory    = var.otel_collector_memory
 
