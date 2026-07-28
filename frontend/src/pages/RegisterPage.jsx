@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 
 import { useAuth } from '../context/AuthContext';
 import { MARKETING_CONSENT_COPY } from '../constants/registrationConsent';
 import { FLAGS } from '../featureFlags/config';
 import { useFeatureFlag, useFlagIdentity } from '../featureFlags/FeatureFlagProvider';
+import { getTargetingTraits } from '../featureFlags/targetingStrategy';
 import {
   companyNameMaxLength,
   jobRoleMaxLength,
@@ -29,10 +30,16 @@ export default function RegisterPage() {
   // Flag OFF (and whenever Flagsmith is disabled, unreachable, or still loading)
   // => false => nothing below mounts and the form is byte-identical to today.
   const extendedFlagEnabled = useFeatureFlag(FLAGS.REGISTRATION_EXTENDED_FIELDS, false);
+  // `{}` for every visitor except one who arrived via an explicit
+  // `?opm_target=device|geo` link (§13.2/§13.3) - the default case sends no
+  // traits at all, identical to before these strategies existed.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- reads only the URL, stable for the page's lifetime
+  const targetingTraits = useMemo(() => getTargetingTraits(), []);
+  const hasTargetingTraits = Object.keys(targetingTraits).length > 0;
   // Same identifier the browser used with Flagsmith; sent so the API can
   // re-evaluate the same flag for the same identity (§4.2). Null when flags are
   // disabled, in which case it is omitted from the payload entirely.
-  const sessionId = useFlagIdentity();
+  const sessionId = useFlagIdentity(hasTargetingTraits ? { traits: targetingTraits } : undefined);
 
   // No identity, no fields - even if the flag reads true. §4.2 makes the API's
   // decision the one that counts, and the API resolves an absent `sessionId` to
@@ -105,6 +112,11 @@ export default function RegisterPage() {
     const payload = { email: form.email, password: form.password };
     if (sessionId) {
       payload.sessionId = sessionId;
+      // Only ever present when an explicit ?opm_target= link asked for it, so
+      // the default visitor's payload is unchanged from before §13 existed.
+      if (hasTargetingTraits) {
+        payload.flagTraits = targetingTraits;
+      }
     }
     if (showExtended) {
       payload.extended = {

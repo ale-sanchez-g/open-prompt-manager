@@ -105,4 +105,39 @@ describe('flag session identity', () => {
       restore();
     }
   });
+
+  // Strategy 1 - QA/verification override (§13.1).
+  describe('opm_qa_session override', () => {
+    afterEach(() => {
+      window.history.pushState({}, '', '/');
+    });
+
+    it('pins the identifier to the URL value instead of minting one', () => {
+      window.history.pushState({}, '', '/register?opm_qa_session=qa-tester-one');
+      expect(getFlagSessionId()).toBe('qa-tester-one');
+    });
+
+    it('wins over a value already cached this visit', () => {
+      const minted = getFlagSessionId();
+      window.history.pushState({}, '', `/register?opm_qa_session=qa-override`);
+      expect(getFlagSessionId()).toBe('qa-override');
+      expect(getFlagSessionId()).not.toBe(minted);
+    });
+
+    it('persists the override to sessionStorage like a minted id', () => {
+      window.history.pushState({}, '', '/register?opm_qa_session=qa-persisted');
+      getFlagSessionId();
+      expect(globalThis.sessionStorage.getItem(STORAGE_KEY)).toBe('qa-persisted');
+    });
+
+    it('ignores a value outside the safe charset/length', () => {
+      window.history.pushState({}, '', `/register?opm_qa_session=${'x'.repeat(65)}`);
+      expect(getFlagSessionId()).toMatch(UUID_V4);
+    });
+
+    it('ignores an empty override and mints normally', () => {
+      window.history.pushState({}, '', '/register?opm_qa_session=');
+      expect(getFlagSessionId()).toMatch(UUID_V4);
+    });
+  });
 });

@@ -21,13 +21,37 @@
 // Scope is the browsing *visit*: sessionStorage, so a reload keeps the same
 // bucket (no flicker between the flag being on and off) while a new tab or a
 // later visit mints a fresh one. Deliberately not localStorage - a durable
-// identifier for an anonymous visitor is exactly what §3.4 warns about.
+// identifier for an anonymous visitor is exactly what §3.4 warns against.
+//
+// Strategy 1 - QA/verification override (§13.1). A tester needs to reliably
+// land on the same Flagsmith identity across visits so an identity-level
+// override in Flagsmith can target them by name. `?opm_qa_session=<value>`
+// pins the identifier to that URL value instead of a random UUID. This adds
+// no new bypass: the identifier was already fully client-supplied and
+// rotatable (§4.2 already accepts that risk for the random case), so a link
+// that lets a tester choose *which* value to rotate to is not a new class of
+// exposure - it is just a convenient, repeatable case of the existing one.
+// Never used for anything security-bearing, same as the random id.
 
 const STORAGE_KEY = 'opm.flagSessionId';
+const QA_OVERRIDE_PARAM = 'opm_qa_session';
+// Bounded, safe-charset: this is an opaque bucketing key, not free text, and
+// must not become a channel for arbitrary/oversized client input.
+const QA_OVERRIDE_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
 // Memoised so identify() and the register payload can never disagree, even if
 // sessionStorage is unavailable (Safari private mode, blocked storage, SSR).
 let cachedSessionId = null;
+
+function readQaOverride() {
+  try {
+    const search = globalThis.location?.search || '';
+    const raw = new URLSearchParams(search).get(QA_OVERRIDE_PARAM);
+    return raw && QA_OVERRIDE_PATTERN.test(raw) ? raw : null;
+  } catch {
+    return null;
+  }
+}
 
 function mintSessionId() {
   const webCrypto = globalThis.crypto;
@@ -74,6 +98,18 @@ function writeStored(value) {
  * @returns {string|null} a random UUID, or null when no CSPRNG is available.
  */
 export function getFlagSessionId() {
+  // Checked on every call, not just the first: an explicit QA link is a
+  // deliberate signal to pin this exact identity, and must win even over a
+  // value already cached earlier in the same tab.
+  const override = readQaOverride();
+  if (override) {
+    if (cachedSessionId !== override) {
+      cachedSessionId = override;
+      writeStored(override);
+    }
+    return cachedSessionId;
+  }
+
   if (cachedSessionId) {
     return cachedSessionId;
   }

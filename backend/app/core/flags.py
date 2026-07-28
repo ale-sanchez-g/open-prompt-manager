@@ -56,8 +56,16 @@ Privacy
 -------
 The ``session_id`` is an opaque per-visit identifier and is PII-adjacent: it is
 used for bucketing only, is never persisted to ``users``, and is never logged
-here. No traits are ever sent (spec §3.4), so no visitor attributes reach
+here. By default no traits are sent (spec §3.4), so no visitor attributes reach
 Flagsmith.
+
+The device/geo targeting strategies (spec §13.2/§13.3) are the one deliberate
+exception: a visitor who arrives via an explicit ``?opm_target=device|geo``
+link sends a small trait bag alongside ``session_id``. ``_sanitize_traits``
+below is what keeps that exception narrow - every surviving value is one of a
+handful of coarse enum buckets (``device_type``, ``os_family``,
+``browser_family``, ``geo_region``), never free text, and never persisted to
+``users`` or logged, same as ``session_id``.
 """
 
 from __future__ import annotations
@@ -86,6 +94,43 @@ MIN_REFRESH_INTERVAL_SECONDS = 300
 # Bounds any HTTP the SDK does (the startup environment-document fetch and the
 # background poll). Short on purpose: a slow Flagsmith must not slow startup.
 REQUEST_TIMEOUT_SECONDS = 3
+
+# Allow-listed trait keys/values for the device/geo targeting strategies
+# (spec §13). Must mirror the enums produced by
+# frontend/src/featureFlags/deviceContext.js and geoContext.js exactly.
+#
+# Anything outside this table is dropped, not rejected: `flag_traits` arrives
+# on a public, unauthenticated endpoint, and a malformed or unexpected value
+# must never turn into a 422 (guardrail 3's "never fail the request on flag
+# data" extends to trait data, not just the flag lookup itself). This is also
+# what keeps the traits channel from becoming a generic, attacker-controlled
+# data-injection path into Flagsmith's persisted identity record (the project
+# has `persist_trait_data: true`, spec §3.4) - every surviving value is one of
+# a handful of coarse buckets, never free text.
+ALLOWED_TRAIT_VALUES: dict[str, frozenset[str]] = {
+    'device_type': frozenset({'mobile', 'tablet', 'desktop'}),
+    'os_family': frozenset({'ios', 'android', 'macos', 'windows', 'linux', 'other'}),
+    'browser_family': frozenset({'chrome', 'safari', 'firefox', 'edge', 'other'}),
+    'geo_region': frozenset({'americas', 'europe-africa', 'asia-pacific', 'other'}),
+}
+
+
+def _sanitize_traits(traits: Optional[Mapping[str, Any]]) -> dict[str, str]:
+    """Keep only allow-listed keys whose value is one of the fixed enum options.
+
+    Never raises - a missing/malformed ``traits`` value (``None``, a string,
+    a list, anything without ``.get``) simply yields ``{}``, which is the same
+    as the visitor sending no traits.
+    """
+    if not isinstance(traits, Mapping):
+        return {}
+
+    clean: dict[str, str] = {}
+    for key, allowed_values in ALLOWED_TRAIT_VALUES.items():
+        value = traits.get(key)
+        if isinstance(value, str) and value in allowed_values:
+            clean[key] = value
+    return clean
 
 
 @dataclass(frozen=True)
@@ -226,7 +271,7 @@ def get_client() -> Any:
     return _client
 
 
-def extended_enabled(session_id: Optional[str]) -> bool:
+def extended_enabled(session_id: Optional[str], traits: Optional[Mapping[str, Any]] = None) -> bool:
     """Is ``registration_extended_fields`` on for this visitor?
 
     ``False`` on every uncertain outcome - no ``session_id``, no client, an
@@ -234,8 +279,17 @@ def extended_enabled(session_id: Optional[str]) -> bool:
     lookup must never raise into the request path, and the caller is entitled to
     treat a ``False`` as "take the legacy path".
 
-    Evaluation is local (no API call, no Flagsmith identity created); the
-    ``session_id`` is never logged.
+    ``traits`` is the device/geo targeting strategies' input (spec §13) - the
+    raw ``flag_traits`` payload from the register request, sanitised through
+    :data:`ALLOWED_TRAIT_VALUES` before it ever reaches the SDK. Passing traits
+    here matters specifically *because* evaluation is local: local evaluation
+    matches segment conditions against the traits given in *this* call, not
+    against whatever the frontend's ``identify()`` already persisted at the
+    edge - so the backend must be told the same coarse values the frontend saw,
+    the same way it is already told the same ``session_id`` (§4.2).
+
+    Evaluation is local (no API call, no Flagsmith identity created); neither
+    ``session_id`` nor any trait value is ever logged.
     """
     if not session_id:
         return False
@@ -244,6 +298,8 @@ def extended_enabled(session_id: Optional[str]) -> bool:
     if client is None:
         return False
 
+    clean_traits = _sanitize_traits(traits)
+
     try:
         # transient=True is the belt to local evaluation's braces. Local
         # evaluation resolves in-process and creates no Flagsmith identity, but
@@ -251,7 +307,11 @@ def extended_enabled(session_id: Optional[str]) -> bool:
         # remote evaluation - which would both spend an API call and persist an
         # identity for an anonymous visitor, breaking the §3.4 budget and the
         # privacy note above. A transient identity is never stored.
-        flags = client.get_identity_flags(identifier=session_id, transient=True)
+        flags = client.get_identity_flags(
+            identifier=session_id,
+            traits=clean_traits or None,
+            transient=True,
+        )
         return bool(flags.is_feature_enabled(FLAG_REGISTRATION_EXTENDED))
     except Exception:
         logger.warning(

@@ -279,6 +279,9 @@ RegisterRequest:
     email:    { type: string, format: email }
     password: { type: string }         # policy unchanged; enforced server-side
     sessionId:{ type: string }         # optional; absent ⇒ flag OFF ⇒ legacy path
+    flagTraits:                        # optional; §13 targeting strategies only
+      type: object
+      additionalProperties: { type: string }
     extended:                          # only honoured when flag ON for this identity
       type: object
       properties:
@@ -297,6 +300,11 @@ Two corrections against the previous draft, both of which would have broken prod
 - **No `minLength: 12` on password.** The live policy is ≥10 with complexity
   (`backend/app/services/auth_service.py:17`, documented at `backend/app/api/auth.py:58`).
   The draft's 12 would have silently tightened policy and broken existing tests.
+
+`flagTraits` was added after this contract was first agreed, for the device/geo targeting
+strategies in §13 — almost every request omits it entirely. Unlike `extended`, a malformed value
+here is never validated against a strict shape; `backend/app/core/flags.py`'s allow-list silently
+drops anything outside a fixed enum rather than 422ing (guardrail 3 extended to trait data).
 
 ### 4.4 DB contract (expand phase — nullable, safe defaults)
 
@@ -718,3 +726,159 @@ to the frontend only.
 environments · rollout segment proven · DB expanded (nullable) · FE & BE gated and dark ·
 validation matrix (§8) green · rolled to 100% with clean guardrails **including the funnel
 metric** · flag archived and code paths unconditional (§10).
+
+---
+
+## 13. Targeted enablement strategies (single visitor / cohort targeting)
+
+§3.3's `PERCENTAGE_SPLIT` segment is built for one job: gradual, population-wide
+exposure during Stage 5. It is the wrong tool for a different, common need -
+"enable the flag for this one tester" or "enable it for a device/geo cohort I
+want to look at before it reaches everyone." This section covers three
+strategies for that, implemented in `frontend/src/featureFlags/` and
+`backend/app/core/flags.py`.
+
+**None of this changes default behaviour.** A visitor who arrives at
+`/register` with no special query parameters gets exactly what §2 guardrail 2
+requires: a random `sessionId`, no traits sent, byte-identical to before these
+strategies existed. All three are opt-in, triggered only by an explicit URL
+parameter a tester is given deliberately.
+
+### 13.0 Two different Flagsmith mechanisms
+
+| | Mechanism | Targets | Used by |
+|---|---|---|---|
+| **Identity override** | A feature state set directly on one Flagsmith Identity (dashboard: Environment → Identities → find/create by identifier → Features → toggle) | Exactly one identity string | §13.1 |
+| **Segment override** | A Segment with trait conditions + a segment override on the feature (same mechanism §3.3 uses for `PERCENTAGE_SPLIT`, just with different conditions) | Everyone whose traits match the condition | §13.2, §13.3 |
+
+Identity overrides take precedence over segment overrides, which take
+precedence over the environment default. Only §13.1 gives you "this one named
+person" with certainty - §13.2/§13.3 give you "whoever matches this device or
+region profile," which is one person only if that profile happens to be
+unique to them.
+
+### 13.1 Strategy 1 - pinned sessionId link (QA / post-verification test)
+
+**Code:** `frontend/src/featureFlags/sessionIdentity.js`.
+
+A tester needs to land on the *same* Flagsmith identity across visits so an
+identity override can target them by name. `getFlagSessionId()` now checks the
+URL for `?opm_qa_session=<value>` on every call and, when present and
+well-formed (`[A-Za-z0-9_-]{1,64}`), pins the identifier to that value instead
+of minting a random UUID - overriding even a value already cached earlier in
+the tab.
+
+**Setup:**
+1. Pick an opaque value for the tester, e.g. `qa-alex-2026-07-28`.
+2. In Flagsmith (Development first - there is no Staging, §3.6), open
+   Environment → Identities → create an identity with that identifier →
+   Features → enable `registration_extended_fields` for it.
+3. Give the tester the link: `https://<host>/register?opm_qa_session=qa-alex-2026-07-28`.
+
+**Why this adds no new risk:** the identifier was already fully
+client-supplied and rotatable - §4.2 already accepts that a visitor can rotate
+`sessionId` until they land in the ON bucket, and records that as an accepted
+risk for a field-addition feature. A link that lets a tester choose *which*
+value to use is a convenient, repeatable case of the same thing, not a new
+exposure. Still never use this identity for anything security-bearing.
+
+### 13.2 Strategy 2 - device-based targeting
+
+**Code:** `frontend/src/featureFlags/deviceContext.js`,
+`frontend/src/featureFlags/targetingStrategy.js`.
+
+A visitor who arrives with `?opm_target=device` gets a coarse device profile
+computed once per visit and cached in `sessionStorage`:
+
+```js
+{ device_type: 'mobile' | 'tablet' | 'desktop',
+  os_family:   'ios' | 'android' | 'macos' | 'windows' | 'linux' | 'other',
+  browser_family: 'chrome' | 'safari' | 'firefox' | 'edge' | 'other' }
+```
+
+Sourced from `navigator.userAgentData` (Client Hints - itself deliberately
+low-entropy) where available, falling back to coarse UA sniffing. **Never the
+raw `navigator.userAgent` string** - only these fixed enum buckets are ever
+computed, sent, or stored.
+
+**Setup (Flagsmith segment):**
+1. Create a segment, e.g. `mobile-visitors`, with condition
+   `device_type EQUAL mobile` (repeat for other buckets/combinations as needed).
+2. Create a segment override on `registration_extended_fields` enabling it for
+   that segment, in Development first. Remember the v2 versioning publish flow
+   (§9.2) - a segment override is not live until published.
+3. Share `https://<host>/register?opm_target=device` with the cohort you want
+   to expose (or make it the QA-tester link's second parameter - see §13.5).
+
+**The one non-obvious backend detail:** the backend's local evaluation
+(§3.4/§12.3) matches segment conditions against the traits given in *that*
+call - it does not fetch whatever the frontend's `identify()` already
+persisted at the edge (that lookup would be a remote call, which is exactly
+what local evaluation exists to avoid). So the frontend sends the same coarse
+values to the API as `flagTraits` on `POST /auth/register`, and
+`extended_enabled(session_id, traits)` in `backend/app/core/flags.py` passes
+them into `get_identity_flags(identifier=..., traits=...)` for the *same*
+request. Miss this and the frontend and backend can disagree about whether the
+segment matches - the same class of bug §4.2 already warns about for identity
+mismatches, just for traits instead of the identifier.
+
+### 13.3 Strategy 3 - geographic targeting without IP or precise location
+
+**Code:** `frontend/src/featureFlags/geoContext.js`.
+
+A visitor who arrives with `?opm_target=geo` sends one coarse trait,
+`geo_region`, bucketed from the browser's IANA timezone
+(`Intl.DateTimeFormat().resolvedOptions().timeZone`):
+
+| Timezone prefix | `geo_region` |
+|---|---|
+| `America/*` | `americas` |
+| `Europe/*`, `Africa/*` | `europe-africa` |
+| `Asia/*`, `Australia/*`, `Pacific/*`, `Indian/*` | `asia-pacific` |
+| anything else | `other` |
+
+**Deliberately not** `navigator.geolocation` (needs a permission prompt on a
+public, anonymous registration page - a direct hit to the §1.2 funnel metric,
+and returns far more precision than "broad region" requires) and **not**
+IP-based lookup (needs a server round trip and treats the IP itself as the
+identifying value - exactly the sensitive input this strategy exists to
+avoid). Timezone needs neither a permission nor a network call, and the raw
+zone string is never sent - only the four buckets above.
+
+**Setup (Flagsmith segment):** same pattern as §13.2 - a segment with
+condition `geo_region EQUAL americas` (or whichever bucket), a segment
+override on the feature, and the same local-evaluation caveat about the
+backend needing the same trait in the same request.
+
+### 13.4 The privacy trade-off this section makes deliberately
+
+§3.4 and the code comments in `sessionIdentity.js` /
+`FeatureFlagProvider.jsx` state a hard rule: no traits, ever, because
+`persist_trait_data: true` means anything attached to an identity is stored
+indefinitely against what is otherwise an anonymous visitor. §13.2/§13.3 are a
+deliberate, narrow exception to that rule - not a reversal of it:
+
+- **The exception is opt-in per visit**, gated by `?opm_target=`. A visitor who
+  never receives that link is completely unaffected - no trait is computed,
+  none is sent, the register payload has no `flagTraits` key at all. This is
+  what keeps guardrail 2 (OFF path identical to main) true for the general
+  population.
+- **When the exception fires, it is coarse by construction.** Every value on
+  both sides of the wire comes from a small fixed enum
+  (`frontend/src/featureFlags/deviceContext.js` /`geoContext.js` on the way
+  out, `ALLOWED_TRAIT_VALUES` in `backend/app/core/flags.py` on the way in) -
+  never a raw user-agent string, never a precise coordinate, never free text.
+  A coarse bucket like "mobile" or "americas" identifies a cohort, not a
+  person.
+- **Treat an `opm_target=` link as a real, if narrow, privacy decision.** Don't
+  distribute it broadly "just to see." The identity-override link in §13.1
+  carries no such caveat, because it targets one already-agreed-upon tester and
+  sends no traits at all.
+
+### 13.5 Combining strategies
+
+The two URL parameters are independent, so a single link can both pin an
+identity and attach a trait, e.g.
+`https://<host>/register?opm_qa_session=qa-alex-2026-07-28&opm_target=device` -
+useful when you want to verify both "this exact tester sees the fields" and
+"the device segment condition matches for them."

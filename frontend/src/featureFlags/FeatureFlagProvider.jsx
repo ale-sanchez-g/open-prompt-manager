@@ -48,12 +48,13 @@ export function useFeatureFlag(flagKey, defaultValue = false) {
   return flags?.[flagKey]?.enabled ?? defaultValue;
 }
 
-// The identifier we have already handed to flagsmith.identify() on this page
-// load. Flagsmith holds a single identity for the whole client, so re-calling
-// identify() with the same value would only re-fetch the same flags and burn
-// API calls against the 50,000/month ceiling (§3.4). Tracking the *value*
-// rather than a boolean means a genuinely new identifier (a test resetting the
-// session id, a future flow minting its own) is still honoured.
+// The identity (identifier + traits) we have already handed to
+// flagsmith.identify() on this page load. Flagsmith holds a single identity
+// for the whole client, so re-calling identify() with the same value would
+// only re-fetch the same flags and burn API calls against the 50,000/month
+// ceiling (§3.4). Tracking the composite key rather than a boolean means a
+// genuinely new identifier or trait bag (a test resetting the session id, an
+// opt-in targeting strategy) is still honoured.
 let identifiedAs = null;
 
 /**
@@ -65,9 +66,19 @@ let identifiedAs = null;
  * against the same identity (§4.2) - the browser never tells the API that a flag
  * is on, it only says *who* to ask about.
  *
- * **No traits are set.** `allow_client_traits` is enabled and identities are
- * persisted (§3.4), so any trait would be stored indefinitely against an
- * anonymous visitor. `identify()` is called with the identifier alone.
+ * **No traits by default.** `allow_client_traits` is enabled and identities are
+ * persisted (§3.4), so any trait is stored indefinitely against an anonymous
+ * visitor - calling this with no `options` (the vast majority of visits) calls
+ * `identify()` with the identifier alone, exactly as before.
+ *
+ * **Opt-in traits** (`options.traits`) exist only for the device/geo targeting
+ * strategies in docs/features/registration-feature.md §13.2/§13.3, sourced from
+ * `targetingStrategy.getTargetingTraits()`. Pass an empty object/omit `traits`
+ * to get the no-traits behaviour; a non-empty object is forwarded to
+ * `identify()` as-is. This module does not sanitise trait values - that already
+ * happened in the coarse-enum modules that produced them (deviceContext.js,
+ * geoContext.js) - so any caller passing hand-built traits is responsible for
+ * the same coarse-enum discipline.
  *
  * Why this is opt-in per flow rather than global provider setup: identifying
  * every visitor of every page would (a) create a persistent Flagsmith identity
@@ -80,22 +91,35 @@ let identifiedAs = null;
  * both return the environment default. Anyone adding a segment override to that
  * flag must re-check this note.
  *
+ * @param {{traits?: Record<string, string>}} [options]
  * @returns {string|null} the per-visit identifier, or null when flags are
  *   disabled (no Environment ID, kill switch, tests). Null means "no identity",
  *   which resolves the flag to its default on both sides.
  */
-export function useFlagIdentity() {
+export function useFlagIdentity(options) {
+  const traits = options?.traits;
   const sessionId = config.enabled ? getFlagSessionId() : null;
+  const hasTraits = Boolean(traits && Object.keys(traits).length > 0);
+  // Stringified so the effect only re-runs on an actual value change, not a
+  // new object reference from the caller re-computing the same traits.
+  const traitsKey = hasTraits ? JSON.stringify(traits) : '';
 
   useEffect(() => {
-    if (!sessionId || identifiedAs === sessionId) {
+    if (!sessionId) {
       return;
     }
-    identifiedAs = sessionId;
+    const identityKey = `${sessionId}|${traitsKey}`;
+    if (identifiedAs === identityKey) {
+      return;
+    }
+    identifiedAs = identityKey;
 
     try {
-      // No second argument: no traits, ever (§3.4).
-      Promise.resolve(flagsmith.identify(sessionId)).catch(() => {
+      // Second argument omitted entirely for the default (no traits) case -
+      // not even an empty object - to match identify()'s own contract for
+      // "no traits" exactly.
+      const call = hasTraits ? flagsmith.identify(sessionId, traits) : flagsmith.identify(sessionId);
+      Promise.resolve(call).catch(() => {
         // Flag evaluation stays at its default, which is the safe/legacy UI.
         // Allow a retry on the next mount rather than sticking on a failure.
         identifiedAs = null;
@@ -103,7 +127,13 @@ export function useFlagIdentity() {
     } catch {
       identifiedAs = null;
     }
-  }, [sessionId]);
+    // `traitsKey` is the real dependency - it changes if and only if the
+    // *value* of `traits` changes. `traits` itself is intentionally omitted:
+    // callers commonly recompute it fresh each render (e.g. from
+    // getTargetingTraits()), and a new object reference with the same
+    // contents must not re-run this effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, traitsKey]);
 
   return sessionId;
 }

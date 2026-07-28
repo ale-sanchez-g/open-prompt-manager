@@ -96,6 +96,23 @@ class RegisterRequest(AuthRequest):
             'enabled for this sessionId; ignored entirely otherwise.'
         ),
     )
+    # Device/geo targeting strategies (docs/features/registration-feature.md
+    # §13.2/§13.3). Present only when the visitor arrived via an explicit
+    # `?opm_target=device|geo` link - the vast majority of requests omit this
+    # key entirely. Loosely typed (not an enum) for the same OFF-path reason
+    # as `extended`: a malformed value must be silently dropped by
+    # `app.core.flags`'s allow-list, never a 422. Evaluation-only, like
+    # `session_id` - never persisted to `users`, never logged.
+    flag_traits: Optional[dict[str, Any]] = Field(
+        None,
+        alias='flagTraits',
+        description=(
+            'Coarse, non-PII trait bag (device_type, os_family, browser_family, geo_region) '
+            'used only to evaluate registration_extended_fields against Flagsmith segment '
+            'overrides. Unknown keys/values are dropped, never rejected. Not persisted.'
+        ),
+        examples=[{'device_type': 'mobile', 'os_family': 'ios', 'browser_family': 'safari'}],
+    )
 
     model_config = {
         'populate_by_name': True,

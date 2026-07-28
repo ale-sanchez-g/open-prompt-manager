@@ -104,7 +104,7 @@ def register(payload: RegisterRequest, request: Request, db: Annotated[Session, 
     # absent sessionId, or a Flagsmith outage all land on the legacy path
     # (guardrail 3) rather than failing a public registration.
     extended_values: dict[str, Any] = {}
-    if payload.extended is not None and extended_enabled(payload.session_id):
+    if payload.extended is not None and extended_enabled(payload.session_id, payload.flag_traits):
         # payload.extended arrives untyped (see RegisterRequest.extended) so that
         # a malformed block never 422s while the flag is off. Now that the flag
         # is confirmed on, parse it for real - a shape that doesn't fit the

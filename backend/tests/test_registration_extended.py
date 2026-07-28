@@ -28,9 +28,11 @@ import app.core.flags as flags_module
 import app.database.base as db_module
 from app.audit import EVENT_REGISTER, EVENT_REGISTER_EXTENDED, RedactingJSONFormatter
 from app.core.flags import (
+    ALLOWED_TRAIT_VALUES,
     DEFAULT_REFRESH_INTERVAL_SECONDS,
     FLAG_REGISTRATION_EXTENDED,
     MIN_REFRESH_INTERVAL_SECONDS,
+    _sanitize_traits,
     extended_enabled,
     get_flagsmith_config,
     init_flags,
@@ -80,8 +82,22 @@ def flag_on(monkeypatch):
     """
     seen = []
 
-    def _enabled(session_id):
+    def _enabled(session_id, traits=None):
         seen.append(session_id)
+        return True
+
+    monkeypatch.setattr('app.api.auth.extended_enabled', _enabled)
+    return seen
+
+
+@pytest.fixture
+def flag_on_recording_traits(monkeypatch):
+    """Like ``flag_on``, but records the ``(session_id, traits)`` pair so a test
+    can assert the endpoint forwards ``flagTraits`` from the request body."""
+    seen = []
+
+    def _enabled(session_id, traits=None):
+        seen.append((session_id, traits))
         return True
 
     monkeypatch.setattr('app.api.auth.extended_enabled', _enabled)
@@ -194,6 +210,37 @@ def test_on_evaluates_the_flag_for_the_submitted_session_id(anon_client, flag_on
     _register(anon_client, 'on-identity@opm.io', sessionId=SESSION_ID, extended=EXTENDED_BLOCK)
 
     assert flag_on == [SESSION_ID]
+
+
+def test_on_forwards_flag_traits_to_the_flag_lookup(anon_client, flag_on_recording_traits):
+    """End-to-end proof for §13.2/§13.3: whatever the client sent as
+    `flagTraits` reaches `extended_enabled` unchanged - sanitisation happens
+    inside app.core.flags, not the endpoint."""
+    _register(
+        anon_client,
+        'on-traits@opm.io',
+        sessionId=SESSION_ID,
+        extended=EXTENDED_BLOCK,
+        flagTraits={'device_type': 'mobile', 'os_family': 'ios'},
+    )
+
+    assert flag_on_recording_traits == [(SESSION_ID, {'device_type': 'mobile', 'os_family': 'ios'})]
+
+
+def test_on_malformed_flag_traits_never_causes_a_422(anon_client, flag_on):
+    """A garbage `flagTraits` value must not fail the request - guardrail 3
+    extends to trait data. Sanitisation happening inside app.core.flags means
+    the endpoint itself never has to validate this shape."""
+    response = _register(
+        anon_client,
+        'on-badtraits@opm.io',
+        sessionId=SESSION_ID,
+        extended=EXTENDED_BLOCK,
+        flagTraits={'device_type': 'not-a-real-bucket', 'nonsense': ['a', 'list']},
+    )
+
+    assert response.status_code == 201
+    assert _user('on-badtraits@opm.io').company_name == COMPANY_NAME
 
 
 def test_on_declining_marketing_records_no_consent_evidence(anon_client, flag_on):
@@ -345,8 +392,8 @@ class _FakeClient:
         self._raises = raises
         self.calls = []
 
-    def get_identity_flags(self, identifier, transient=False):
-        self.calls.append({'identifier': identifier, 'transient': transient})
+    def get_identity_flags(self, identifier, traits=None, transient=False):
+        self.calls.append({'identifier': identifier, 'traits': traits, 'transient': transient})
         if self._raises is not None:
             raise self._raises
         return _FakeFlags(self._enabled)
@@ -389,13 +436,100 @@ def test_extended_enabled_asks_for_a_transient_identity(fake_client):
 
     extended_enabled(SESSION_ID)
 
-    assert client.calls == [{'identifier': SESSION_ID, 'transient': True}]
+    assert client.calls == [{'identifier': SESSION_ID, 'traits': None, 'transient': True}]
 
 
 def test_extended_enabled_is_deterministic_for_one_session(fake_client):
     fake_client(enabled=True)
 
     assert len({extended_enabled(SESSION_ID) for _ in range(5)}) == 1
+
+
+# ── Device/geo targeting strategies (spec §13) ───────────────────────────────
+
+
+def test_extended_enabled_forwards_allow_listed_traits(fake_client):
+    """Local evaluation matches segment conditions on traits given in *this*
+    call, not on whatever the frontend already persisted at the edge - so the
+    backend must be told the same coarse values the frontend saw (§13.2)."""
+    client = fake_client(enabled=True)
+
+    extended_enabled(SESSION_ID, {'device_type': 'mobile', 'os_family': 'ios'})
+
+    assert client.calls == [
+        {
+            'identifier': SESSION_ID,
+            'traits': {'device_type': 'mobile', 'os_family': 'ios'},
+            'transient': True,
+        }
+    ]
+
+
+def test_extended_enabled_drops_unknown_trait_keys(fake_client):
+    client = fake_client(enabled=True)
+
+    extended_enabled(SESSION_ID, {'device_type': 'mobile', 'evil_key': 'anything'})
+
+    assert client.calls[0]['traits'] == {'device_type': 'mobile'}
+
+
+def test_extended_enabled_drops_values_outside_the_fixed_enum(fake_client):
+    client = fake_client(enabled=True)
+
+    # Not one of the coarse buckets in ALLOWED_TRAIT_VALUES - dropped, not
+    # rejected, exactly like an unknown key.
+    extended_enabled(SESSION_ID, {'device_type': 'quantum-toaster'})
+
+    assert client.calls[0]['traits'] is None
+
+
+def test_extended_enabled_passes_no_traits_when_none_given(fake_client):
+    client = fake_client(enabled=True)
+
+    extended_enabled(SESSION_ID)
+
+    assert client.calls[0]['traits'] is None
+
+
+def test_sanitize_traits_keeps_every_allow_listed_value():
+    for key, values in ALLOWED_TRAIT_VALUES.items():
+        for value in values:
+            assert _sanitize_traits({key: value}) == {key: value}
+
+
+def test_sanitize_traits_drops_unknown_keys():
+    assert _sanitize_traits({'not_a_real_key': 'mobile'}) == {}
+
+
+def test_sanitize_traits_drops_values_outside_the_enum():
+    assert _sanitize_traits({'device_type': 'smart-fridge'}) == {}
+
+
+def test_sanitize_traits_drops_non_string_values():
+    assert _sanitize_traits({'device_type': 1}) == {}
+    assert _sanitize_traits({'device_type': True}) == {}
+    assert _sanitize_traits({'device_type': None}) == {}
+
+
+@pytest.mark.parametrize('bad_input', [None, 'a string', ['a', 'list'], 42, True])
+def test_sanitize_traits_handles_non_mapping_input(bad_input):
+    assert _sanitize_traits(bad_input) == {}
+
+
+def test_sanitize_traits_keeps_only_the_allow_listed_subset():
+    mixed = {'device_type': 'mobile', 'evil_key': 'x', 'os_family': 'not-real', 'geo_region': 'americas'}
+    assert _sanitize_traits(mixed) == {'device_type': 'mobile', 'geo_region': 'americas'}
+
+
+def test_extended_enabled_traits_never_break_the_lookup(fake_client):
+    """A malformed traits value must never raise (guardrail 3) - it degrades to
+    "no traits" (dropped by _sanitize_traits) rather than failing the request,
+    so the lookup still proceeds and answers based on the client/flag state."""
+    fake_client(enabled=True)
+
+    assert extended_enabled(SESSION_ID, traits='not-a-mapping') is True
+    assert extended_enabled(SESSION_ID, traits=['not', 'a', 'mapping']) is True
+    assert extended_enabled(SESSION_ID, traits={'device_type': 12345}) is True
 
 
 @pytest.mark.parametrize('failure', [RuntimeError('flagsmith is down'), TimeoutError(), ValueError('bad key')])

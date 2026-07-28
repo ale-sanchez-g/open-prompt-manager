@@ -320,6 +320,11 @@ Every flag needs an owner and an exit. When adding a flag, record it here:
 
 - **Rollout:** enable Dev → Staging → Prod. Use Flagsmith segments/percentage
   rollout for gradual exposure when needed.
+- **Targeting one tester or a device/geo cohort** (rather than a random
+  percentage) is a different job from the rollout above — see
+  `docs/features/registration-feature.md` §13 for the three strategies built
+  for `registration_extended_fields` (pinned identity link, device segment,
+  geo segment) and the identity-override vs segment-override distinction.
 - **Kill switch:** disabling the flag in Flagsmith is the rollback — no redeploy.
   `VITE_FLAGSMITH_ENABLED=false` is the app-wide off switch. **Not instant on
   either side.** The frontend SDK re-evaluates on its own poll/`identify()`
