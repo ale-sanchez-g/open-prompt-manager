@@ -320,6 +320,15 @@ PY
 	echo "Migration '${migration_module}' completed successfully"
 }
 
+describe_service_state() {
+	aws ecs describe-services \
+		--region "$AWS_REGION" \
+		--cluster "$CLUSTER_NAME" \
+		--services "$SERVICE_NAME" \
+		--query 'services[0].{status:status,desiredCount:desiredCount,runningCount:runningCount,pendingCount:pendingCount,deployments:deployments[*].{status:status,rolloutState:rolloutState,desiredCount:desiredCount,runningCount:runningCount,pendingCount:pendingCount,taskDefinition:taskDefinition},events:events[0:10].message}' \
+		--output json
+}
+
 for module in "${MIGRATION_MODULES[@]}"; do
 	run_migration_module "$module"
 done
@@ -332,10 +341,15 @@ if [[ "$FORCE_NEW_DEPLOYMENT" == "true" ]]; then
 		--service "$SERVICE_NAME" \
 		--force-new-deployment >/dev/null
 
-	aws ecs wait services-stable \
+	if ! aws ecs wait services-stable \
 		--region "$AWS_REGION" \
 		--cluster "$CLUSTER_NAME" \
-		--services "$SERVICE_NAME"
+		--services "$SERVICE_NAME"; then
+		echo "ECS service did not stabilize after the forced deployment." >&2
+		describe_service_state >&2 || true
+		echo "Inspect backend logs in CloudWatch: /ecs/${PROJECT_NAME}/backend" >&2
+		exit 1
+	fi
 
 	echo "Service is stable after forced deployment"
 fi

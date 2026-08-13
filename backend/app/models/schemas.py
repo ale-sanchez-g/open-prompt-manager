@@ -20,6 +20,101 @@ class AuthRequest(BaseModel):
     }
 
 
+class ExtendedRegistrationFields(BaseModel):
+    """Optional profile fields collected at registration.
+
+    Gated by the ``registration_extended_fields`` flag - see
+    docs/features/registration-feature.md §4.3.
+
+    **This model is deliberately permissive: no length limits, no format checks.**
+    Guardrail 2 requires that with the flag OFF a stray ``extended`` block is
+    ignored without error, exactly as today (where it is dropped as an unknown
+    field). Declaring constraints here would turn an over-long company name into
+    a 422 on the OFF path, which would be a behaviour change. Constraints live in
+    the flag-gated service layer instead, using the limits in
+    ``app.core.registration``.
+
+    This model is never used to type ``RegisterRequest.extended`` directly (see
+    the comment there): doing so would make FastAPI parse - and reject - a
+    malformed or wrong-shaped block before the flag is even consulted, which is
+    exactly the OFF-path regression guardrail 2 forbids.
+    """
+
+    company_name: Optional[str] = Field(
+        None, alias='companyName', description='Free-text company or organisation name.', examples=['Acme Ltd']
+    )
+    job_role: Optional[str] = Field(
+        None, alias='jobRole', description='Free-text job role.', examples=['Platform Engineer']
+    )
+    phone: Optional[str] = Field(
+        None, description='Contact phone number. PII - normalised to E.164 before storage.', examples=['+61412345678']
+    )
+    marketing_opt_in: bool = Field(
+        False,
+        alias='marketingOptIn',
+        description='Consent to marketing email. Must default to false and render unchecked.',
+    )
+
+    model_config = {'populate_by_name': True}
+
+
+class RegisterRequest(AuthRequest):
+    """Registration payload. Extends AuthRequest without altering it.
+
+    ``AuthRequest`` is shared with ``POST /auth/login``; the extended-registration
+    change must not widen the login contract, so the new optional fields live on
+    this subclass and only the register endpoint uses it.
+
+    Both new fields are optional. Requiring ``sessionId`` would be a breaking
+    change to a public, unauthenticated endpoint and would violate guardrail 2 -
+    existing clients send ``{email, password}`` only. Absent ``sessionId`` means
+    no Flagsmith identity, which resolves the flag to false and takes the legacy
+    path.
+    """
+
+    session_id: Optional[str] = Field(
+        None,
+        alias='sessionId',
+        description=(
+            'Opaque per-visit identifier used only to evaluate the '
+            'registration_extended_fields flag against the same Flagsmith identity the '
+            'browser used. Not persisted. Optional: when absent the legacy flow applies.'
+        ),
+        examples=['b7f1c2de-3a4b-4c5d-8e9f-0a1b2c3d4e5f'],
+    )
+    # Deliberately untyped (not ExtendedRegistrationFields). With the flag off,
+    # any value here - including a malformed one, e.g. `"extended": "oops"` -
+    # must be dropped exactly like main drops an unknown field, never a 422
+    # (guardrail 2). Typing this as ExtendedRegistrationFields would make
+    # FastAPI validate (and reject) it before app.api.auth.register ever
+    # checks the flag. The endpoint parses it into ExtendedRegistrationFields
+    # itself, but only once the flag is confirmed on for this sessionId.
+    extended: Optional[Any] = Field(
+        None,
+        description=(
+            'Extended profile fields. Only honoured when registration_extended_fields is '
+            'enabled for this sessionId; ignored entirely otherwise.'
+        ),
+    )
+
+    model_config = {
+        'populate_by_name': True,
+        'json_schema_extra': {
+            'example': {
+                'email': constants['EXAMPLE_EMAIL'],
+                'password': constants['EXAMPLE_PASS'],
+                'sessionId': 'b7f1c2de-3a4b-4c5d-8e9f-0a1b2c3d4e5f',
+                'extended': {
+                    'companyName': 'Acme Ltd',
+                    'jobRole': 'Platform Engineer',
+                    'phone': '+61412345678',
+                    'marketingOptIn': False,
+                },
+            },
+        },
+    }
+
+
 class RegisterResponse(BaseModel):
     id: str = Field(..., description=constants['DESCRIPTION_MESSAGE'], examples=[constants['REGISTER_USER_ID_EXAMPLE']])
 

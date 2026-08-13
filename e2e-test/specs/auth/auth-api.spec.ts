@@ -1,12 +1,16 @@
 // spec: e2e-test/api-test-plan.md
 // seed: e2e-test/seed.spec.ts
 
+import { randomInt } from 'node:crypto';
 import { test, expect, type APIRequestContext } from '@playwright/test';
 
 const STRONG_PASSWORD = 'Test@1234Secure!';
 
+// randomInt (CSPRNG), not Math.random: these values end up in email/sessionId
+// fields that flow into auth and flag-bucketing decisions, which CodeQL flags
+// as a security-sensitive use of an insecure RNG.
 function uniqueEmail(prefix = 'pw-auth'): string {
-  return `${prefix}-${Math.floor(Math.random() * 1000000)}@opm-test.io`;
+  return `${prefix}-${randomInt(1000000)}@opm-test.io`;
 }
 
 async function registerUser(
@@ -23,6 +27,31 @@ async function loginUser(
   password = STRONG_PASSWORD,
 ) {
   return request.post('/auth/login', { data: { email, password } });
+}
+
+// ── registration_extended_fields (OPM-FLAG-REG-001) ──────────────────────────
+//
+// See the same block in auth-ui.spec.ts. E2E_EXTENDED_FIELDS_SESSION_ID is an
+// identifier a Flagsmith segment puts in the ON bucket at 100% in the target
+// environment; without it the ON specs skip rather than pretend.
+//
+// The specs that are *not* gated are the ones whose expected result is the same
+// whichever way the flag resolves. Those are the interesting ones: the contract
+// says an extended block must never be a hard failure, so a 201 is correct both
+// when the API honours the block and when it discards it.
+const EXTENDED_SESSION_ID = process.env.E2E_EXTENDED_FIELDS_SESSION_ID ?? '';
+const EXTENDED_ON = process.env.E2E_EXTENDED_FIELDS_ENABLED === 'true' && EXTENDED_SESSION_ID !== '';
+
+const VALID_EXTENDED = {
+  companyName: 'Acme Ltd',
+  jobRole: 'Platform Engineer',
+  phone: '+61412345678',
+  marketingOptIn: false,
+};
+
+/** A throwaway identity, so the flag resolves however the segment says it should. */
+function randomSessionId(): string {
+  return `e2e-${Date.now()}-${randomInt(1000000)}`;
 }
 
 test.describe('Auth API Tests', () => {
@@ -66,6 +95,131 @@ test.describe('Auth API Tests', () => {
     const response = await registerUser(request, 'not-an-email');
 
     expect(response.status()).toBe(422);
+  });
+
+  // ── Register: extended fields (registration_extended_fields) ───────────────
+
+  test('Auth - Register without sessionId still returns 201 (guardrail 2)', async ({ request }) => {
+    // 1. POST /auth/register the way every client before this change did
+    const response = await request.post('/auth/register', {
+      data: { email: uniqueEmail('reg-legacy'), password: STRONG_PASSWORD },
+    });
+
+    // expect: unchanged. Making sessionId required would break a public,
+    // unauthenticated endpoint; absent means no identity, which means flag off.
+    expect(response.status()).toBe(201);
+    expect(await response.json()).toHaveProperty('id');
+  });
+
+  test('Auth - Register with sessionId but no extended block returns 201', async ({ request }) => {
+    // 1. POST /auth/register the way the new bundle does when the flag is off
+    const response = await request.post('/auth/register', {
+      data: {
+        email: uniqueEmail('reg-sid'),
+        password: STRONG_PASSWORD,
+        sessionId: randomSessionId(),
+      },
+    });
+
+    // expect: sessionId is an accepted, optional, inert field
+    expect(response.status()).toBe(201);
+    expect(await response.json()).toHaveProperty('id');
+  });
+
+  test('Auth - Register with an extended block never hard-fails, whatever the flag says', async ({ request }) => {
+    // Matrix rows 2 and 13. The flag can flip between the form rendering and the
+    // POST landing, so a valid extended block arriving at a flag-off backend must
+    // be discarded silently, not rejected. Ungated on purpose: 201 is the right
+    // answer in both states, which is exactly the property worth asserting.
+
+    // 1. POST /auth/register with a valid extended block and a random identity
+    const response = await request.post('/auth/register', {
+      data: {
+        email: uniqueEmail('reg-ext-any'),
+        password: STRONG_PASSWORD,
+        sessionId: randomSessionId(),
+        extended: VALID_EXTENDED,
+      },
+    });
+
+    expect(response.status()).toBe(201);
+    expect(await response.json()).toHaveProperty('id');
+  });
+
+  test('Auth - Register with an extended block and no sessionId returns 201', async ({ request }) => {
+    // No identity means the flag resolves false, so the block is discarded.
+    // A 422 here would mean the backend validated a block it had already decided
+    // to ignore.
+    const response = await request.post('/auth/register', {
+      data: {
+        email: uniqueEmail('reg-ext-nosid'),
+        password: STRONG_PASSWORD,
+        extended: VALID_EXTENDED,
+      },
+    });
+
+    expect(response.status()).toBe(201);
+  });
+
+  test('Auth - Register with a valid extended block returns 201 while the flag is on', async ({ request }) => {
+    test.skip(!EXTENDED_ON, 'needs E2E_EXTENDED_FIELDS_ENABLED and a 100% segment for the test identity');
+
+    // 1. POST /auth/register with the identity the segment targets
+    const response = await request.post('/auth/register', {
+      data: {
+        email: uniqueEmail('reg-ext-on'),
+        password: STRONG_PASSWORD,
+        sessionId: EXTENDED_SESSION_ID,
+        extended: { ...VALID_EXTENDED, marketingOptIn: true },
+      },
+    });
+
+    expect(response.status()).toBe(201);
+    expect(await response.json()).toHaveProperty('id');
+  });
+
+  test('Auth - Register with an invalid extended block returns 422 while the flag is on', async ({ request }) => {
+    test.skip(!EXTENDED_ON, 'needs E2E_EXTENDED_FIELDS_ENABLED and a 100% segment for the test identity');
+    const email = uniqueEmail('reg-ext-422');
+
+    // 1. POST /auth/register with a phone number that fails the shared contract
+    const response = await request.post('/auth/register', {
+      data: {
+        email,
+        password: STRONG_PASSWORD,
+        sessionId: EXTENDED_SESSION_ID,
+        extended: { ...VALID_EXTENDED, phone: 'not a phone' },
+      },
+    });
+
+    expect(response.status()).toBe(422);
+    expect(await response.json()).toHaveProperty('error');
+
+    // expect: matrix row 4 — no partial write. The account must not exist, which
+    // a successful re-registration on the same email proves.
+    const retry = await registerUser(request, email);
+    expect(retry.status()).toBe(201);
+  });
+
+  test('Auth - The same sessionId gets the same decision twice', async ({ request }) => {
+    // Matrix row 7's client-side half: bucketing is deterministic per identity,
+    // so two identical requests must not disagree. Ungated - the assertion is
+    // that the two agree, not what they agree on.
+    const sessionId = randomSessionId();
+    const payload = (email: string) => ({
+      email,
+      password: STRONG_PASSWORD,
+      sessionId,
+      extended: { ...VALID_EXTENDED, phone: 'not a phone' },
+    });
+
+    const first = await request.post('/auth/register', { data: payload(uniqueEmail('det-1')) });
+    const second = await request.post('/auth/register', { data: payload(uniqueEmail('det-2')) });
+
+    // Either both 201 (flag off, block discarded) or both 422 (flag on, phone
+    // rejected). A split means the identity landed in different buckets.
+    expect(second.status()).toBe(first.status());
+    expect([201, 422]).toContain(first.status());
   });
 
   // ── Login ──────────────────────────────────────────────────────────────────

@@ -15,7 +15,7 @@
 # on without generating merge churn in the shared variables.tf/iam.tf
 # files that other concurrent infra issues also touch. The only
 # outside references are to resources this file does not own
-# (aws_iam_role.ecs_task_execution, aws_kms_key.secrets/logs) and the
+# (aws_iam_role.ecs_task_execution, aws_kms_key.secrets/logs/ecr) and the
 # container definition it contributes to aws_ecs_task_definition.backend
 # in ecs.tf.
 # ─────────────────────────────────────────────
@@ -28,10 +28,10 @@ variable "otel_collector_enabled" {
   default     = true
 }
 
-variable "otel_collector_image" {
-  description = "Container image for the OpenTelemetry Collector sidecar, pinned by digest (AWS Distro for OpenTelemetry Collector -- public.ecr.aws/aws-observability/aws-otel-collector). The default digest below is the multi-arch image index for the ':latest' tag resolved at the time this was written; bump it deliberately after reviewing upstream release notes, never point this at a mutable tag."
+variable "otel_collector_image_digest" {
+  description = "Digest (sha256:...) of the OpenTelemetry Collector image mirrored into aws_ecr_repository.otel_collector_mirror below. This is the only part of the image reference that changes when re-mirroring a new upstream release -- the registry/repository portion is always derived from the mirror repository resource, never hardcoded, so this stays correct in any account/region. See docs/runbooks/otel-collector-image-mirror.md for the re-mirror procedure. Never point this at a mutable tag."
   type        = string
-  default     = "public.ecr.aws/aws-observability/aws-otel-collector@sha256:a465f606684ab1ac3c5221c8bffe783b0120c8bd5318e1bf63c90f2cf56af835"
+  default     = "sha256:a465f606684ab1ac3c5221c8bffe783b0120c8bd5318e1bf63c90f2cf56af835"
 }
 
 variable "otel_collector_memory" {
@@ -57,6 +57,64 @@ variable "otel_exporter_otlp_headers" {
   type        = map(string)
   default     = {}
   sensitive   = true
+}
+
+# ───────────── Mirror registry (private ECR) ─────────────
+# The Collector image lives on the ECR *Public* Gallery, which the
+# backend's private-egress VPC cannot reach: the ecr.api/ecr.dkr
+# interface endpoints only proxy private ECR, so pulling the sidecar
+# image times out with CannotPullContainerError (#365). This repository
+# holds a mirror of that upstream image so the pull stays inside the VPC.
+resource "aws_ecr_repository" "otel_collector_mirror" {
+  name = "${var.project_name}-otel-collector"
+  # IMMUTABLE (unlike the MUTABLE backend/frontend repos): this only ever
+  # holds a mirror of a third-party image pinned by digest, never an app
+  # rebuild that reuses a tag.
+  image_tag_mutability = "IMMUTABLE"
+  force_delete         = true
+
+  encryption_configuration {
+    encryption_type = "KMS"
+    kms_key         = aws_kms_key.ecr.arn
+  }
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = {
+    Name        = "${var.project_name}-otel-collector"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_ecr_lifecycle_policy" "otel_collector_mirror" {
+  repository = aws_ecr_repository.otel_collector_mirror.name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Keep last 10 images"
+        selection = {
+          tagStatus   = "any"
+          countType   = "imageCountMoreThan"
+          countNumber = 10
+        }
+        action = {
+          type = "expire"
+        }
+      }
+    ]
+  })
+}
+
+locals {
+  # Built from the mirror repository resource rather than a hardcoded
+  # "<account>.dkr.ecr.<region>.amazonaws.com/..." string so this resolves
+  # correctly in any account/region the stack is deployed to.
+  otel_collector_image = "${aws_ecr_repository.otel_collector_mirror.repository_url}@${var.otel_collector_image_digest}"
 }
 
 # ───────────── Rendered Collector config ─────────────
@@ -212,7 +270,7 @@ resource "aws_iam_role_policy" "ecs_execution_otel_config" {
 locals {
   otel_sidecar_container_definition = {
     name      = "otel-collector"
-    image     = var.otel_collector_image
+    image     = local.otel_collector_image
     essential = false
     memory    = var.otel_collector_memory
 

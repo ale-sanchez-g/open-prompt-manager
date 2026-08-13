@@ -18,7 +18,13 @@ function parseEnabled(value, fallback) {
 }
 
 function readEnv() {
-  return import.meta?.env ?? {};
+  // Deliberately `import.meta.env`, not `import.meta?.env`: Vite's dev-server
+  // only statically recognizes the unchained expression to inject real env
+  // values. The optional-chained form is invisible to it and always
+  // evaluates to `undefined`, silently disabling every flag in local dev
+  // regardless of .env.local. `import.meta` itself is always defined inside
+  // an ES module, so the chaining bought nothing.
+  return import.meta.env ?? {};
 }
 
 /**
@@ -41,4 +47,8 @@ export function getFlagsmithConfig(env = readEnv()) {
 // truth and no stringly-typed keys scattered across the app.
 export const FLAGS = Object.freeze({
   DASHBOARD_WELCOME_BANNER: 'dashboard_welcome_banner',
+  // Extended registration fields. Must stay byte-identical to
+  // FLAG_REGISTRATION_EXTENDED in backend/app/core/flags.py - both sides evaluate
+  // this same key for the same identity. See docs/features/registration-feature.md §4.1.
+  REGISTRATION_EXTENDED_FIELDS: 'registration_extended_fields',
 });

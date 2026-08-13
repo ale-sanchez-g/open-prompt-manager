@@ -1,7 +1,8 @@
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
@@ -10,15 +11,24 @@ from app.audit import (
     EVENT_LOGIN_LOCKOUT,
     EVENT_LOGIN_SUCCESS,
     EVENT_REGISTER,
+    EVENT_REGISTER_EXTENDED,
     EVENT_TOKEN_ISSUED,
     EVENT_TOKEN_REFRESH,
     EVENT_TOKEN_REFRESH_FAILURE,
     EVENT_TOKEN_REVOKE,
     audit_event,
 )
+from app.core.flags import extended_enabled
 from app.database.base import get_db
 from app.models.auth import User
-from app.models.schemas import AuthRequest, MeResponse, RegisterResponse, TokenResponse
+from app.models.schemas import (
+    AuthRequest,
+    ExtendedRegistrationFields,
+    MeResponse,
+    RegisterRequest,
+    RegisterResponse,
+    TokenResponse,
+)
 from app.services.auth_service import (
     ACCESS_TOKEN_TTL_SECONDS,
     AuthError,
@@ -45,6 +55,11 @@ from app.services.auth_service import (
     validate_email,
     validate_password,
 )
+from app.services.registration_service import (
+    apply_extended_fields,
+    supplied_field_names,
+    validate_extended_fields,
+)
 
 router = APIRouter(prefix='/auth', tags=['auth'])
 
@@ -60,12 +75,16 @@ router = APIRouter(prefix='/auth', tags=['auth'])
         'and special characters. The very first account to register becomes an admin so the '
         'instance has an initial administrator, as does any email listed in the ADMIN_EMAILS '
         'configuration; every other account is a standard user. '
-        'Registration does not issue JWTs.'
+        'Registration does not issue JWTs.\n\n'
+        'The optional `extended` profile block is honoured only when the '
+        '`registration_extended_fields` flag is enabled for the supplied `sessionId`. '
+        'With the flag off — including whenever `sessionId` is absent — the block is '
+        'ignored and this endpoint behaves exactly as it always has.'
     ),
     response_description='The newly created user identifier.',
-    responses={409: {'description': 'Email already registered.'}, 422: {'description': 'Password or email validation failed.'}},
+    responses={409: {'description': 'Email already registered.'}, 422: {'description': 'Password, email, or extended-field validation failed.'}},
 )
-def register(payload: AuthRequest, request: Request, db: Annotated[Session, Depends(get_db)]) -> RegisterResponse:
+def register(payload: RegisterRequest, request: Request, db: Annotated[Session, Depends(get_db)]) -> RegisterResponse:
     normalized_email = normalize_email(payload.email)
     if not validate_email(normalized_email):
         raise AuthError(status_code=422, error='Invalid email address')
@@ -73,10 +92,49 @@ def register(payload: AuthRequest, request: Request, db: Annotated[Session, Depe
         raise AuthError(status_code=422, error='Password does not meet complexity requirements')
     if get_user_by_email(db, normalized_email) is not None:
         raise AuthError(status_code=409, error='Email already registered')
+
+    # Flag-gated extended fields (OPM-FLAG-REG-001).
+    #
+    # Validated here, *before* create_user, so a rejected extended block cannot
+    # leave a half-created account behind (spec §8 matrix row 4). The flag is
+    # only consulted when there is a block to act on: no block means the legacy
+    # path regardless, so there is nothing for the flag to decide.
+    #
+    # extended_enabled() resolves locally and never raises, so an unset key, an
+    # absent sessionId, or a Flagsmith outage all land on the legacy path
+    # (guardrail 3) rather than failing a public registration.
+    extended_values: dict[str, Any] = {}
+    if payload.extended is not None and extended_enabled(payload.session_id):
+        # payload.extended arrives untyped (see RegisterRequest.extended) so that
+        # a malformed block never 422s while the flag is off. Now that the flag
+        # is confirmed on, parse it for real - a shape that doesn't fit the
+        # contract (wrong type, or not an object at all, e.g. "oops") is exactly
+        # as invalid as a value that fails app.core.registration's rules, so it
+        # gets the same 422 treatment, still before create_user (matrix row 4).
+        try:
+            extended_model = ExtendedRegistrationFields.model_validate(payload.extended)
+        except ValidationError as exc:
+            raise AuthError(status_code=422, error='extended fields are malformed') from exc
+        extended_values = validate_extended_fields(extended_model)
+
     is_admin = count_users(db) == 0 or is_bootstrap_admin(normalized_email)
     role = ROLE_ADMIN if is_admin else ROLE_USER
     user = create_user(db, normalized_email, payload.password, role=role)
     audit_event(EVENT_REGISTER, request=request, actor=normalized_email, target=user.id, outcome='success', role=role)
+
+    if extended_values:
+        apply_extended_fields(db, user, extended_values)
+        # Field names only. No extended value — least of all the phone number —
+        # may reach a log record (guardrail 7).
+        audit_event(
+            EVENT_REGISTER_EXTENDED,
+            request=request,
+            actor=normalized_email,
+            target=user.id,
+            outcome='success',
+            fields=','.join(supplied_field_names(extended_values)),
+        )
+
     return RegisterResponse(id=user.id)
 
 
