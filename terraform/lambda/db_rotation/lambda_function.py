@@ -27,10 +27,15 @@ from urllib.parse import quote, unquote, urlsplit, urlunsplit
 
 import boto3
 import pg8000.dbapi
+from botocore.config import Config
 from botocore.exceptions import ClientError
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+# Bound how long any single Secrets Manager API call can take so a network
+# stall cannot silently consume the whole Lambda invocation timeout.
+_BOTO_CONFIG = Config(connect_timeout=5, read_timeout=10, retries={"max_attempts": 3})
 
 # Characters excluded from generated passwords so the value is always safe to
 # embed unescaped between the ":" and "@" of a connection string and to pass
@@ -93,7 +98,12 @@ def lambda_handler(event, context):
 
     endpoint = os.environ["SECRETS_MANAGER_ENDPOINT"]
     region = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
-    service = boto3.client("secretsmanager", endpoint_url=endpoint, region_name=region)
+    service = boto3.client(
+        "secretsmanager",
+        endpoint_url=endpoint,
+        region_name=region,
+        config=_BOTO_CONFIG,
+    )
 
     try:
         metadata = service.describe_secret(SecretId=arn)
