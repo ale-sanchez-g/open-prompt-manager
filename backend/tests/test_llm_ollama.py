@@ -308,9 +308,18 @@ def test_get_provider_ollama_custom_url():
     assert provider._base_url == 'http://other:11434'
 
 
-def test_get_provider_openai_compatible_raises():
-    with pytest.raises(ValueError, match='not yet implemented'):
+def test_get_provider_openai_compatible_requires_base_url():
+    with pytest.raises(ValueError, match='base_url'):
         get_provider({'type': 'openai_compatible'})
+
+
+def test_get_provider_openai_compatible():
+    from app.services.llm.openai_compatible import OpenAICompatibleProvider
+
+    provider = get_provider({'type': 'openai_compatible', 'base_url': 'https://api.deepseek.com', 'api_key': 'sk-test'})
+    assert isinstance(provider, OpenAICompatibleProvider)
+    assert provider._base_url == 'https://api.deepseek.com'
+    assert provider._api_key == 'sk-test'
 
 
 def test_get_provider_unknown_raises():

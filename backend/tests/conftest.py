@@ -11,6 +11,7 @@ from sqlalchemy.orm import sessionmaker
 # Import models so Base.metadata is fully populated before create_all
 from app.models.auth import User, RefreshToken  # noqa
 from app.models.prompt import Prompt, Tag, Agent, PromptMetric, PromptExecution  # noqa
+from app.models.llm_provider_config import LLMProviderConfig  # noqa
 import app.database.base as db_module
 from app.database.base import Base, get_db
 from main import create_app

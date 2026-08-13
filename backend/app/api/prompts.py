@@ -1,16 +1,27 @@
+import time
 from collections import deque
 from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.database.base import get_db
+from app.models.llm_provider_config import LLMProviderConfig
 from app.models.prompt import Prompt, Tag, Agent, PromptMetric, PromptExecution
 from app.models.schemas import (
     PromptCreate, PromptUpdate, PromptResponse, PromptListResponse,
     VersionCreate, RenderRequest, RenderResponse,
     ExecutionCreate, ExecutionResponse,
+    PromptTestRequest, PromptTestResponse,
     MetricCreate, MetricResponse,
 )
+from app.services import encryption
+from app.services.llm.base import (
+    ProviderAuthError,
+    ProviderBadRequestError,
+    ProviderTimeoutError,
+    ProviderUnavailableError,
+)
+from app.services.llm.registry import get_provider
 from app.services.prompt_service import render_prompt, update_prompt_stats, _increment_version
 from app.services.auth_service import ROLE_ADMIN
 
@@ -333,6 +344,113 @@ def render(prompt_id: int, payload: RenderRequest, db: Annotated[Session, Depend
         rendered_content=rendered,
         variables_used=vars_used,
         components_resolved=components,
+    )
+
+
+@router.post(
+    '/{prompt_id}/test',
+    response_model=PromptTestResponse,
+    summary='Test a prompt against a live LLM provider',
+    description=(
+        'Renders the prompt with the supplied variables, exactly like `POST /render`, then sends the '
+        'rendered text to a configured LLM provider for a live completion. A `PromptExecution` is '
+        'recorded for both successful and failed provider calls, and the prompt\'s aggregate stats '
+        '(`usage_count`, `avg_rating`, `success_rate`) are refreshed on success.'
+    ),
+    response_description='The LLM output together with token/latency stats and the recorded execution ID.',
+    responses={
+        400: {'description': 'Provider is disabled, rejected the request, or authentication failed.'},
+        404: {'description': 'Prompt or provider not found.'},
+        422: {'description': 'Missing required variable or circular component reference detected.'},
+        502: {'description': 'Provider is unreachable or timed out.'},
+    },
+)
+async def test_prompt(prompt_id: int, payload: PromptTestRequest, db: Annotated[Session, Depends(get_db)]):
+    prompt = _get_prompt_or_404(prompt_id, db)
+    try:
+        rendered, _vars_used, _components = render_prompt(prompt, payload.variables, db)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    config = db.get(LLMProviderConfig, payload.provider_id)
+    if config is None:
+        raise HTTPException(status_code=404, detail=f'Provider {payload.provider_id} not found')
+    if not config.enabled:
+        raise HTTPException(status_code=400, detail=f'Provider {payload.provider_id} is disabled')
+
+    model = payload.model or config.default_model
+    if not model:
+        raise HTTPException(status_code=400, detail='No model specified and the provider has no default_model configured')
+
+    api_key = None
+    if config.api_key_encrypted:
+        try:
+            api_key = encryption.decrypt(config.api_key_encrypted)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=500, detail=f'Failed to decrypt provider API key: {exc}') from exc
+
+    params = payload.params.model_dump(exclude_none=True) if payload.params else None
+
+    # Per-user LLM-call rate limiting is out of scope here (tracked separately as a hardening follow-up).
+    t0 = time.monotonic()
+    try:
+        provider = get_provider({'type': config.provider_type, 'base_url': config.base_url, 'api_key': api_key})
+        result = await provider.chat(
+            messages=[{'role': 'user', 'content': rendered}],
+            model=model,
+            params=params,
+        )
+    except (ProviderAuthError, ProviderBadRequestError, ProviderUnavailableError, ProviderTimeoutError) as exc:
+        failed_execution = PromptExecution(
+            prompt_id=prompt_id,
+            agent_id=payload.agent_id,
+            input_variables=payload.variables,
+            rendered_prompt=rendered,
+            response=None,
+            execution_time_ms=int((time.monotonic() - t0) * 1000),
+            success=0,
+        )
+        db.add(failed_execution)
+        db.commit()
+        update_prompt_stats(prompt_id, db)
+        if isinstance(exc, ProviderAuthError):
+            raise HTTPException(status_code=400, detail=f'Provider authentication failed: {exc}') from exc
+        if isinstance(exc, ProviderBadRequestError):
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=502, detail=f'Provider request failed: {exc}') from exc
+
+    cost = 0.0
+    if config.cost_per_1k_input_tokens:
+        cost += (result.prompt_tokens / 1000) * config.cost_per_1k_input_tokens
+    if config.cost_per_1k_output_tokens:
+        cost += (result.completion_tokens / 1000) * config.cost_per_1k_output_tokens
+
+    execution = PromptExecution(
+        prompt_id=prompt_id,
+        agent_id=payload.agent_id,
+        input_variables=payload.variables,
+        rendered_prompt=rendered,
+        response=result.content,
+        execution_time_ms=int(result.latency_ms),
+        token_count=result.total_tokens,
+        cost=cost,
+        success=1,
+    )
+    db.add(execution)
+    db.commit()
+    db.refresh(execution)
+    update_prompt_stats(prompt_id, db)
+
+    return PromptTestResponse(
+        output=result.content,
+        model=result.model,
+        provider=config.name,
+        rendered_prompt=rendered,
+        latency_ms=result.latency_ms,
+        prompt_tokens=result.prompt_tokens,
+        completion_tokens=result.completion_tokens,
+        total_tokens=result.total_tokens,
+        execution_id=execution.id,
     )
 
 
