@@ -174,8 +174,11 @@ def _set_secret(service, arn, token):
             # the username is quoted as an identifier; the password is bound
             # safely as a parameter.
             username = pending_fields["username"]
+            if not username:
+                raise ValueError("DATABASE_URL is missing a username")
+            safe_username = username.replace('"', '""')
             cur.execute(
-                f'ALTER USER "{username}" WITH PASSWORD %s',
+                f'ALTER USER "{safe_username}" WITH PASSWORD %s',
                 (pending_fields["password"],),
             )
     logger.info("setSecret: database password updated")
