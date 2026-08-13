@@ -27,6 +27,7 @@ from urllib.parse import quote, unquote, urlsplit, urlunsplit
 
 import boto3
 import pg8000.dbapi
+from botocore.exceptions import ClientError
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -94,29 +95,36 @@ def lambda_handler(event, context):
     region = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
     service = boto3.client("secretsmanager", endpoint_url=endpoint, region_name=region)
 
-    metadata = service.describe_secret(SecretId=arn)
-    if not metadata.get("RotationEnabled", False):
-        raise ValueError(f"Secret {arn} is not enabled for rotation")
+    try:
+        metadata = service.describe_secret(SecretId=arn)
+        if not metadata.get("RotationEnabled", False):
+            raise ValueError(f"Secret {arn} is not enabled for rotation")
 
-    versions = metadata["VersionIdsToStages"]
-    if token not in versions:
-        raise ValueError(f"Secret version {token} has no stage for rotation of {arn}")
-    if "AWSCURRENT" in versions[token]:
-        logger.info("Requested version is already AWSCURRENT; nothing to rotate")
-        return
-    if "AWSPENDING" not in versions[token]:
-        raise ValueError(f"Secret version {token} not AWSPENDING for rotation of {arn}")
+        versions = metadata["VersionIdsToStages"]
+        if token not in versions:
+            raise ValueError(f"Secret version {token} has no stage for rotation of {arn}")
+        if "AWSCURRENT" in versions[token]:
+            logger.info("Requested version is already AWSCURRENT; nothing to rotate")
+            return
+        if "AWSPENDING" not in versions[token]:
+            raise ValueError(f"Secret version {token} not AWSPENDING for rotation of {arn}")
 
-    if step == "createSecret":
-        _create_secret(service, arn, token)
-    elif step == "setSecret":
-        _set_secret(service, arn, token)
-    elif step == "testSecret":
-        _test_secret(service, arn, token)
-    elif step == "finishSecret":
-        _finish_secret(service, arn, token)
-    else:
-        raise ValueError(f"Invalid step parameter: {step}")
+        if step == "createSecret":
+            _create_secret(service, arn, token)
+        elif step == "setSecret":
+            _set_secret(service, arn, token)
+        elif step == "testSecret":
+            _test_secret(service, arn, token)
+        elif step == "finishSecret":
+            _finish_secret(service, arn, token)
+        else:
+            raise ValueError(f"Invalid step parameter: {step}")
+    except ClientError as exc:
+        error_code = exc.response.get("Error", {}).get("Code", "Unknown")
+        logger.error(
+            "Secrets Manager rotation step %s failed for %s: %s", step, arn, error_code
+        )
+        raise
 
 
 def _create_secret(service, arn, token):
