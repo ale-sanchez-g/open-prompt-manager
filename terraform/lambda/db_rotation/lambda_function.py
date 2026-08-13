@@ -131,7 +131,7 @@ def _create_secret(service, arn, token):
         logger.info("createSecret: AWSPENDING version already exists")
         return
     except service.exceptions.ResourceNotFoundException:
-        pass
+        logger.info("createSecret: no existing AWSPENDING version, creating one")
 
     fields = _parse_url(current)
     new_password = service.get_random_password(
@@ -164,7 +164,7 @@ def _set_secret(service, arn, token):
             logger.info("setSecret: pending credentials already active")
             return
     except pg8000.dbapi.DatabaseError:
-        pass
+        logger.info("setSecret: pending credentials not active yet, rotating now")
 
     with closing(_connect(current)) as conn:
         conn.autocommit = True
@@ -207,10 +207,12 @@ def _finish_secret(service, arn, token):
             current_version = version
             break
 
-    service.update_secret_version_stage(
-        SecretId=arn,
-        VersionStage="AWSCURRENT",
-        MoveToVersionId=token,
-        RemoveFromVersionId=current_version,
-    )
+    kwargs = {
+        "SecretId": arn,
+        "VersionStage": "AWSCURRENT",
+        "MoveToVersionId": token,
+    }
+    if current_version is not None:
+        kwargs["RemoveFromVersionId"] = current_version
+    service.update_secret_version_stage(**kwargs)
     logger.info("finishSecret: promoted pending version to AWSCURRENT")
