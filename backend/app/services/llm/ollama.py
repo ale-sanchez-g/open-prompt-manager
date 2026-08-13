@@ -6,6 +6,7 @@ Base URL defaults to http://localhost:11434 and is configurable.
 """
 from __future__ import annotations
 
+import json
 import time
 from typing import Any, AsyncIterator, Optional
 
@@ -65,7 +66,7 @@ class OllamaProvider(LLMProvider):
         raise ProviderUnavailableError(f'Ollama error: {exc}') from exc
 
     def _check_response(self, response: httpx.Response) -> None:
-        """Raise a normalized exception for non-2xx responses."""
+        """Raise a normalized exception for non-2xx buffered responses."""
         if response.status_code == 401:
             raise ProviderAuthError('Ollama returned 401 Unauthorized')
         if response.status_code == 400:
@@ -80,6 +81,39 @@ class OllamaProvider(LLMProvider):
             raise ProviderBadRequestError(
                 f'Ollama client error {response.status_code}: {response.text}'
             )
+
+    def _check_stream_response(self, response: httpx.Response) -> None:
+        """Raise a normalized exception for non-2xx streaming responses.
+
+        Uses only the status code (no response body read) so that it is safe
+        to call before the streaming body has been consumed.
+        """
+        if response.status_code == 401:
+            raise ProviderAuthError('Ollama returned 401 Unauthorized')
+        if response.status_code >= 500:
+            raise ProviderUnavailableError(
+                f'Ollama server error {response.status_code}'
+            )
+        if response.status_code >= 400:
+            raise ProviderBadRequestError(
+                f'Ollama client error {response.status_code}'
+            )
+
+    @staticmethod
+    def _build_options(params: dict[str, Any]) -> dict[str, Any]:
+        """Translate normalized params into Ollama option keys."""
+        options: dict[str, Any] = {}
+        if 'temperature' in params:
+            options['temperature'] = params['temperature']
+        if 'max_tokens' in params:
+            options['num_predict'] = params['max_tokens']
+        if 'top_p' in params:
+            options['top_p'] = params['top_p']
+        # Forward any extra provider-specific keys directly.
+        for key, val in params.items():
+            if key not in ('temperature', 'max_tokens', 'top_p'):
+                options[key] = val
+        return options
 
     # ------------------------------------------------------------------
     # LLMProvider interface
@@ -98,17 +132,7 @@ class OllamaProvider(LLMProvider):
             'messages': messages,
             'stream': False,
         }
-        options: dict[str, Any] = {}
-        if 'temperature' in params:
-            options['temperature'] = params['temperature']
-        if 'max_tokens' in params:
-            options['num_predict'] = params['max_tokens']
-        if 'top_p' in params:
-            options['top_p'] = params['top_p']
-        # Forward any extra provider-specific keys under options.
-        for key, val in params.items():
-            if key not in ('temperature', 'max_tokens', 'top_p'):
-                options[key] = val
+        options = self._build_options(params)
         if options:
             payload['options'] = options
 
@@ -156,31 +180,21 @@ class OllamaProvider(LLMProvider):
             'messages': messages,
             'stream': True,
         }
-        options: dict[str, Any] = {}
-        if 'temperature' in params:
-            options['temperature'] = params['temperature']
-        if 'max_tokens' in params:
-            options['num_predict'] = params['max_tokens']
-        if 'top_p' in params:
-            options['top_p'] = params['top_p']
-        for key, val in params.items():
-            if key not in ('temperature', 'max_tokens', 'top_p'):
-                options[key] = val
+        options = self._build_options(params)
         if options:
             payload['options'] = options
 
         url = '/api/chat'
-        import json as _json
         try:
             async with self._client() as client:
                 async with client.stream('POST', url, json=payload) as response:
-                    self._check_response(response)
+                    self._check_stream_response(response)
                     async for line in response.aiter_lines():
                         if not line:
                             continue
                         try:
-                            chunk = _json.loads(line)
-                        except _json.JSONDecodeError:
+                            chunk = json.loads(line)
+                        except json.JSONDecodeError:
                             continue
                         delta = chunk.get('message', {}).get('content', '')
                         if delta:
