@@ -97,73 +97,84 @@ def lambda_handler(event, context):
 
     try:
         metadata = service.describe_secret(SecretId=arn)
-        if not metadata.get("RotationEnabled", False):
-            raise ValueError(f"Secret {arn} is not enabled for rotation")
-
-        versions = metadata["VersionIdsToStages"]
-        if token not in versions:
-            raise ValueError(f"Secret version {token} has no stage for rotation of {arn}")
-        if "AWSCURRENT" in versions[token]:
-            logger.info("Requested version is already AWSCURRENT; nothing to rotate")
-            return
-        if "AWSPENDING" not in versions[token]:
-            raise ValueError(f"Secret version {token} not AWSPENDING for rotation of {arn}")
-
-        if step == "createSecret":
-            _create_secret(service, arn, token)
-        elif step == "setSecret":
-            _set_secret(service, arn, token)
-        elif step == "testSecret":
-            _test_secret(service, arn, token)
-        elif step == "finishSecret":
-            _finish_secret(service, arn, token)
-        else:
-            raise ValueError(f"Invalid step parameter: {step}")
     except ClientError as exc:
-        error_code = exc.response.get("Error", {}).get("Code", "Unknown")
-        logger.error(
-            "Secrets Manager rotation step %s failed for %s: %s", step, arn, error_code
-        )
+        logger.error("describeSecret failed: %s", _error_code(exc))
         raise
+
+    if not metadata.get("RotationEnabled", False):
+        raise ValueError(f"Secret {arn} is not enabled for rotation")
+
+    versions = metadata["VersionIdsToStages"]
+    if token not in versions:
+        raise ValueError(f"Secret version {token} has no stage for rotation of {arn}")
+    if "AWSCURRENT" in versions[token]:
+        logger.info("Requested version is already AWSCURRENT; nothing to rotate")
+        return
+    if "AWSPENDING" not in versions[token]:
+        raise ValueError(f"Secret version {token} not AWSPENDING for rotation of {arn}")
+
+    if step == "createSecret":
+        _create_secret(service, arn, token)
+    elif step == "setSecret":
+        _set_secret(service, arn, token)
+    elif step == "testSecret":
+        _test_secret(service, arn, token)
+    elif step == "finishSecret":
+        _finish_secret(service, arn, token)
+    else:
+        raise ValueError(f"Invalid step parameter: {step}")
+
+
+def _error_code(exc):
+    """Extract the AWS error code from a ClientError for logging without leaking secrets."""
+    return exc.response.get("Error", {}).get("Code", "Unknown")
 
 
 def _create_secret(service, arn, token):
     """Generate a new password and store the candidate URL as AWSPENDING."""
-    current = service.get_secret_value(SecretId=arn, VersionStage="AWSCURRENT")[
-        "SecretString"
-    ]
     try:
-        service.get_secret_value(
-            SecretId=arn, VersionId=token, VersionStage="AWSPENDING"
+        current = service.get_secret_value(SecretId=arn, VersionStage="AWSCURRENT")[
+            "SecretString"
+        ]
+        try:
+            service.get_secret_value(
+                SecretId=arn, VersionId=token, VersionStage="AWSPENDING"
+            )
+            logger.info("createSecret: AWSPENDING version already exists")
+            return
+        except service.exceptions.ResourceNotFoundException:
+            logger.info("createSecret: no existing AWSPENDING version, creating one")
+
+        fields = _parse_url(current)
+        new_password = service.get_random_password(
+            PasswordLength=32, ExcludeCharacters=_EXCLUDE_CHARACTERS
+        )["RandomPassword"]
+        pending_url = _build_url(fields, new_password)
+
+        service.put_secret_value(
+            SecretId=arn,
+            ClientRequestToken=token,
+            SecretString=pending_url,
+            VersionStages=["AWSPENDING"],
         )
-        logger.info("createSecret: AWSPENDING version already exists")
-        return
-    except service.exceptions.ResourceNotFoundException:
-        logger.info("createSecret: no existing AWSPENDING version, creating one")
-
-    fields = _parse_url(current)
-    new_password = service.get_random_password(
-        PasswordLength=32, ExcludeCharacters=_EXCLUDE_CHARACTERS
-    )["RandomPassword"]
-    pending_url = _build_url(fields, new_password)
-
-    service.put_secret_value(
-        SecretId=arn,
-        ClientRequestToken=token,
-        SecretString=pending_url,
-        VersionStages=["AWSPENDING"],
-    )
-    logger.info("createSecret: stored new AWSPENDING secret value")
+        logger.info("createSecret: stored new AWSPENDING secret value")
+    except ClientError as exc:
+        logger.error("createSecret: AWS request failed: %s", _error_code(exc))
+        raise
 
 
 def _set_secret(service, arn, token):
     """Apply the pending password to the database via ALTER USER."""
-    pending = service.get_secret_value(
-        SecretId=arn, VersionId=token, VersionStage="AWSPENDING"
-    )["SecretString"]
-    current = service.get_secret_value(SecretId=arn, VersionStage="AWSCURRENT")[
-        "SecretString"
-    ]
+    try:
+        pending = service.get_secret_value(
+            SecretId=arn, VersionId=token, VersionStage="AWSPENDING"
+        )["SecretString"]
+        current = service.get_secret_value(SecretId=arn, VersionStage="AWSCURRENT")[
+            "SecretString"
+        ]
+    except ClientError as exc:
+        logger.error("setSecret: AWS request failed: %s", _error_code(exc))
+        raise
     pending_fields = _parse_url(pending)
 
     # First try the pending credentials in case setSecret already ran.
@@ -193,9 +204,13 @@ def _set_secret(service, arn, token):
 
 def _test_secret(service, arn, token):
     """Verify the pending credentials can connect and run a trivial query."""
-    pending = service.get_secret_value(
-        SecretId=arn, VersionId=token, VersionStage="AWSPENDING"
-    )["SecretString"]
+    try:
+        pending = service.get_secret_value(
+            SecretId=arn, VersionId=token, VersionStage="AWSPENDING"
+        )["SecretString"]
+    except ClientError as exc:
+        logger.error("testSecret: AWS request failed: %s", _error_code(exc))
+        raise
     with closing(_connect(pending)) as conn:
         with closing(conn.cursor()) as cur:
             cur.execute("SELECT 1")
@@ -205,22 +220,26 @@ def _test_secret(service, arn, token):
 
 def _finish_secret(service, arn, token):
     """Promote the AWSPENDING version to AWSCURRENT."""
-    metadata = service.describe_secret(SecretId=arn)
-    current_version = None
-    for version, stages in metadata["VersionIdsToStages"].items():
-        if "AWSCURRENT" in stages:
-            if version == token:
-                logger.info("finishSecret: version already AWSCURRENT")
-                return
-            current_version = version
-            break
+    try:
+        metadata = service.describe_secret(SecretId=arn)
+        current_version = None
+        for version, stages in metadata["VersionIdsToStages"].items():
+            if "AWSCURRENT" in stages:
+                if version == token:
+                    logger.info("finishSecret: version already AWSCURRENT")
+                    return
+                current_version = version
+                break
 
-    kwargs = {
-        "SecretId": arn,
-        "VersionStage": "AWSCURRENT",
-        "MoveToVersionId": token,
-    }
-    if current_version is not None:
-        kwargs["RemoveFromVersionId"] = current_version
-    service.update_secret_version_stage(**kwargs)
-    logger.info("finishSecret: promoted pending version to AWSCURRENT")
+        kwargs = {
+            "SecretId": arn,
+            "VersionStage": "AWSCURRENT",
+            "MoveToVersionId": token,
+        }
+        if current_version is not None:
+            kwargs["RemoveFromVersionId"] = current_version
+        service.update_secret_version_stage(**kwargs)
+        logger.info("finishSecret: promoted pending version to AWSCURRENT")
+    except ClientError as exc:
+        logger.error("finishSecret: AWS request failed: %s", _error_code(exc))
+        raise
