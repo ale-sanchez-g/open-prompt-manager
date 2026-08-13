@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any, AsyncIterator, Optional
+from typing import Any, AsyncIterator, NoReturn, Optional
 
 import httpx
 
@@ -57,7 +57,7 @@ class OllamaProvider(LLMProvider):
             kwargs['transport'] = self._transport
         return httpx.AsyncClient(**kwargs)
 
-    def _raise_translated(self, exc: Exception, url: str) -> None:
+    def _raise_translated(self, exc: Exception, url: str) -> NoReturn:
         """Translate an httpx error to a normalized provider exception and raise it."""
         if isinstance(exc, httpx.TimeoutException):
             raise ProviderTimeoutError(f'Ollama request timed out: {url}') from exc
