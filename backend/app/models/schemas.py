@@ -692,7 +692,7 @@ class ProviderCreate(BaseModel):
     api_key: Optional[str] = Field(
         None,
         description='Plaintext API key. Encrypted at rest; never returned in responses.',
-        examples=['sk-abc123xyz789'],
+        examples=['your-provider-api-key'],
     )
     default_model: Optional[str] = Field(None, description='Default model identifier to use for this provider.', examples=['deepseek-chat'])
     cost_per_1k_input_tokens: Optional[float] = Field(None, description='Cost in USD per 1,000 input tokens, for cost tracking.', examples=[0.001])
@@ -704,7 +704,7 @@ class ProviderCreate(BaseModel):
                 'name': 'My DeepSeek Account',
                 'provider_type': 'openai_compatible',
                 'base_url': 'https://api.deepseek.com',
-                'api_key': 'sk-abc123xyz789',
+                'api_key': 'your-provider-api-key',
                 'default_model': 'deepseek-chat',
                 'cost_per_1k_input_tokens': 0.001,
                 'cost_per_1k_output_tokens': 0.002,
@@ -723,7 +723,7 @@ class ProviderUpdate(BaseModel):
             'Replacement plaintext API key. Omit or send an empty string to keep the '
             'currently stored key unchanged.'
         ),
-        examples=['sk-new-key-456'],
+        examples=['your-replacement-api-key'],
     )
     default_model: Optional[str] = Field(None, description='Updated default model identifier.', examples=['deepseek-chat'])
     enabled: Optional[bool] = Field(None, description='Whether this provider is available for use.', examples=[True])

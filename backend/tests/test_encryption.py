@@ -22,7 +22,10 @@ def test_encrypt_decrypt_round_trip():
 
 def test_encrypt_produces_different_ciphertext_each_time():
     plaintext = 'sk-super-secret-api-key-123456'
-    assert encrypt(plaintext) != encrypt(plaintext)
+    first_ciphertext = encrypt(plaintext)
+    second_ciphertext = encrypt(plaintext)
+
+    assert first_ciphertext != second_ciphertext
 
 
 def test_mask_key_shape():
