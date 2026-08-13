@@ -193,7 +193,7 @@ Optional flags:
 
 Required repository configuration:
 
-- Secret: `AWS_DEPLOY_ROLE_ARN` (IAM role trusted by GitHub OIDC). The role needs `kms:Decrypt` on the `alias/<project>-secrets` key so re-deploys can read the existing `JWT_SECRET`. See [`terraform/install.md`](terraform/install.md#prerequisites) for the full permission list.
+- Secret: `AWS_DEPLOY_ROLE_ARN` (IAM role trusted by GitHub OIDC). The role needs `kms:Decrypt` on the `alias/<project>-secrets` key so re-deploys can read the existing `JWT_SECRET` and `OPM_ENCRYPTION_KEY`. See [`terraform/install.md`](terraform/install.md#prerequisites) for the full permission list.
 - Environment: create a `prod` environment (Settings → Environments) and add required reviewers to enable the manual approval gate.
 - Optional variables: `AWS_REGION`, `PROJECT_NAME`, `ENVIRONMENT` (defaults: `ap-southeast-2`, `open-prompt-manager`, `prod`)
 
