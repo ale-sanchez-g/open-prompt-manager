@@ -80,7 +80,6 @@ def _connect(url, timeout=5):
         host=fields["host"],
         port=int(fields["port"] or 5432),
         database=fields["dbname"],
-        ssl_context=True,
         timeout=timeout,
     )
 
