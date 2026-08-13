@@ -949,6 +949,18 @@ jobs:
           fi
           echo "JWT_SECRET=$JWT_SECRET" >> "$GITHUB_ENV"
 
+      - name: Generate encryption key for CI runtime
+        run: |
+          # Fernet key: 32 random bytes, urlsafe-base64 encoded (44 chars incl. padding).
+          # Required for the providers-api spec, which registers providers with a
+          # real api_key and exercises the encrypt/decrypt round trip.
+          OPM_ENCRYPTION_KEY="$(openssl rand -base64 32 | tr '+/' '-_')"
+          if [ "${#OPM_ENCRYPTION_KEY}" -ne 44 ]; then
+            echo "::error::Generated encryption key must be exactly 44 characters"
+            exit 1
+          fi
+          echo "OPM_ENCRYPTION_KEY=$OPM_ENCRYPTION_KEY" >> "$GITHUB_ENV"
+
       - name: Start services
         run: docker compose up -d --build
         env:
