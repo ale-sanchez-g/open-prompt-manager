@@ -362,6 +362,7 @@ def render(prompt_id: int, payload: RenderRequest, db: Annotated[Session, Depend
         400: {'description': 'Provider is disabled, rejected the request, or authentication failed.'},
         404: {'description': 'Prompt, provider, or agent not found.'},
         422: {'description': 'Missing required variable or circular component reference detected.'},
+        500: {'description': "Failed to decrypt the provider's stored API key."},
         502: {'description': 'Provider is unreachable or timed out.'},
     },
 )

@@ -7,6 +7,8 @@ constants = {
     'REGISTER_USER_ID_EXAMPLE': 'usr_abc123',
     'EXAMPLE_EMAIL': 'user@opm.io',
     'EXAMPLE_PASS': 'Str0ng!Pass', # Note: these are just examples and should not be used in production
+    'EXAMPLE_PROVIDER_NAME': 'My DeepSeek Account',
+    'EXAMPLE_PROVIDER_BASE_URL': 'https://api.deepseek.com',
 }
 
 class AuthRequest(BaseModel):
@@ -671,7 +673,7 @@ class PromptTestRequest(BaseModel):
 class PromptTestResponse(BaseModel):
     output: str = Field(..., description='The raw text response from the LLM.', examples=['Hello, Alice! Welcome to PromptHub.'])
     model: str = Field(..., description='Model identifier actually used for the completion.', examples=['deepseek-chat'])
-    provider: str = Field(..., description='Name of the provider connection used.', examples=['My DeepSeek Account'])
+    provider: str = Field(..., description='Name of the provider connection used.', examples=[constants['EXAMPLE_PROVIDER_NAME']])
     rendered_prompt: str = Field(..., description='The fully-rendered prompt text sent to the LLM.', examples=['Hello, Alice! Welcome to PromptHub.'])
     latency_ms: float = Field(..., description='Round-trip latency of the LLM call in milliseconds.', examples=[340.5])
     prompt_tokens: int = Field(0, description='Tokens consumed by the prompt.', examples=[42])
@@ -682,13 +684,13 @@ class PromptTestResponse(BaseModel):
 
 # Provider schemas
 class ProviderCreate(BaseModel):
-    name: str = Field(..., description='Human-readable name for this provider connection.', examples=['My DeepSeek Account'])
+    name: str = Field(..., description='Human-readable name for this provider connection.', examples=[constants['EXAMPLE_PROVIDER_NAME']])
     provider_type: Literal['ollama', 'openai_compatible'] = Field(
         ...,
         description="Adapter type. One of: 'ollama', 'openai_compatible'.",
         examples=['openai_compatible'],
     )
-    base_url: str = Field(..., description='Base URL of the provider API.', examples=['https://api.deepseek.com'])
+    base_url: str = Field(..., description='Base URL of the provider API.', examples=[constants['EXAMPLE_PROVIDER_BASE_URL']])
     api_key: Optional[str] = Field(
         None,
         description='Plaintext API key. Encrypted at rest; never returned in responses.',
@@ -701,9 +703,9 @@ class ProviderCreate(BaseModel):
     model_config = {
         'json_schema_extra': {
             'example': {
-                'name': 'My DeepSeek Account',
+                'name': constants['EXAMPLE_PROVIDER_NAME'],
                 'provider_type': 'openai_compatible',
-                'base_url': 'https://api.deepseek.com',
+                'base_url': constants['EXAMPLE_PROVIDER_BASE_URL'],
                 'api_key': 'your-provider-api-key',
                 'default_model': 'deepseek-chat',
                 'cost_per_1k_input_tokens': 0.001,
@@ -714,9 +716,9 @@ class ProviderCreate(BaseModel):
 
 
 class ProviderUpdate(BaseModel):
-    name: Optional[str] = Field(None, description='Updated display name.', examples=['My DeepSeek Account'])
+    name: Optional[str] = Field(None, description='Updated display name.', examples=[constants['EXAMPLE_PROVIDER_NAME']])
     provider_type: Optional[Literal['ollama', 'openai_compatible']] = Field(None, description="Updated adapter type. One of: 'ollama', 'openai_compatible'.", examples=['openai_compatible'])
-    base_url: Optional[str] = Field(None, description='Updated base URL of the provider API.', examples=['https://api.deepseek.com'])
+    base_url: Optional[str] = Field(None, description='Updated base URL of the provider API.', examples=[constants['EXAMPLE_PROVIDER_BASE_URL']])
     api_key: Optional[str] = Field(
         None,
         description=(
@@ -739,9 +741,9 @@ class ProviderUpdate(BaseModel):
 
 class ProviderResponse(BaseModel):
     id: int = Field(..., description='Auto-assigned primary key.', examples=[1])
-    name: str = Field(..., description='Human-readable name for this provider connection.', examples=['My DeepSeek Account'])
+    name: str = Field(..., description='Human-readable name for this provider connection.', examples=[constants['EXAMPLE_PROVIDER_NAME']])
     provider_type: str = Field(..., description='Adapter type.', examples=['openai_compatible'])
-    base_url: str = Field(..., description='Base URL of the provider API.', examples=['https://api.deepseek.com'])
+    base_url: str = Field(..., description='Base URL of the provider API.', examples=[constants['EXAMPLE_PROVIDER_BASE_URL']])
     api_key_masked: Optional[str] = Field(
         None,
         description='Masked API key (first 3 and last 3 characters only), or null if no key is stored.',
@@ -776,7 +778,7 @@ class ProviderTestResponse(BaseModel):
 class ProviderPresetResponse(BaseModel):
     key: str = Field(..., description='Preset identifier to use as `provider_type`-agnostic hint.', examples=['deepseek'])
     name: str = Field(..., description='Display name of the preset provider.', examples=['DeepSeek'])
-    base_url: str = Field(..., description='Base URL to prefill for this preset.', examples=['https://api.deepseek.com'])
+    base_url: str = Field(..., description='Base URL to prefill for this preset.', examples=[constants['EXAMPLE_PROVIDER_BASE_URL']])
 
 
 # Metric schemas

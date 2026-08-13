@@ -223,6 +223,7 @@ def delete_provider(
     responses={
         400: {'description': 'Provider rejected the request (bad request or authentication failure).'},
         404: {'description': 'Provider not found.'},
+        500: {'description': "Failed to decrypt the provider's stored API key."},
         502: {'description': 'Provider is unreachable or timed out.'},
     },
 )
@@ -252,7 +253,10 @@ async def get_provider_models(
         'reported as `ok: false` with a `detail` message.'
     ),
     response_description='Health check result.',
-    responses={404: {'description': 'Provider not found.'}},
+    responses={
+        404: {'description': 'Provider not found.'},
+        500: {'description': "Failed to decrypt the provider's stored API key."},
+    },
 )
 async def test_provider(
     provider_id: int,
