@@ -73,6 +73,13 @@ variable "jwt_secret" {
   sensitive   = true
 }
 
+variable "opm_encryption_key" {
+  description = "Fernet key (32 url-safe base64-encoded bytes) used to encrypt LLM provider API keys at rest. If unset, Terraform generates one. Rotating this value invalidates every already-stored provider API key."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "frontend_image" {
   description = "Full URI of the frontend Docker image (ECR or any registry)."
   type        = string
