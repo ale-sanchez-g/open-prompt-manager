@@ -226,16 +226,24 @@ async def test_chat_403_raises_auth_error():
 
 @pytest.mark.anyio
 async def test_chat_500_raises_unavailable():
-    provider = _provider(lambda _r: httpx.Response(500, text='internal error'))
-    with pytest.raises(ProviderUnavailableError):
+    sensitive_body = 'Traceback (most recent call last): internal-secret-detail'
+    provider = _provider(lambda _r: httpx.Response(500, text=sensitive_body))
+    with pytest.raises(ProviderUnavailableError) as excinfo:
         await provider.chat(messages=[{'role': 'user', 'content': 'Hi'}], model='gpt-test')
+
+    # The exception message is surfaced verbatim to API clients (str(exc)) —
+    # the provider's response body must never leak through it.
+    assert sensitive_body not in str(excinfo.value)
 
 
 @pytest.mark.anyio
 async def test_chat_400_raises_bad_request():
-    provider = _provider(lambda _r: httpx.Response(400, text='invalid request'))
-    with pytest.raises(ProviderBadRequestError):
+    sensitive_body = 'invalid request: internal-secret-detail'
+    provider = _provider(lambda _r: httpx.Response(400, text=sensitive_body))
+    with pytest.raises(ProviderBadRequestError) as excinfo:
         await provider.chat(messages=[{'role': 'user', 'content': 'Hi'}], model='gpt-test')
+
+    assert sensitive_body not in str(excinfo.value)
 
 
 @pytest.mark.anyio
@@ -296,10 +304,14 @@ async def test_health_check_healthy():
 
 @pytest.mark.anyio
 async def test_health_check_unauthorized():
-    provider = _provider(lambda _r: httpx.Response(401, text='unauthorized'))
+    sensitive_body = 'unauthorized: internal-secret-detail'
+    provider = _provider(lambda _r: httpx.Response(401, text=sensitive_body))
     health = await provider.health_check()
     assert health.healthy is False
     assert health.detail is not None
+    # POST /api/providers/{id}/test surfaces `detail` verbatim to API
+    # clients — the provider's response body must never leak through it.
+    assert sensitive_body not in health.detail
 
 
 @pytest.mark.anyio

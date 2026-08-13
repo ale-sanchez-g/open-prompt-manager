@@ -105,6 +105,26 @@ def test_delete_provider(anon_client, admin_token):
     assert response.json() == []
 
 
+def test_create_with_invalid_provider_type_returns_422(anon_client, admin_token):
+    payload = dict(PROVIDER_PAYLOAD, provider_type='not-a-real-provider')
+    response = anon_client.post('/api/providers/', json=payload, headers=_auth(admin_token))
+
+    # An unconstrained string here would persist a broken config that later
+    # 500s when get_provider() is called against it — must be rejected at
+    # the schema level instead.
+    assert response.status_code == 422
+
+
+def test_update_with_invalid_provider_type_returns_422(anon_client, admin_token):
+    created = _create_provider(anon_client, admin_token)
+    response = anon_client.put(
+        f"/api/providers/{created['id']}",
+        json={'provider_type': 'not-a-real-provider'},
+        headers=_auth(admin_token),
+    )
+    assert response.status_code == 422
+
+
 def test_get_models_and_test_404_for_missing_provider(anon_client, admin_token):
     response = anon_client.get('/api/providers/999/models', headers=_auth(admin_token))
     assert response.status_code == 404

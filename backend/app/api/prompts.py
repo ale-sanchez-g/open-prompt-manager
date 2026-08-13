@@ -355,12 +355,12 @@ def render(prompt_id: int, payload: RenderRequest, db: Annotated[Session, Depend
         'Renders the prompt with the supplied variables, exactly like `POST /render`, then sends the '
         'rendered text to a configured LLM provider for a live completion. A `PromptExecution` is '
         'recorded for both successful and failed provider calls, and the prompt\'s aggregate stats '
-        '(`usage_count`, `avg_rating`, `success_rate`) are refreshed on success.'
+        '(`usage_count`, `avg_rating`, `success_rate`) are refreshed on every run, success or failure.'
     ),
     response_description='The LLM output together with token/latency stats and the recorded execution ID.',
     responses={
         400: {'description': 'Provider is disabled, rejected the request, or authentication failed.'},
-        404: {'description': 'Prompt or provider not found.'},
+        404: {'description': 'Prompt, provider, or agent not found.'},
         422: {'description': 'Missing required variable or circular component reference detected.'},
         502: {'description': 'Provider is unreachable or timed out.'},
     },
@@ -371,6 +371,9 @@ async def test_prompt(prompt_id: int, payload: PromptTestRequest, db: Annotated[
         rendered, _vars_used, _components = render_prompt(prompt, payload.variables, db)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+
+    if payload.agent_id is not None and db.get(Agent, payload.agent_id) is None:
+        raise HTTPException(status_code=404, detail=f'Agent {payload.agent_id} not found')
 
     config = db.get(LLMProviderConfig, payload.provider_id)
     if config is None:

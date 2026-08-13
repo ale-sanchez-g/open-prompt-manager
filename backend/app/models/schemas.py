@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field
 
 constants = {
@@ -683,7 +683,7 @@ class PromptTestResponse(BaseModel):
 # Provider schemas
 class ProviderCreate(BaseModel):
     name: str = Field(..., description='Human-readable name for this provider connection.', examples=['My DeepSeek Account'])
-    provider_type: str = Field(
+    provider_type: Literal['ollama', 'openai_compatible'] = Field(
         ...,
         description="Adapter type. One of: 'ollama', 'openai_compatible'.",
         examples=['openai_compatible'],
@@ -715,7 +715,7 @@ class ProviderCreate(BaseModel):
 
 class ProviderUpdate(BaseModel):
     name: Optional[str] = Field(None, description='Updated display name.', examples=['My DeepSeek Account'])
-    provider_type: Optional[str] = Field(None, description="Updated adapter type. One of: 'ollama', 'openai_compatible'.", examples=['openai_compatible'])
+    provider_type: Optional[Literal['ollama', 'openai_compatible']] = Field(None, description="Updated adapter type. One of: 'ollama', 'openai_compatible'.", examples=['openai_compatible'])
     base_url: Optional[str] = Field(None, description='Updated base URL of the provider API.', examples=['https://api.deepseek.com'])
     api_key: Optional[str] = Field(
         None,

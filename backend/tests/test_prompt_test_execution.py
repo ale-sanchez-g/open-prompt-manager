@@ -191,6 +191,24 @@ def test_test_prompt_unknown_provider_returns_404(client):
     assert response.status_code == 404
 
 
+def test_test_prompt_unknown_agent_returns_404(client, anon_client, admin_token, monkeypatch):
+    provider = _create_provider(anon_client, admin_token)
+    prompt = _create_prompt(client)
+    fake = FakeProvider(result=CompletionResult(content='x', model='m'))
+    _patch_provider(monkeypatch, fake)
+
+    response = client.post(
+        f"/api/prompts/{prompt['id']}/test",
+        json={'provider_id': provider['id'], 'variables': {'user_name': 'Alice'}, 'agent_id': 999999},
+    )
+
+    # A non-existent agent_id must be rejected cleanly, not surfaced as a
+    # 500 from a foreign-key constraint violation on commit.
+    assert response.status_code == 404
+    assert fake.calls == []
+    assert client.get(f"/api/prompts/{prompt['id']}/executions").json() == []
+
+
 def test_test_prompt_disabled_provider_returns_400(client, anon_client, admin_token):
     provider = _create_provider(anon_client, admin_token)
     disable_response = anon_client.put(

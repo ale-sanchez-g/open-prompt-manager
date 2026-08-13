@@ -85,18 +85,24 @@ class OpenAICompatibleProvider(LLMProvider):
         raise ProviderUnavailableError(f'Provider error: {exc}') from exc
 
     def _check_response(self, response: httpx.Response) -> None:
-        """Raise a normalized exception for non-2xx buffered responses."""
+        """Raise a normalized exception for non-2xx buffered responses.
+
+        Only the status code is included in the message. The response body
+        comes from the (possibly misconfigured or malicious) provider server
+        and callers surface ``str(exc)`` directly to API clients, so it must
+        never be echoed back verbatim.
+        """
         if response.status_code in (401, 403):
             raise ProviderAuthError(
                 f'Provider returned {response.status_code} Unauthorized'
             )
         if response.status_code >= 500:
             raise ProviderUnavailableError(
-                f'Provider server error {response.status_code}: {response.text}'
+                f'Provider server error {response.status_code}'
             )
         if response.status_code >= 400:
             raise ProviderBadRequestError(
-                f'Provider client error {response.status_code}: {response.text}'
+                f'Provider client error {response.status_code}'
             )
 
     def _check_stream_response(self, response: httpx.Response) -> None:
@@ -250,7 +256,9 @@ class OpenAICompatibleProvider(LLMProvider):
             return ProviderHealth(
                 healthy=healthy,
                 provider='openai_compatible',
-                detail=response.text if not healthy else None,
+                # Status-code only — the body is untrusted provider content and
+                # this detail is surfaced verbatim by POST /api/providers/{id}/test.
+                detail=f'Provider returned {response.status_code}' if not healthy else None,
             )
         except httpx.TimeoutException as exc:
             return ProviderHealth(healthy=False, provider='openai_compatible', detail=str(exc))
