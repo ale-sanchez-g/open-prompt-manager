@@ -126,11 +126,6 @@ class LLMProvider(ABC):
             ProviderAuthError, ProviderTimeoutError, ProviderUnavailableError,
             ProviderBadRequestError — same semantics as chat().
         """
-        # Declare as async generator to satisfy the abstract contract.
-        # Subclasses must override this; the body is never reached.
-        raise NotImplementedError  # pragma: no cover
-        # Make this an async generator at the type level.
-        yield  # type: ignore[misc]  # pragma: no cover
 
     @abstractmethod
     async def list_models(self) -> list[ModelInfo]:
