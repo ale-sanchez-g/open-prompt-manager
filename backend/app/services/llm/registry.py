@@ -13,6 +13,14 @@ from .ollama import OllamaProvider
 from .openai_compatible import OpenAICompatibleProvider
 
 
+_OPTIONAL_TIMEOUT_KEYS = ('connect_timeout', 'read_timeout')
+
+
+def _copy_optional_kwargs(provider_config: dict[str, Any], keys: tuple[str, ...]) -> dict[str, Any]:
+    """Copy any of ``keys`` present in ``provider_config`` into a fresh kwargs dict."""
+    return {key: provider_config[key] for key in keys if key in provider_config}
+
+
 def get_provider(provider_config: dict[str, Any]) -> LLMProvider:
     """
     Instantiate and return an LLMProvider for the given configuration.
@@ -35,25 +43,14 @@ def get_provider(provider_config: dict[str, Any]) -> LLMProvider:
     provider_type = provider_config.get('type', '')
 
     if provider_type == 'ollama':
-        kwargs: dict[str, Any] = {}
-        if 'base_url' in provider_config:
-            kwargs['base_url'] = provider_config['base_url']
-        if 'connect_timeout' in provider_config:
-            kwargs['connect_timeout'] = provider_config['connect_timeout']
-        if 'read_timeout' in provider_config:
-            kwargs['read_timeout'] = provider_config['read_timeout']
+        kwargs = _copy_optional_kwargs(provider_config, ('base_url',) + _OPTIONAL_TIMEOUT_KEYS)
         return OllamaProvider(**kwargs)
 
     if provider_type == 'openai_compatible':
         if not provider_config.get('base_url'):
             raise ValueError("Provider type 'openai_compatible' requires a 'base_url'.")
         kwargs = {'base_url': provider_config['base_url']}
-        if 'api_key' in provider_config:
-            kwargs['api_key'] = provider_config['api_key']
-        if 'connect_timeout' in provider_config:
-            kwargs['connect_timeout'] = provider_config['connect_timeout']
-        if 'read_timeout' in provider_config:
-            kwargs['read_timeout'] = provider_config['read_timeout']
+        kwargs.update(_copy_optional_kwargs(provider_config, ('api_key',) + _OPTIONAL_TIMEOUT_KEYS))
         return OpenAICompatibleProvider(**kwargs)
 
     raise ValueError(

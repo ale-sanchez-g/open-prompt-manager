@@ -1,6 +1,6 @@
 import time
 from collections import deque
-from typing import Annotated, Optional
+from typing import Annotated, NoReturn, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,7 @@ from app.models.schemas import (
 )
 from app.services import encryption
 from app.services.llm.base import (
+    CompletionResult,
     ProviderAuthError,
     ProviderBadRequestError,
     ProviderTimeoutError,
@@ -347,6 +348,70 @@ def render(prompt_id: int, payload: RenderRequest, db: Annotated[Session, Depend
     )
 
 
+def _validate_test_agent(agent_id: Optional[int], db: Session) -> None:
+    if agent_id is not None and db.get(Agent, agent_id) is None:
+        raise HTTPException(status_code=404, detail=f'Agent {agent_id} not found')
+
+
+def _resolve_test_provider(payload: PromptTestRequest, db: Session) -> tuple[LLMProviderConfig, str, Optional[str]]:
+    """Look up and validate the provider for a test run. Returns (config, model, decrypted api_key)."""
+    config = db.get(LLMProviderConfig, payload.provider_id)
+    if config is None:
+        raise HTTPException(status_code=404, detail=f'Provider {payload.provider_id} not found')
+    if not config.enabled:
+        raise HTTPException(status_code=400, detail=f'Provider {payload.provider_id} is disabled')
+
+    model = payload.model or config.default_model
+    if not model:
+        raise HTTPException(status_code=400, detail='No model specified and the provider has no default_model configured')
+
+    api_key = None
+    if config.api_key_encrypted:
+        try:
+            api_key = encryption.decrypt(config.api_key_encrypted)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=500, detail=f'Failed to decrypt provider API key: {exc}') from exc
+
+    return config, model, api_key
+
+
+def _record_failed_test_execution(
+    prompt_id: int,
+    payload: PromptTestRequest,
+    rendered: str,
+    exc: Exception,
+    execution_time_ms: int,
+    db: Session,
+) -> NoReturn:
+    """Record a failed PromptExecution for a provider-call failure, then raise the matching HTTPException."""
+    failed_execution = PromptExecution(
+        prompt_id=prompt_id,
+        agent_id=payload.agent_id,
+        input_variables=payload.variables,
+        rendered_prompt=rendered,
+        response=None,
+        execution_time_ms=execution_time_ms,
+        success=0,
+    )
+    db.add(failed_execution)
+    db.commit()
+    update_prompt_stats(prompt_id, db)
+    if isinstance(exc, ProviderAuthError):
+        raise HTTPException(status_code=400, detail=f'Provider authentication failed: {exc}') from exc
+    if isinstance(exc, ProviderBadRequestError):
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    raise HTTPException(status_code=502, detail=f'Provider request failed: {exc}') from exc
+
+
+def _compute_test_cost(config: LLMProviderConfig, result: CompletionResult) -> float:
+    cost = 0.0
+    if config.cost_per_1k_input_tokens:
+        cost += (result.prompt_tokens / 1000) * config.cost_per_1k_input_tokens
+    if config.cost_per_1k_output_tokens:
+        cost += (result.completion_tokens / 1000) * config.cost_per_1k_output_tokens
+    return cost
+
+
 @router.post(
     '/{prompt_id}/test',
     response_model=PromptTestResponse,
@@ -373,25 +438,8 @@ async def test_prompt(prompt_id: int, payload: PromptTestRequest, db: Annotated[
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
-    if payload.agent_id is not None and db.get(Agent, payload.agent_id) is None:
-        raise HTTPException(status_code=404, detail=f'Agent {payload.agent_id} not found')
-
-    config = db.get(LLMProviderConfig, payload.provider_id)
-    if config is None:
-        raise HTTPException(status_code=404, detail=f'Provider {payload.provider_id} not found')
-    if not config.enabled:
-        raise HTTPException(status_code=400, detail=f'Provider {payload.provider_id} is disabled')
-
-    model = payload.model or config.default_model
-    if not model:
-        raise HTTPException(status_code=400, detail='No model specified and the provider has no default_model configured')
-
-    api_key = None
-    if config.api_key_encrypted:
-        try:
-            api_key = encryption.decrypt(config.api_key_encrypted)
-        except RuntimeError as exc:
-            raise HTTPException(status_code=500, detail=f'Failed to decrypt provider API key: {exc}') from exc
+    _validate_test_agent(payload.agent_id, db)
+    config, model, api_key = _resolve_test_provider(payload, db)
 
     params = payload.params.model_dump(exclude_none=True) if payload.params else None
 
@@ -405,29 +453,7 @@ async def test_prompt(prompt_id: int, payload: PromptTestRequest, db: Annotated[
             params=params,
         )
     except (ProviderAuthError, ProviderBadRequestError, ProviderUnavailableError, ProviderTimeoutError) as exc:
-        failed_execution = PromptExecution(
-            prompt_id=prompt_id,
-            agent_id=payload.agent_id,
-            input_variables=payload.variables,
-            rendered_prompt=rendered,
-            response=None,
-            execution_time_ms=int((time.monotonic() - t0) * 1000),
-            success=0,
-        )
-        db.add(failed_execution)
-        db.commit()
-        update_prompt_stats(prompt_id, db)
-        if isinstance(exc, ProviderAuthError):
-            raise HTTPException(status_code=400, detail=f'Provider authentication failed: {exc}') from exc
-        if isinstance(exc, ProviderBadRequestError):
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        raise HTTPException(status_code=502, detail=f'Provider request failed: {exc}') from exc
-
-    cost = 0.0
-    if config.cost_per_1k_input_tokens:
-        cost += (result.prompt_tokens / 1000) * config.cost_per_1k_input_tokens
-    if config.cost_per_1k_output_tokens:
-        cost += (result.completion_tokens / 1000) * config.cost_per_1k_output_tokens
+        _record_failed_test_execution(prompt_id, payload, rendered, exc, int((time.monotonic() - t0) * 1000), db)
 
     execution = PromptExecution(
         prompt_id=prompt_id,
@@ -437,7 +463,7 @@ async def test_prompt(prompt_id: int, payload: PromptTestRequest, db: Annotated[
         response=result.content,
         execution_time_ms=int(result.latency_ms),
         token_count=result.total_tokens,
-        cost=cost,
+        cost=_compute_test_cost(config, result),
         success=1,
     )
     db.add(execution)

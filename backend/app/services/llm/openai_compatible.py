@@ -188,6 +188,26 @@ class OpenAICompatibleProvider(LLMProvider):
             raw=data,
         )
 
+    @staticmethod
+    async def _iter_sse_deltas(response: httpx.Response) -> AsyncIterator[str]:
+        """Parse SSE 'data: ' lines from a streaming chat-completions response, yielding text deltas."""
+        async for line in response.aiter_lines():
+            if not line or not line.startswith('data:'):
+                continue
+            data_str = line[len('data:'):].strip()
+            if data_str == '[DONE]':
+                break
+            try:
+                chunk = json.loads(data_str)
+            except json.JSONDecodeError:
+                continue
+            choices = chunk.get('choices') or []
+            if not choices:
+                continue
+            delta = choices[0].get('delta', {}).get('content', '')
+            if delta:
+                yield delta
+
     async def chat_stream(
         self,
         messages: list[dict[str, str]],
@@ -203,22 +223,8 @@ class OpenAICompatibleProvider(LLMProvider):
             async with self._client() as client:
                 async with client.stream('POST', url, json=payload) as response:
                     self._check_stream_response(response)
-                    async for line in response.aiter_lines():
-                        if not line or not line.startswith('data:'):
-                            continue
-                        data_str = line[len('data:'):].strip()
-                        if data_str == '[DONE]':
-                            break
-                        try:
-                            chunk = json.loads(data_str)
-                        except json.JSONDecodeError:
-                            continue
-                        choices = chunk.get('choices') or []
-                        if not choices:
-                            continue
-                        delta = choices[0].get('delta', {}).get('content', '')
-                        if delta:
-                            yield delta
+                    async for delta in self._iter_sse_deltas(response):
+                        yield delta
         except (ProviderAuthError, ProviderBadRequestError, ProviderUnavailableError, ProviderTimeoutError):
             raise
         except Exception as exc:
