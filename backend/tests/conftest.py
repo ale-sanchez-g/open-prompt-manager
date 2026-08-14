@@ -11,6 +11,7 @@ from sqlalchemy.orm import sessionmaker
 # Import models so Base.metadata is fully populated before create_all
 from app.models.auth import User, RefreshToken  # noqa
 from app.models.prompt import Prompt, Tag, Agent, PromptMetric, PromptExecution  # noqa
+from app.models.llm_provider_config import LLMProviderConfig  # noqa
 import app.database.base as db_module
 from app.database.base import Base, get_db
 from main import create_app
@@ -81,4 +82,4 @@ def client(anon_client):
     login_response = anon_client.post('/auth/login', json=AUTH_TEST_USER)
     assert login_response.status_code == 200
     anon_client.headers.update({'Authorization': f"Bearer {login_response.json()['access_token']}"})
-    yield anon_client
+    return anon_client

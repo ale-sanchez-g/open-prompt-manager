@@ -145,6 +145,10 @@ resource "aws_ecs_task_definition" "backend" {
           {
             name      = "JWT_SECRET"
             valueFrom = aws_secretsmanager_secret.jwt_secret.arn
+          },
+          {
+            name      = "OPM_ENCRYPTION_KEY"
+            valueFrom = aws_secretsmanager_secret.opm_encryption_key.arn
           }
         ]
 
