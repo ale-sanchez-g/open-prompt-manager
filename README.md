@@ -193,7 +193,7 @@ Optional flags:
 
 Required repository configuration:
 
-- Secret: `AWS_DEPLOY_ROLE_ARN` (IAM role trusted by GitHub OIDC). The role needs `kms:Decrypt` on the `alias/<project>-secrets` key so re-deploys can read the existing `JWT_SECRET`. See [`terraform/install.md`](terraform/install.md#prerequisites) for the full permission list.
+- Secret: `AWS_DEPLOY_ROLE_ARN` (IAM role trusted by GitHub OIDC). The role needs `kms:Decrypt` on the `alias/<project>-secrets` key so re-deploys can read the existing `JWT_SECRET` and `OPM_ENCRYPTION_KEY`. See [`terraform/install.md`](terraform/install.md#prerequisites) for the full permission list.
 - Environment: create a `prod` environment (Settings → Environments) and add required reviewers to enable the manual approval gate.
 - Optional variables: `AWS_REGION`, `PROJECT_NAME`, `ENVIRONMENT` (defaults: `ap-southeast-2`, `open-prompt-manager`, `prod`)
 
@@ -522,6 +522,7 @@ helm install prompt-manager ./helm/prompt-manager \
 |----------|---------|-------------|
 | `DATABASE_URL` | `sqlite:///./data/prompts.db` | Database connection string |
 | `JWT_SECRET` | _(required)_ | Secret used to sign access and refresh tokens. Must be set before the backend starts. |
+| `OPM_ENCRYPTION_KEY` | _(empty)_ | Fernet key used to encrypt LLM provider API keys at rest (`POST /api/providers`). Generate one with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Only required once a provider connection with an API key is configured; storing or reading an encrypted key without it set raises an error. |
 | `ADMIN_EMAILS` | _(empty)_ | Comma-separated list of emails that are always assigned the `admin` role at registration. Provides a deterministic way to bootstrap administrators independent of registration order. The very first registered account is always made an admin regardless of this setting. |
 | `CORS_ORIGINS` | `http://localhost,http://localhost:3000,vscode-file://vscode-app` | Comma-separated allowed CORS origins. Include `vscode-file://vscode-app` for VS Code MCP clients. |
 | `MCP_ALLOWED_HOSTS` | `localhost,localhost:8000,127.0.0.1,127.0.0.1:8000` | Comma-separated host names allowed to connect to the MCP endpoint |
