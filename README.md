@@ -113,14 +113,16 @@ Local Docker migration:
 
 ```bash
 cd backend
-python -m migrations.add_agent_updated_at   # MIG-001: agents.updated_at
-python -m migrations.add_user_role          # MIG-002: users.role
+python -m migrations.add_agent_updated_at     # MIG-001: agents.updated_at
+python -m migrations.add_user_role            # MIG-002: users.role
+python -m migrations.add_user_extended_fields # users extended profile fields
+python -m migrations.add_llm_provider_config  # llm_provider_configs table
 ```
 
 AWS ECS migration — run any migration module(s) as a one-off task with the reusable runner:
 
 ```bash
-AWS_REGION=us-east-1 ./scripts/migration/run_aws_migration.sh migrations.add_user_role
+AWS_REGION=us-east-1 ./scripts/migration/run_aws_migration.sh migrations.add_user_role migrations.add_llm_provider_config
 
 # Or use the dated convenience wrappers:
 AWS_REGION=us-east-1 ./scripts/migration/2026-apr-09-aws-mig-001.sh   # agents.updated_at

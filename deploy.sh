@@ -776,10 +776,11 @@ else
     "${SCRIPT_DIR}/scripts/migration/run_aws_migration.sh" \
       migrations.add_agent_updated_at \
       migrations.add_user_role \
-      migrations.add_user_extended_fields; then
+      migrations.add_user_extended_fields \
+      migrations.add_llm_provider_config; then
     ok "Database schema is up to date."
   else
-    fail "Database migration failed. The infrastructure is deployed but the schema upgrade did not complete. Inspect CloudWatch logs (/ecs/${PROJECT_NAME}/backend) and re-run: AWS_REGION=${AWS_REGION} ${SCRIPT_DIR}/scripts/migration/run_aws_migration.sh migrations.add_agent_updated_at migrations.add_user_role migrations.add_user_extended_fields"
+    fail "Database migration failed. The infrastructure is deployed but the schema upgrade did not complete. Inspect CloudWatch logs (/ecs/${PROJECT_NAME}/backend) and re-run: AWS_REGION=${AWS_REGION} ${SCRIPT_DIR}/scripts/migration/run_aws_migration.sh migrations.add_agent_updated_at migrations.add_user_role migrations.add_user_extended_fields migrations.add_llm_provider_config"
   fi
  fi 
 
