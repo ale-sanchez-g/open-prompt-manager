@@ -82,4 +82,4 @@ def client(anon_client):
     login_response = anon_client.post('/auth/login', json=AUTH_TEST_USER)
     assert login_response.status_code == 200
     anon_client.headers.update({'Authorization': f"Bearer {login_response.json()['access_token']}"})
-    yield anon_client
+    return anon_client
