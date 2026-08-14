@@ -72,6 +72,13 @@ def _instantiate_provider(config: LLMProviderConfig):
     })
 
 
+def _encrypt_api_key(api_key: str) -> str:
+    try:
+        return encryption.encrypt(api_key)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=f'Failed to encrypt provider API key: {exc}') from exc
+
+
 _PROVIDER_ERROR_STATUS = {
     ProviderUnavailableError: 502,
     ProviderTimeoutError: 502,
@@ -138,7 +145,7 @@ def create_provider(
         name=payload.name,
         provider_type=payload.provider_type,
         base_url=payload.base_url,
-        api_key_encrypted=encryption.encrypt(payload.api_key) if payload.api_key else None,
+        api_key_encrypted=_encrypt_api_key(payload.api_key) if payload.api_key else None,
         default_model=payload.default_model,
         cost_per_1k_input_tokens=payload.cost_per_1k_input_tokens,
         cost_per_1k_output_tokens=payload.cost_per_1k_output_tokens,
@@ -178,7 +185,7 @@ def update_provider(
     if payload.base_url is not None:
         config.base_url = payload.base_url
     if payload.api_key:
-        config.api_key_encrypted = encryption.encrypt(payload.api_key)
+        config.api_key_encrypted = _encrypt_api_key(payload.api_key)
     if payload.default_model is not None:
         config.default_model = payload.default_model
     if payload.enabled is not None:

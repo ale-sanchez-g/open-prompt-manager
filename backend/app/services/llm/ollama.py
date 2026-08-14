@@ -66,20 +66,22 @@ class OllamaProvider(LLMProvider):
         raise ProviderUnavailableError(f'Ollama error: {exc}') from exc
 
     def _check_response(self, response: httpx.Response) -> None:
-        """Raise a normalized exception for non-2xx buffered responses."""
+        """Raise a normalized exception for non-2xx buffered responses.
+
+        Only the status code is included in the message. The response body
+        comes from the (possibly misconfigured or malicious) provider server
+        and callers surface ``str(exc)`` directly to API clients, so it must
+        never be echoed back verbatim.
+        """
         if response.status_code == 401:
             raise ProviderAuthError('Ollama returned 401 Unauthorized')
-        if response.status_code == 400:
-            raise ProviderBadRequestError(
-                f'Ollama bad request: {response.text}'
-            )
         if response.status_code >= 500:
             raise ProviderUnavailableError(
-                f'Ollama server error {response.status_code}: {response.text}'
+                f'Ollama server error {response.status_code}'
             )
         if response.status_code >= 400:
             raise ProviderBadRequestError(
-                f'Ollama client error {response.status_code}: {response.text}'
+                f'Ollama client error {response.status_code}'
             )
 
     def _check_stream_response(self, response: httpx.Response) -> None:
@@ -234,10 +236,13 @@ class OllamaProvider(LLMProvider):
         try:
             async with self._client() as client:
                 response = await client.get(url)
+            healthy = response.status_code < 400
             return ProviderHealth(
-                healthy=response.status_code < 400,
+                healthy=healthy,
                 provider='ollama',
-                detail=response.text if response.status_code >= 400 else None,
+                # Status-code only — the body is untrusted provider content and
+                # this detail is surfaced verbatim by POST /api/providers/{id}/test.
+                detail=f'Ollama returned {response.status_code}' if not healthy else None,
             )
         except httpx.TimeoutException as exc:
             return ProviderHealth(healthy=False, provider='ollama', detail=str(exc))
