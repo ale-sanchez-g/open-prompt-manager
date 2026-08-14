@@ -134,7 +134,11 @@ def list_providers(
     summary='Add a provider',
     description='Registers a new LLM provider connection. The API key, if supplied, is encrypted at rest. Requires an admin access token.',
     response_description='The newly created provider connection, with a masked API key.',
-    responses={401: {'description': 'Authentication required.'}, 403: {'description': 'Admin role required.'}},
+    responses={
+        401: {'description': 'Authentication required.'},
+        403: {'description': 'Admin role required.'},
+        500: {'description': 'Failed to encrypt the supplied API key.'},
+    },
 )
 def create_provider(
     payload: ProviderCreate,
@@ -169,6 +173,7 @@ def create_provider(
         401: {'description': 'Authentication required.'},
         403: {'description': 'Admin role required.'},
         404: {'description': 'Provider not found.'},
+        500: {'description': 'Failed to encrypt the supplied API key.'},
     },
 )
 def update_provider(
