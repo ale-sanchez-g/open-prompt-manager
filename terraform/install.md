@@ -74,7 +74,7 @@ Internet
 | **OTel Collector (sidecar)** | AWS Distro for OpenTelemetry Collector runs as a sidecar in the backend task (`otel.tf`, image pinned by digest, toggle via `otel_collector_enabled`). Receives OTLP on `localhost:4317`/`4318`; exporter defaults to `debug` (no-op) until `otel_exporter_otlp_endpoint` is set. Config is rendered by Terraform into the SSM SecureString parameter `/<project>/<env>/otel/collector-config` and injected as `AOT_CONFIG_CONTENT`, so the exporter target flips without a new task-definition image. Logs to `/ecs/<project>/otel-collector`. |
 | **ECR** | Private container image registry with lifecycle policies for backend and frontend Docker images. Image layers are encrypted at rest with a dedicated customer-managed KMS key (`alias/<project>-ecr`). |
 | **RDS PostgreSQL 16** | `db.t4g.micro` with 20 GiB gp3 storage, encrypted at rest, in the private subnets. Multi-AZ disabled by default (enable via `db_multi_az = true`). **IAM database authentication enabled** as an additional access path alongside password auth. |
-| **Secrets Manager** | Stores the auto-generated PostgreSQL `DATABASE_URL` at `<project>/<env>/database-url` and the `JWT_SECRET`, both encrypted with a dedicated customer-managed KMS key (`alias/<project>-secrets`). Injected into the backend ECS container at task start — never a plain-text env var. The `DATABASE_URL` secret is **rotated automatically** every `db_secret_rotation_days` (default 30) by an in-VPC Lambda. |
+| **Secrets Manager** | Stores the auto-generated PostgreSQL `DATABASE_URL` (`<project>/<env>/database-url`), `JWT_SECRET` (`<project>/<env>/jwt-secret`), and `OPM_ENCRYPTION_KEY` (`<project>/<env>/opm-encryption-key` — Fernet key used to encrypt LLM provider API keys at rest), all encrypted with a dedicated customer-managed KMS key (`alias/<project>-secrets`). Injected into the backend ECS container at task start — never a plain-text env var. The `DATABASE_URL` secret is **rotated automatically** every `db_secret_rotation_days` (default 30) by an in-VPC Lambda. |
 | **Secret rotation Lambda** | `db-rotation` function (private subnets, dedicated SG, DLQ, X-Ray) rotates the RDS master password and rewrites the `DATABASE_URL` secret in place. Built from `terraform/lambda/db_rotation/` (`pg8000`, vendored by `build.sh`). |
 | **KMS** | Customer-managed keys (with automatic rotation) for CloudWatch Logs, Secrets Manager, and ECR image encryption. |
 | **CloudWatch Logs** | Log groups `/ecs/<project>/backend` and `/ecs/<project>/frontend` with configurable retention (`cloudwatch_log_retention_in_days`, default 365). RDS exports `postgresql` and `upgrade` logs to CloudWatch. |
@@ -96,7 +96,7 @@ Before you begin, ensure you have the following installed and configured:
 You also need:
 - An **AWS account** with permissions to create VPCs, ECS, ECR, IAM, KMS, Secrets Manager, SSM Parameter Store, ALB, and CloudWatch resources.
 - AWS credentials configured locally (`aws configure` or environment variables).
-- **`kms:Decrypt` on the secrets CMK for the deploy principal.** The deploy script reads the existing `JWT_SECRET` from Secrets Manager on every run. Because that secret is encrypted with the customer-managed `alias/<project>-secrets` key, the principal running `deploy.sh` (or the GitHub OIDC `AWS_DEPLOY_ROLE_ARN`) must be able to decrypt with that key. Admin/broad credentials already satisfy this; tightly-scoped deploy roles must add `kms:Decrypt` on the key to their IAM policy. (First-time deploys are unaffected — the secret is read before it is migrated to the CMK.)
+- **`kms:Decrypt` on the secrets CMK for the deploy principal.** The deploy script reads the existing `JWT_SECRET` and `OPM_ENCRYPTION_KEY` from Secrets Manager on every run — for `OPM_ENCRYPTION_KEY` this isn't just continuity, it's correctness: unlike `JWT_SECRET` (rotating it only logs users out), regenerating `OPM_ENCRYPTION_KEY` permanently breaks decryption of every already-stored LLM provider API key. Because both secrets are encrypted with the customer-managed `alias/<project>-secrets` key, the principal running `deploy.sh` (or the GitHub OIDC `AWS_DEPLOY_ROLE_ARN`) must be able to decrypt with that key. Admin/broad credentials already satisfy this; tightly-scoped deploy roles must add `kms:Decrypt` on the key to their IAM policy. (First-time deploys are unaffected — each secret is read before it is migrated to the CMK.)
 
 ---
 
@@ -314,7 +314,7 @@ Review the resources that will be created. Key items to confirm:
   - 2 ECR repositories (backend, frontend)
   - 2 IAM roles: `ecs-task-execution-role` and `ecs-task-role`
   - 1 RDS PostgreSQL 16 instance (`db.t4g.micro`, 20 GiB gp3, encrypted)
-  - 1 Secrets Manager secret containing the `DATABASE_URL`
+  - 3 Secrets Manager secrets: `DATABASE_URL`, `JWT_SECRET`, `OPM_ENCRYPTION_KEY`
   - (Optional) 1 ACM certificate when `create_certificate = true` and `enable_https = true`
 
 If you spot any warnings or issues in the plan output, review them before proceeding. To review the plan later:
@@ -903,7 +903,7 @@ terraform/
 ├── ecr.tf               # ECR repositories and lifecycle policies
 ├── alb.tf               # Application Load Balancer, target groups, listener rules
 ├── ecs.tf               # ECS cluster (Container Insights), task definitions, services
-├── rds.tf               # RDS PostgreSQL with Enhanced Monitoring/Performance Insights, subnet group, and DB secret
+├── rds.tf               # RDS PostgreSQL with Enhanced Monitoring/Performance Insights, subnet group; also the DATABASE_URL, JWT_SECRET, and OPM_ENCRYPTION_KEY Secrets Manager resources
 ├── certificate.tf       # ACM certificate creation and local certificate_arn resolution
 ├── dns.tf               # Route 53 hosted zone, A/CNAME records, ACM DNS validation
 ├── outputs.tf           # Output values (URLs, IDs, DB endpoint, secret ARN)

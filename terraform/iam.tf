@@ -100,7 +100,7 @@ resource "aws_iam_role_policy" "ecs_execution_secrets" {
       {
         Effect   = "Allow"
         Action   = ["secretsmanager:GetSecretValue"]
-        Resource = [aws_secretsmanager_secret.db_url.arn, aws_secretsmanager_secret.jwt_secret.arn]
+        Resource = [aws_secretsmanager_secret.db_url.arn, aws_secretsmanager_secret.jwt_secret.arn, aws_secretsmanager_secret.opm_encryption_key.arn]
       }
     ]
   })

@@ -45,6 +45,36 @@ resource "aws_secretsmanager_secret_version" "jwt_secret" {
 }
 
 # ─────────────────────────────────────────────
+# Secrets Manager — OPM_ENCRYPTION_KEY
+# Stores the Fernet key the backend uses to
+# encrypt LLM provider API keys at rest.
+# ─────────────────────────────────────────────
+resource "random_id" "opm_encryption_key" {
+  byte_length = 32
+}
+
+resource "aws_secretsmanager_secret" "opm_encryption_key" {
+  name                    = "${var.project_name}/${var.environment}/opm-encryption-key"
+  description             = "OPM_ENCRYPTION_KEY (Fernet key) for the ${var.project_name} backend service"
+  recovery_window_in_days = 7
+  kms_key_id              = aws_kms_key.secrets.arn
+
+  tags = {
+    Name        = "${var.project_name}-opm-encryption-key"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "opm_encryption_key" {
+  secret_id = aws_secretsmanager_secret.opm_encryption_key.id
+  # random_id.b64_url is RFC 4648 §5 base64url WITHOUT padding (43 chars for 32
+  # bytes); Fernet requires the padded form (44 chars), so the trailing "="
+  # is appended here to reconstruct it.
+  secret_string = var.opm_encryption_key != "" ? var.opm_encryption_key : "${random_id.opm_encryption_key.b64_url}="
+}
+
+# ─────────────────────────────────────────────
 # Secrets Manager — DATABASE_URL
 # Stores the full PostgreSQL connection string.
 # The ECS task execution role is granted read

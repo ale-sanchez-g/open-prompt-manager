@@ -39,3 +39,10 @@ description = "Flagsmith client-side (publishable) Development environment key, 
 regexes = [
   '''mGoGnmAiyNzxXCikjAo8Qd''',
 ]
+
+[[allowlists]]
+description = "Illustrative (non-secret) provider API key examples used in OpenAPI schema docs (backend/app/models/schemas.py) before they were replaced with non-key-shaped placeholders; still present in earlier commit history since gitleaks scans full history"
+regexes = [
+  '''sk-abc123xyz789''',
+  '''sk-new-key-456''',
+]

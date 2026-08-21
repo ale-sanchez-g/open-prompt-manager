@@ -652,3 +652,97 @@ registration. The E2E stack configures `ADMIN_EMAILS=e2e-admin@opm-test.io`
   4. Admin after login — expect: Admin nav link visible; clicking it opens the User Management page listing users
   5. Admin creates a user via the Add User form — expect: the new user appears in the list
   6. Admin's own row — expect: role selector and delete button are disabled (cannot self-demote or self-delete)
+
+### 11. Providers API Tests
+
+**Seed:** `e2e-test/seed.spec.ts`
+
+Covers `POST /api/prompts/{id}/test`'s dependency: LLM provider connections
+(`/api/providers/*`). Reads are open to any authenticated user; writes
+(create/update/delete) require the admin role, reusing the same
+`require_admin` guard as `/api/admin/*`. API keys are Fernet-encrypted at rest
+and only ever surfaced masked (`api_key_masked`).
+
+Tests that exercise live connectivity (models proxy, health check) point the
+provider at `http://localhost:19999` — a port nothing listens on inside the
+backend container's own network namespace — to deterministically trigger the
+"provider unreachable" path (connection refused) without depending on a real
+Ollama/DeepSeek instance being reachable from the test environment.
+
+#### 11.1. Providers API — Presets & Access Control
+
+**File:** `e2e-test/specs/providers/providers-api.spec.ts`
+
+**Steps:**
+  1. GET /api/providers/presets with no token
+    - expect: 200, array including `deepseek`, `groq`, `openrouter` (unauthenticated — static config only)
+  2. GET /api/providers/ with no token
+    - expect: 401 `{ "error": "missing_token" }`
+  3. POST /api/providers/ with no token
+    - expect: 401 `{ "error": "missing_token" }`
+  4. Standard user calls POST /api/providers/
+    - expect: 403 `{ "error": "admin_required" }`
+  5. Standard user calls GET /api/providers/
+    - expect: 200 (reads are not admin-only)
+
+#### 11.2. Providers API — CRUD & Key Handling (admin)
+
+**File:** `e2e-test/specs/providers/providers-api.spec.ts`
+
+**Steps:**
+  1. POST an Ollama provider with no `api_key` — expect: 201, `api_key_masked: null`, no `api_key`/`api_key_encrypted` field in the response
+  2. POST an OpenAI-compatible provider with an `api_key` — expect: 201, `api_key_masked` set and different from the raw key; raw key absent from the serialized response
+  3. GET the provider list — expect: response body never contains the raw key substring
+  4. PUT cost fields and `default_model` — expect: 200, values persisted
+  5. PUT with a blank `api_key` — expect: 200, `api_key_masked` unchanged (existing key preserved)
+  6. Standard user calls PUT/DELETE on a provider — expect: 403 for both
+  7. DELETE a provider — expect: 204; no longer present in the list
+  8. PUT/DELETE an unknown provider id — expect: 404
+
+#### 11.3. Providers API — Live Connectivity Error Handling
+
+**File:** `e2e-test/specs/providers/providers-api.spec.ts`
+
+**Steps:**
+  1. POST /api/providers/{id}/test against an unreachable provider
+    - expect: 200 (health check never raises), `ok: false`, non-empty `detail`
+  2. GET /api/providers/{id}/models against an unreachable provider
+    - expect: 502, `detail` is a clean normalized message (no traceback, no raw exception repr)
+  3. GET /api/providers/{unknown_id}/models — expect: 404
+  4. POST /api/providers/{unknown_id}/test — expect: 404
+
+### 12. Prompt Test-Execution API Tests
+
+**Seed:** `e2e-test/seed.spec.ts`
+
+Covers `POST /api/prompts/{prompt_id}/test` — renders the prompt (same
+semantics as `POST /render`), executes it against a configured provider, and
+records a `PromptExecution` for both success and failure so quality metrics
+(`usage_count`, `avg_rating`, `success_rate`) stay in sync automatically.
+Live-completion happy-path coverage (an actual model response) is left to a
+real or mocked provider outside this stack; this suite deterministically
+covers auth, validation, and the full failure/recording path using an
+unreachable provider (see §11 for the `http://localhost:19999` convention).
+
+#### 12.1. Prompt Test-Execution API — Auth & Validation
+
+**File:** `e2e-test/specs/prompts/prompt-test-execution.spec.ts`
+
+**Steps:**
+  1. POST /api/prompts/{id}/test with no token — expect: 401 `{ "error": "missing_token" }`
+  2. POST with a missing required variable — expect: 422 (same semantics as `POST /render`)
+  3. POST against an unknown prompt id — expect: 404
+  4. POST with an unknown `provider_id` — expect: 404
+  5. POST against a disabled provider (`enabled: false`) — expect: 400
+
+#### 12.2. Prompt Test-Execution API — Provider Failure Recording
+
+**File:** `e2e-test/specs/prompts/prompt-test-execution.spec.ts`
+
+**Steps:**
+  1. POST against an unreachable provider
+    - expect: 502 with a clean, non-traceback `detail` message
+    - expect: GET /api/prompts/{id}/executions includes a new row with `success: 0` and the rendered prompt text
+    - expect: GET /api/prompts/{id} shows `usage_count` incremented (stats refresh on failure too, not just success)
+  2. POST with no `model` override and a provider that has no `default_model` configured
+    - expect: 400 (no model resolvable)

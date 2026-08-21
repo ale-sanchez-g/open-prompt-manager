@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field
 
 constants = {
@@ -7,6 +7,8 @@ constants = {
     'REGISTER_USER_ID_EXAMPLE': 'usr_abc123',
     'EXAMPLE_EMAIL': 'user@opm.io',
     'EXAMPLE_PASS': 'Str0ng!Pass', # Note: these are just examples and should not be used in production
+    'EXAMPLE_PROVIDER_NAME': 'My DeepSeek Account',
+    'EXAMPLE_PROVIDER_BASE_URL': 'https://api.deepseek.com',
 }
 
 class AuthRequest(BaseModel):
@@ -613,6 +615,170 @@ class ExecutionResponse(BaseModel):
     timestamp: datetime = Field(..., description='UTC timestamp when the execution was recorded.')
 
     model_config = {'from_attributes': True}
+
+
+# Prompt test-execution schemas
+class PromptTestParams(BaseModel):
+    temperature: Optional[float] = Field(
+        None,
+        description='Sampling temperature. Omit to use the provider adapter\'s own default.',
+        examples=[0.7],
+    )
+    max_tokens: Optional[int] = Field(
+        None,
+        description='Maximum tokens to generate. Omit to use the provider adapter\'s own default.',
+        examples=[512],
+    )
+    top_p: Optional[float] = Field(
+        None,
+        description='Nucleus sampling parameter. Omit to use the provider adapter\'s own default.',
+        examples=[1.0],
+    )
+
+
+class PromptTestRequest(BaseModel):
+    provider_id: int = Field(..., description='ID of the configured LLM provider connection to run against.', examples=[1])
+    model: Optional[str] = Field(
+        None,
+        description="Model identifier to use. Falls back to the provider's configured default_model if omitted.",
+        examples=['deepseek-chat'],
+    )
+    variables: dict[str, Any] = Field(
+        default_factory=dict,
+        description='Key-value pairs to substitute into the prompt template. Required variables must be present.',
+        examples=[{'user_name': 'Alice', 'platform': 'PromptHub'}],
+    )
+    params: Optional[PromptTestParams] = Field(
+        None,
+        description='Optional generation parameters. Omitted fields fall back to the provider adapter defaults.',
+    )
+    agent_id: Optional[int] = Field(
+        None,
+        description='ID of the agent to attribute this test run to. Omit for ad-hoc runs.',
+        examples=[1],
+    )
+
+    model_config = {
+        'json_schema_extra': {
+            'example': {
+                'provider_id': 1,
+                'model': 'deepseek-chat',
+                'variables': {'user_name': 'Alice', 'platform': 'PromptHub'},
+                'params': {'temperature': 0.7},
+            }
+        }
+    }
+
+
+class PromptTestResponse(BaseModel):
+    output: str = Field(..., description='The raw text response from the LLM.', examples=['Hello, Alice! Welcome to PromptHub.'])
+    model: str = Field(..., description='Model identifier actually used for the completion.', examples=['deepseek-chat'])
+    provider: str = Field(..., description='Name of the provider connection used.', examples=[constants['EXAMPLE_PROVIDER_NAME']])
+    rendered_prompt: str = Field(..., description='The fully-rendered prompt text sent to the LLM.', examples=['Hello, Alice! Welcome to PromptHub.'])
+    latency_ms: float = Field(..., description='Round-trip latency of the LLM call in milliseconds.', examples=[340.5])
+    prompt_tokens: int = Field(0, description='Tokens consumed by the prompt.', examples=[42])
+    completion_tokens: int = Field(0, description='Tokens consumed by the completion.', examples=[22])
+    total_tokens: int = Field(0, description='Total tokens consumed (prompt + completion).', examples=[64])
+    execution_id: int = Field(..., description='ID of the PromptExecution record created for this run.', examples=[1])
+
+
+# Provider schemas
+class ProviderCreate(BaseModel):
+    name: str = Field(..., description='Human-readable name for this provider connection.', examples=[constants['EXAMPLE_PROVIDER_NAME']])
+    provider_type: Literal['ollama', 'openai_compatible'] = Field(
+        ...,
+        description="Adapter type. One of: 'ollama', 'openai_compatible'.",
+        examples=['openai_compatible'],
+    )
+    base_url: str = Field(..., description='Base URL of the provider API.', examples=[constants['EXAMPLE_PROVIDER_BASE_URL']])
+    api_key: Optional[str] = Field(
+        None,
+        description='Plaintext API key. Encrypted at rest; never returned in responses.',
+        examples=['your-provider-api-key'],
+    )
+    default_model: Optional[str] = Field(None, description='Default model identifier to use for this provider.', examples=['deepseek-chat'])
+    cost_per_1k_input_tokens: Optional[float] = Field(None, description='Cost in USD per 1,000 input tokens, for cost tracking.', examples=[0.001])
+    cost_per_1k_output_tokens: Optional[float] = Field(None, description='Cost in USD per 1,000 output tokens, for cost tracking.', examples=[0.002])
+
+    model_config = {
+        'json_schema_extra': {
+            'example': {
+                'name': constants['EXAMPLE_PROVIDER_NAME'],
+                'provider_type': 'openai_compatible',
+                'base_url': constants['EXAMPLE_PROVIDER_BASE_URL'],
+                'api_key': 'your-provider-api-key',
+                'default_model': 'deepseek-chat',
+                'cost_per_1k_input_tokens': 0.001,
+                'cost_per_1k_output_tokens': 0.002,
+            }
+        }
+    }
+
+
+class ProviderUpdate(BaseModel):
+    name: Optional[str] = Field(None, description='Updated display name.', examples=[constants['EXAMPLE_PROVIDER_NAME']])
+    provider_type: Optional[Literal['ollama', 'openai_compatible']] = Field(None, description="Updated adapter type. One of: 'ollama', 'openai_compatible'.", examples=['openai_compatible'])
+    base_url: Optional[str] = Field(None, description='Updated base URL of the provider API.', examples=[constants['EXAMPLE_PROVIDER_BASE_URL']])
+    api_key: Optional[str] = Field(
+        None,
+        description=(
+            'Replacement plaintext API key. Omit or send an empty string to keep the '
+            'currently stored key unchanged.'
+        ),
+        examples=['your-replacement-api-key'],
+    )
+    default_model: Optional[str] = Field(None, description='Updated default model identifier.', examples=['deepseek-chat'])
+    enabled: Optional[bool] = Field(None, description='Whether this provider is available for use.', examples=[True])
+    cost_per_1k_input_tokens: Optional[float] = Field(None, description='Updated cost in USD per 1,000 input tokens.', examples=[0.001])
+    cost_per_1k_output_tokens: Optional[float] = Field(None, description='Updated cost in USD per 1,000 output tokens.', examples=[0.002])
+
+    model_config = {
+        'json_schema_extra': {
+            'example': {'default_model': 'deepseek-reasoner', 'enabled': True},
+        }
+    }
+
+
+class ProviderResponse(BaseModel):
+    id: int = Field(..., description='Auto-assigned primary key.', examples=[1])
+    name: str = Field(..., description='Human-readable name for this provider connection.', examples=[constants['EXAMPLE_PROVIDER_NAME']])
+    provider_type: str = Field(..., description='Adapter type.', examples=['openai_compatible'])
+    base_url: str = Field(..., description='Base URL of the provider API.', examples=[constants['EXAMPLE_PROVIDER_BASE_URL']])
+    api_key_masked: Optional[str] = Field(
+        None,
+        description='Masked API key (first 3 and last 3 characters only), or null if no key is stored.',
+        examples=['sk-***789'],
+    )
+    default_model: Optional[str] = Field(None, description='Default model identifier for this provider.', examples=['deepseek-chat'])
+    enabled: bool = Field(True, description='Whether this provider is available for use.', examples=[True])
+    cost_per_1k_input_tokens: Optional[float] = Field(None, description='Cost in USD per 1,000 input tokens.', examples=[0.001])
+    cost_per_1k_output_tokens: Optional[float] = Field(None, description='Cost in USD per 1,000 output tokens.', examples=[0.002])
+    created_at: datetime = Field(..., description='UTC timestamp when the provider was added.')
+    updated_at: datetime = Field(..., description='UTC timestamp of the last update.')
+
+    model_config = {'from_attributes': True}
+
+
+class ProviderModelInfo(BaseModel):
+    id: str = Field(..., description='Provider-specific model identifier.', examples=['deepseek-chat'])
+    name: str = Field(..., description='Display name for the model.', examples=['deepseek-chat'])
+    metadata: dict[str, Any] = Field(default_factory=dict, description='Additional provider-specific model metadata.')
+
+
+class ProviderModelsResponse(BaseModel):
+    models: list[ProviderModelInfo] = Field(default_factory=list, description='Models available from this provider.')
+
+
+class ProviderTestResponse(BaseModel):
+    ok: bool = Field(..., description='True if the provider responded healthily.', examples=[True])
+    latency_ms: Optional[float] = Field(None, description='Round-trip latency of the health check in milliseconds.', examples=[124.3])
+    detail: Optional[str] = Field(None, description='Additional detail, especially on failure.', examples=[None])
+
+
+class ProviderPresetResponse(BaseModel):
+    key: str = Field(..., description='Preset identifier to use as `provider_type`-agnostic hint.', examples=['deepseek'])
+    name: str = Field(..., description='Display name of the preset provider.', examples=['DeepSeek'])
+    base_url: str = Field(..., description='Base URL to prefill for this preset.', examples=[constants['EXAMPLE_PROVIDER_BASE_URL']])
 
 
 # Metric schemas

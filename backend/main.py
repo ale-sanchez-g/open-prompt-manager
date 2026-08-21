@@ -12,6 +12,7 @@ from app.database.base import create_tables
 from app.api.auth import router as auth_router
 from app.api.admin import router as admin_router
 from app.api.prompts import router as prompts_router
+from app.api.providers import router as providers_router
 from app.api.tags_agents import tags_router, agents_router
 from app import __version__
 from app.middleware.rate_limit import RateLimitMiddleware
@@ -110,6 +111,13 @@ def create_app() -> FastAPI:
                 ),
             },
             {
+                'name': 'providers',
+                'description': (
+                    'Configure connections to LLM providers (Ollama, OpenAI-compatible services such as '
+                    'DeepSeek/Groq/OpenRouter). List available models and run live health checks.'
+                ),
+            },
+            {
                 'name': 'health',
                 'description': 'Liveness / readiness check endpoint.',
             },
@@ -166,7 +174,11 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=exc.status_code, content={'error': exc.error})
 
     public_prefixes = ('/api/docs', '/api/redoc')
-    public_paths = {'/auth/register', '/auth/login', '/auth/refresh', '/auth/logout', '/api/health', '/api/ready', '/api/openapi.json'}
+    public_paths = {
+        '/auth/register', '/auth/login', '/auth/refresh', '/auth/logout',
+        '/api/health', '/api/ready', '/api/openapi.json',
+        '/api/providers/presets',
+    }
 
     @application.middleware('http')
     async def require_authentication(request: Request, call_next):
@@ -199,6 +211,7 @@ def create_app() -> FastAPI:
     application.include_router(auth_router)
     application.include_router(admin_router)
     application.include_router(prompts_router)
+    application.include_router(providers_router)
     application.include_router(tags_router)
     application.include_router(agents_router)
 
@@ -258,7 +271,7 @@ def create_app() -> FastAPI:
             'description': 'Enter the JWT access token obtained from **POST /auth/login**.',
         }
         protected_prefix = '/api/'
-        public_paths = {'/api/health', '/api/ready'}
+        public_paths = {'/api/health', '/api/ready', '/api/providers/presets'}
         http_methods = {'get', 'post', 'put', 'delete', 'patch', 'options', 'head', 'trace'}
 
         for path, operations in schema.get('paths', {}).items():

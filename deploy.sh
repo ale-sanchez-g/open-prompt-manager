@@ -32,6 +32,7 @@ PRIMARY_DOMAIN=""
 DOMAIN_NAMES=()
 HTTP_INGRESS_CIDRS=()
 JWT_SECRET=""
+OPM_ENCRYPTION_KEY=""
 
 # Flagsmith client-side environment key for the frontend. This is PUBLISHABLE
 # (baked into the browser bundle at image-build time) — NOT a secret, so it is a
@@ -81,6 +82,57 @@ load_or_generate_jwt_secret() {
   command -v openssl &>/dev/null || fail "'openssl' is not installed or not in PATH"
   JWT_SECRET=$(openssl rand -hex 32)
   ok "Generated new JWT secret for first-time deployment."
+}
+
+# Reads the existing OPM_ENCRYPTION_KEY (Fernet key) from Secrets Manager and
+# re-passes it on every deploy, same as load_or_generate_jwt_secret above and
+# for the same reason: Terraform's random_id fallback only runs once at
+# creation, but explicitly threading the live value through every apply
+# guards against it ever being silently regenerated. This matters MORE than
+# for JWT_SECRET — rotating a JWT secret just logs everyone out, but
+# regenerating this key permanently breaks decryption of every already-stored
+# LLM provider API key.
+load_or_generate_opm_encryption_key() {
+  local secret_name="${PROJECT_NAME}/${ENVIRONMENT}/opm-encryption-key"
+  local existing_secret_arn=""
+
+  existing_secret_arn=$(aws secretsmanager describe-secret \
+    --secret-id "${secret_name}" \
+    --region "${AWS_REGION}" \
+    --query ARN \
+    --output text 2>/dev/null || true)
+
+  if [[ -n "${existing_secret_arn}" && "${existing_secret_arn}" != "None" ]]; then
+    local deleted_date
+    deleted_date=$(aws secretsmanager describe-secret \
+      --secret-id "${existing_secret_arn}" \
+      --region "${AWS_REGION}" \
+      --query DeletedDate \
+      --output text 2>/dev/null || true)
+
+    if [[ -n "${deleted_date}" && "${deleted_date}" != "None" ]]; then
+      warn "Secret '${secret_name}' is scheduled for deletion — force-deleting now..."
+      aws secretsmanager delete-secret \
+        --secret-id "${existing_secret_arn}" \
+        --force-delete-without-recovery \
+        --region "${AWS_REGION}" >/dev/null
+    else
+      OPM_ENCRYPTION_KEY=$(aws secretsmanager get-secret-value \
+        --secret-id "${existing_secret_arn}" \
+        --region "${AWS_REGION}" \
+        --query SecretString \
+        --output text 2>/dev/null || true)
+
+      [[ -n "${OPM_ENCRYPTION_KEY}" && "${OPM_ENCRYPTION_KEY}" != "None" ]] || fail "Existing encryption key was found but could not be read from Secrets Manager."
+      ok "Loaded existing encryption key from Secrets Manager."
+      return 0
+    fi
+  fi
+
+  command -v openssl &>/dev/null || fail "'openssl' is not installed or not in PATH"
+  # Fernet key: 32 random bytes, urlsafe-base64 encoded (44 chars incl. padding).
+  OPM_ENCRYPTION_KEY=$(openssl rand -base64 32 | tr '+/' '-_')
+  ok "Generated new encryption key for first-time deployment."
 }
 
 # ─────────────────────────────────────────────
@@ -446,6 +498,7 @@ ensure_acm_certificate_is_issued() {
     -var="environment=${ENVIRONMENT}" \
     -var="project_name=${PROJECT_NAME}" \
     -var="jwt_secret=${JWT_SECRET}" \
+    -var="opm_encryption_key=${OPM_ENCRYPTION_KEY}" \
     -var="otel_collector_enabled=${OTEL_COLLECTOR_ENABLED}" \
     -var="enable_https=${ENABLE_HTTPS}" \
     -var="create_certificate=${CREATE_CERTIFICATE}" \
@@ -527,6 +580,7 @@ AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/de
 ok "AWS credentials valid (account: ${AWS_ACCOUNT_ID})"
 
 load_or_generate_jwt_secret
+load_or_generate_opm_encryption_key
 
 DEPLOY_TAG=$(git -C "${SCRIPT_DIR}" rev-parse --short HEAD 2>/dev/null || date +%Y%m%d%H%M%S)
 ok "Deploy image tag: ${DEPLOY_TAG}"
@@ -564,6 +618,7 @@ if [[ "$DESTROY" == "true" ]]; then
     -var="environment=${ENVIRONMENT}" \
     -var="project_name=${PROJECT_NAME}" \
     -var="jwt_secret=${JWT_SECRET}" \
+    -var="opm_encryption_key=${OPM_ENCRYPTION_KEY}" \
     -var="otel_collector_enabled=${OTEL_COLLECTOR_ENABLED}" \
     -var="enable_https=${ENABLE_HTTPS}" \
     -var="create_certificate=${CREATE_CERTIFICATE}" \
@@ -596,7 +651,8 @@ terraform plan -out="${PLAN_FILE}.ecr" \
   -var="environment=${ENVIRONMENT}" \
   -var="project_name=${PROJECT_NAME}" \
   -var="otel_collector_enabled=${OTEL_COLLECTOR_ENABLED}" \
-  -var="jwt_secret=${JWT_SECRET}" 2>&1 | tee "${PLAN_FILE}.ecr.log"
+  -var="jwt_secret=${JWT_SECRET}" \
+  -var="opm_encryption_key=${OPM_ENCRYPTION_KEY}" 2>&1 | tee "${PLAN_FILE}.ecr.log"
 
 log "Applying ECR repository changes with Terraform..."
 terraform apply -auto-approve "${PLAN_FILE}.ecr"
@@ -679,6 +735,7 @@ terraform plan -out="${PLAN_FILE}" \
   -var="environment=${ENVIRONMENT}" \
   -var="project_name=${PROJECT_NAME}" \
   -var="jwt_secret=${JWT_SECRET}" \
+  -var="opm_encryption_key=${OPM_ENCRYPTION_KEY}" \
   -var="otel_collector_enabled=${OTEL_COLLECTOR_ENABLED}" \
   -var="backend_image=${BACKEND_IMAGE_URI}" \
   -var="frontend_image=${FRONTEND_IMAGE_URI}" \

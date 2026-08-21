@@ -26,4 +26,5 @@ def get_db():
 def create_tables():
     from app.models.auth import User, RefreshToken  # noqa
     from app.models.prompt import Prompt, Tag, Agent, PromptMetric, PromptExecution  # noqa
+    from app.models.llm_provider_config import LLMProviderConfig  # noqa
     Base.metadata.create_all(bind=engine)
