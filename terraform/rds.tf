@@ -54,6 +54,13 @@ resource "random_id" "opm_encryption_key" {
 }
 
 resource "aws_secretsmanager_secret" "opm_encryption_key" {
+  # checkov:skip=CKV2_AWS_57:Automatic rotation is intentionally not enabled.
+  # This Fernet key encrypts LLM provider API keys already at rest; rotating
+  # it would make every previously-encrypted value undecryptable unless the
+  # application re-encrypts existing rows with the new key first. Safe
+  # rotation requires that application-side re-encryption support, which is
+  # tracked as a separate change. The secret is encrypted with a
+  # customer-managed KMS key and is read-only at runtime.
   name                    = "${var.project_name}/${var.environment}/opm-encryption-key"
   description             = "OPM_ENCRYPTION_KEY (Fernet key) for the ${var.project_name} backend service"
   recovery_window_in_days = 7
