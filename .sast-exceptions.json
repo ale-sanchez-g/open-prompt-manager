@@ -40,12 +40,6 @@
       "justification": "RDS Multi-AZ is controlled by var.db_multi_az but defaults to false. Planned: enable Multi-AZ for production to ensure HA failover."
     },
     {
-      "id": "CKV_AWS_161",
-      "owner": "github-agents",
-      "expires": "2026-09-30",
-      "justification": "RDS uses password-based auth via Secrets Manager. Planned: enable IAM database authentication as an additional access control layer."
-    },
-    {
       "id": "CKV_AWS_293",
       "owner": "github-agents",
       "expires": "2026-09-30",
@@ -86,12 +80,6 @@
       "owner": "github-agents",
       "expires": "2026-09-30",
       "justification": "Route53 DNS query logging not enabled. Planned: add aws_route53_query_log resource with CloudWatch Log Group destination."
-    },
-    {
-      "id": "CKV2_AWS_57",
-      "owner": "github-agents",
-      "expires": "2026-09-30",
-      "justification": "Secrets Manager automatic rotation not configured. Planned: add aws_secretsmanager_secret_rotation with Lambda rotation function for database credentials."
     },
     {
       "id": "CKV_AWS_145",

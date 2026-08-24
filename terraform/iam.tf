@@ -39,6 +39,18 @@ data "aws_iam_policy_document" "flow_log_assume_role" {
   }
 }
 
+data "aws_iam_policy_document" "lambda_assume_role" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["lambda.amazonaws.com"]
+    }
+  }
+}
+
 resource "aws_iam_role" "ecs_task_execution" {
   name               = "${var.project_name}-ecs-task-execution-role"
   assume_role_policy = data.aws_iam_policy_document.ecs_task_assume_role.json
@@ -146,6 +158,84 @@ resource "aws_iam_role_policy" "flow_log" {
           aws_cloudwatch_log_group.flow_log.arn,
           "${aws_cloudwatch_log_group.flow_log.arn}:*"
         ]
+      }
+    ]
+  })
+}
+
+# ─────────────────────────────────────────────
+# Secrets Manager Rotation Lambda Role
+# Execution role for the DATABASE_URL rotation
+# function (see rotation.tf). Grants the minimum
+# permissions to read/write the single rotated
+# secret, run inside the VPC, and emit traces.
+# ─────────────────────────────────────────────
+resource "aws_iam_role" "db_rotation" {
+  name               = "${var.project_name}-${var.environment}-db-rotation-role"
+  assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+
+  tags = {
+    Name        = "${var.project_name}-db-rotation-role"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+# Managed policy grants the ENI + CloudWatch Logs permissions a VPC-attached
+# Lambda requires (AWSLambdaVPCAccessExecutionRole).
+resource "aws_iam_role_policy_attachment" "db_rotation_vpc" {
+  role       = aws_iam_role.db_rotation.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
+resource "aws_iam_role_policy" "db_rotation" {
+  name = "${var.project_name}-db-rotation-policy"
+  role = aws_iam_role.db_rotation.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "ManageRotatedSecret"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:DescribeSecret",
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:PutSecretValue",
+          "secretsmanager:UpdateSecretVersionStage"
+        ]
+        Resource = aws_secretsmanager_secret.db_url.arn
+      },
+      {
+        Sid      = "GenerateRotationPassword"
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetRandomPassword"]
+        Resource = "*"
+      },
+      {
+        Sid    = "DecryptSecretWithCmk"
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey",
+          "kms:DescribeKey"
+        ]
+        Resource = aws_kms_key.secrets.arn
+      },
+      {
+        Sid    = "WriteTraces"
+        Effect = "Allow"
+        Action = [
+          "xray:PutTraceSegments",
+          "xray:PutTelemetryRecords"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid      = "SendToDeadLetterQueue"
+        Effect   = "Allow"
+        Action   = ["sqs:SendMessage"]
+        Resource = aws_sqs_queue.db_rotation_dlq.arn
       }
     ]
   })

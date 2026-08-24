@@ -421,7 +421,22 @@ build_http_cidrs_arg() {
   echo "[${cidrs_json%,}]"
 }
 
+build_rotation_lambda() {
+  # The DATABASE_URL rotation Lambda imports pg8000, which is not in the Lambda
+  # runtime. Vendor it into the function directory so Terraform's archive_file
+  # packages a self-contained deployment zip (see terraform/rotation.tf).
+  local build_script="${TERRAFORM_DIR}/lambda/db_rotation/build.sh"
+  if [[ -x "${build_script}" || -f "${build_script}" ]]; then
+    log "Building secret-rotation Lambda package..."
+    PYTHON_BIN="${PYTHON_BIN:-python3}" bash "${build_script}"
+    ok "Rotation Lambda dependencies vendored."
+  else
+    warn "Rotation Lambda build script not found at ${build_script}; skipping."
+  fi
+}
+
 prepare_terraform_workspace() {
+  build_rotation_lambda
   terraform init -input=false -reconfigure
   terraform workspace select "${TF_WORKSPACE}" >/dev/null 2>&1 \
     || terraform workspace new "${TF_WORKSPACE}" >/dev/null

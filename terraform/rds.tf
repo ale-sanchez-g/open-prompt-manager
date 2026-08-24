@@ -20,6 +20,13 @@ resource "random_password" "jwt_secret" {
 # backend for access and refresh tokens.
 # ─────────────────────────────────────────────
 resource "aws_secretsmanager_secret" "jwt_secret" {
+  # checkov:skip=CKV2_AWS_57:Automatic value rotation of the JWT signing secret
+  # is intentionally not enabled. Rotating this secret invalidates every active
+  # access and refresh token, forcing all users to re-authenticate. Safe
+  # rotation requires application support for an overlapping (current + previous)
+  # signing-key window, which is tracked as a separate application change. The
+  # secret is encrypted with a customer-managed KMS key and is read-only at
+  # runtime. See docs/adr-secrets-rotation-iam-auth.md.
   name                    = "${var.project_name}/${var.environment}/jwt-secret"
   description             = "JWT_SECRET for the ${var.project_name} backend service"
   recovery_window_in_days = 7
@@ -47,6 +54,13 @@ resource "random_id" "opm_encryption_key" {
 }
 
 resource "aws_secretsmanager_secret" "opm_encryption_key" {
+  # checkov:skip=CKV2_AWS_57:Automatic rotation is intentionally not enabled.
+  # This Fernet key encrypts LLM provider API keys already at rest; rotating
+  # it would make every previously-encrypted value undecryptable unless the
+  # application re-encrypts existing rows with the new key first. Safe
+  # rotation requires that application-side re-encryption support, which is
+  # tracked as a separate change. The secret is encrypted with a
+  # customer-managed KMS key and is read-only at runtime.
   name                    = "${var.project_name}/${var.environment}/opm-encryption-key"
   description             = "OPM_ENCRYPTION_KEY (Fernet key) for the ${var.project_name} backend service"
   recovery_window_in_days = 7
@@ -138,15 +152,21 @@ resource "aws_db_instance" "main" {
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.rds.id]
 
-  multi_az                        = var.db_multi_az
-  publicly_accessible             = false
-  deletion_protection             = var.db_deletion_protection
-  auto_minor_version_upgrade      = true
-  copy_tags_to_snapshot           = true
-  monitoring_interval             = 60
-  monitoring_role_arn             = aws_iam_role.rds_enhanced_monitoring.arn
-  performance_insights_enabled    = true
-  performance_insights_kms_key_id = var.db_performance_insights_kms_key_id
+  multi_az            = var.db_multi_az
+  publicly_accessible = false
+  deletion_protection = var.db_deletion_protection
+
+  # Enable IAM database authentication (CKV_AWS_161). This is additive: the
+  # master user continues to authenticate with the password stored in Secrets
+  # Manager, while IAM principals granted rds-db:connect can additionally
+  # obtain short-lived auth tokens. See docs/adr-secrets-rotation-iam-auth.md.
+  iam_database_authentication_enabled = true
+  auto_minor_version_upgrade          = true
+  copy_tags_to_snapshot               = true
+  monitoring_interval                 = 60
+  monitoring_role_arn                 = aws_iam_role.rds_enhanced_monitoring.arn
+  performance_insights_enabled        = true
+  performance_insights_kms_key_id     = var.db_performance_insights_kms_key_id
 
   # Take a final snapshot before deletion only when deletion_protection is on,
   # which signals a production-grade deployment.

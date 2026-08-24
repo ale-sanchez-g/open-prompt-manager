@@ -65,6 +65,39 @@ run "rds_performance_insights_enabled" {
   }
 }
 
+run "rds_iam_database_authentication_enabled" {
+  command = plan
+
+  # CKV_AWS_161: IAM database authentication must be enabled on the instance.
+  assert {
+    condition     = aws_db_instance.main.iam_database_authentication_enabled == true
+    error_message = "RDS must enable IAM database authentication (CKV_AWS_161)."
+  }
+}
+
+run "db_secret_rotation_configured" {
+  command = plan
+
+  # CKV2_AWS_57: the DATABASE_URL secret must have automatic rotation attached.
+  assert {
+    condition     = aws_secretsmanager_secret_rotation.db_url.rotation_rules[0].automatically_after_days == var.db_secret_rotation_days
+    error_message = "DATABASE_URL secret must rotate on the configured cadence (db_secret_rotation_days)."
+  }
+}
+
+run "db_secret_rotation_cadence_override" {
+  command = plan
+
+  variables {
+    db_secret_rotation_days = 14
+  }
+
+  assert {
+    condition     = aws_secretsmanager_secret_rotation.db_url.rotation_rules[0].automatically_after_days == 14
+    error_message = "db_secret_rotation_days override must drive the rotation cadence."
+  }
+}
+
 run "secrets_use_cmk_encryption" {
   command = plan
 

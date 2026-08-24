@@ -101,6 +101,14 @@ Use the deployment script from the repository root for AWS infrastructure, image
 
 > **Upgrade note (existing deployments):** the ECR repositories are encrypted with a customer-managed KMS key. Switching an existing environment to KMS encryption forces replacement of the ECR repositories, which removes their stored images (`force_delete` is set). Re-push the backend and frontend images after applying — `./deploy.sh` does this automatically. New deployments are unaffected. See [`terraform/install.md`](terraform/install.md) for details.
 
+> **Security note — DB credential rotation & IAM auth:** RDS now has IAM
+> database authentication enabled (additive to password auth), and the
+> `DATABASE_URL` secret rotates automatically every 30 days via an in-VPC
+> Lambda. `./deploy.sh` builds the rotation Lambda package automatically; manual
+> `terraform apply` requires running `terraform/lambda/db_rotation/build.sh`
+> first. See [`docs/adr-secrets-rotation-iam-auth.md`](docs/adr-secrets-rotation-iam-auth.md)
+> and [`terraform/install.md`](terraform/install.md#secret-rotation-and-iam-database-authentication).
+
 ### Database schema upgrades
 
 `Base.metadata.create_all()` only creates missing tables — it never alters existing ones — so additive columns introduced by new backend code (for example `agents.updated_at` or `users.role`) must be applied to existing databases by a migration.

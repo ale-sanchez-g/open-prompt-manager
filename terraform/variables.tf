@@ -185,6 +185,17 @@ variable "db_performance_insights_kms_key_id" {
   default     = null
 }
 
+variable "db_secret_rotation_days" {
+  description = "Cadence (in days) for automatic rotation of the DATABASE_URL secret in Secrets Manager."
+  type        = number
+  default     = 30
+
+  validation {
+    condition     = var.db_secret_rotation_days >= 1 && var.db_secret_rotation_days <= 365
+    error_message = "db_secret_rotation_days must be between 1 and 365."
+  }
+}
+
 # ─────────────────────────────────────────────
 # TLS/HTTPS
 # ─────────────────────────────────────────────
