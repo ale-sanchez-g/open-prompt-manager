@@ -10,6 +10,6 @@ bcrypt==5.0.0
 PyJWT==2.13.0
 # Server-side feature flags. Imported only by app/core/flags.py, which degrades
 # to flags-off if the import fails, so a partial install cannot stop the API.
-flagsmith==6.2.1
+flagsmith==6.2.2
 httpx==0.28.1
 cryptography==50.0.0
