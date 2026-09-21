@@ -5,7 +5,7 @@ sqlalchemy==2.0.54
 pydantic==2.13.4
 pydantic-settings==2.15.0
 python-multipart==0.0.32
-psycopg2-binary==2.9.11
+psycopg2-binary==2.9.13
 bcrypt==5.0.0
 PyJWT==2.13.0
 # Server-side feature flags. Imported only by app/core/flags.py, which degrades
