@@ -22,7 +22,7 @@
     "prop-types": "^15.8.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.8",
-    "react-router": "^8.3.0",
+    "react-router": "^8.3.1",
     "web-vitals": "^6.1.1"
   },
   "devDependencies": {
