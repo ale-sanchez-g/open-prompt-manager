@@ -1251,16 +1251,65 @@ jobs:
         working-directory: e2e-test
 
       - name: Install k6
+        env:
+          # Pinned k6 release-signing key. gpg accepts only this exact key,
+          # whichever keyserver answers, so adding fallbacks below does not
+          # widen what we are willing to trust.
+          K6_KEY_FINGERPRINT: C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          K6_KEYRING: /usr/share/keyrings/k6-archive-keyring.gpg
         run: |
+          set -euo pipefail
+
+          # This key used to be fetched from a single hkp keyserver with no
+          # timeout and no retry, so a transient keyserver outage hung the job
+          # for ~5 minutes and then failed it before any k6 test ran
+          # ("gpg: keyserver receive failed: End of file"). Bound each attempt
+          # with `timeout` and try more than one keyserver. The bound is on the
+          # shell, not `--keyserver-options timeout=`, because gpg only warns
+          # on keyserver options it does not recognise.
           sudo gpg -k
-          sudo gpg --no-default-keyring \
-            --keyring /usr/share/keyrings/k6-archive-keyring.gpg \
-            --keyserver hkp://keyserver.ubuntu.com:80 \
-            --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
-          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" \
+
+          fetch_key() {
+            sudo timeout 30 gpg --no-default-keyring \
+              --keyring "$K6_KEYRING" \
+              --keyserver "$1" \
+              --recv-keys "$K6_KEY_FINGERPRINT"
+          }
+
+          fetched=""
+          # The original (proven on these runners) URL stays first so the
+          # happy path is unchanged; the others engage only on failure.
+          for keyserver in \
+            hkp://keyserver.ubuntu.com:80 \
+            hkps://keyserver.ubuntu.com \
+            hkps://keys.openpgp.org
+          do
+            for attempt in 1 2; do
+              if fetch_key "$keyserver"; then
+                fetched="$keyserver"
+                break 2
+              fi
+              echo "::warning::Could not fetch the k6 signing key from ${keyserver} (attempt ${attempt}/2)."
+              sleep 5
+            done
+          done
+
+          if [ -z "$fetched" ]; then
+            echo "::error::Could not fetch the k6 signing key ${K6_KEY_FINGERPRINT} from any keyserver."
+            exit 1
+          fi
+          echo "Fetched the k6 signing key from ${fetched}."
+
+          # Fail loudly rather than building an apt source against a keyring
+          # that does not actually hold the pinned key.
+          sudo gpg --no-default-keyring --keyring "$K6_KEYRING" \
+            --list-keys "$K6_KEY_FINGERPRINT" > /dev/null
+
+          echo "deb [signed-by=${K6_KEYRING}] https://dl.k6.io/deb stable main" \
             | sudo tee /etc/apt/sources.list.d/k6.list
           sudo apt-get update -qq
           sudo apt-get install -y k6
+          k6 version
 
       # ── Phase 1: Rate-limiting correctness (low auth limit) ───────────────
 
