@@ -253,3 +253,71 @@ variable "rate_limit_auth_per_minute" {
   type        = number
   default     = 60
 }
+
+variable "rate_limit_backend" {
+  description = "Backend used for distributed rate-limit counters."
+  type        = string
+  default     = "redis"
+
+  validation {
+    condition     = contains(["memory", "redis"], var.rate_limit_backend)
+    error_message = "rate_limit_backend must be either memory or redis."
+  }
+}
+
+variable "rate_limit_trusted_proxy_count" {
+  description = "Number of trusted reverse proxy hops in X-Forwarded-For. The ALB appends the client IP, so use 1 for the standard ALB deployment."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.rate_limit_trusted_proxy_count >= 0
+    error_message = "rate_limit_trusted_proxy_count must be non-negative."
+  }
+}
+
+variable "rate_limit_redis_required" {
+  description = "Require Redis availability for rate limiting."
+  type        = bool
+  default     = true
+}
+
+variable "rate_limit_redis_failure_policy" {
+  description = "Redis outage policy. Use fail_closed to deny requests when shared counters are unavailable, or fail_open to allow requests using memory fallback."
+  type        = string
+  default     = "fail_closed"
+
+  validation {
+    condition     = contains(["fail_open", "fail_closed"], var.rate_limit_redis_failure_policy)
+    error_message = "rate_limit_redis_failure_policy must be fail_open or fail_closed."
+  }
+}
+
+variable "rate_limit_redis_node_type" {
+  description = "ElastiCache node type for the rate-limit Redis cluster."
+  type        = string
+  default     = "cache.t4g.micro"
+}
+
+variable "rate_limit_redis_engine_version" {
+  description = "Redis engine version for the rate-limit ElastiCache cluster."
+  type        = string
+  default     = "7.1"
+}
+
+variable "rate_limit_redis_multi_az" {
+  description = "Deploy a Multi-AZ Redis primary and replica with automatic failover."
+  type        = bool
+  default     = true
+}
+
+variable "rate_limit_redis_snapshot_retention_days" {
+  description = "Number of days to retain ElastiCache snapshots; 0 disables snapshots."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.rate_limit_redis_snapshot_retention_days >= 0 && var.rate_limit_redis_snapshot_retention_days <= 35
+    error_message = "rate_limit_redis_snapshot_retention_days must be between 0 and 35."
+  }
+}

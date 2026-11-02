@@ -119,7 +119,27 @@ resource "aws_ecs_task_definition" "backend" {
             value = tostring(var.rate_limit_auth_per_minute)
           },
           {
-            # otel-collector (#339) is a sidecar in this same task, sharing
+            name  = "RATE_LIMIT_BACKEND"
+            value = var.rate_limit_backend
+          },
+          {
+            name  = "RATE_LIMIT_REDIS_URL"
+            value = "rediss://${aws_elasticache_replication_group.rate_limit.primary_endpoint_address}:${aws_elasticache_replication_group.rate_limit.port}"
+          },
+          {
+            name  = "RATE_LIMIT_TRUSTED_PROXY_COUNT"
+            value = tostring(var.rate_limit_trusted_proxy_count)
+          },
+          {
+            name  = "RATE_LIMIT_REDIS_REQUIRED"
+            value = tostring(var.rate_limit_redis_required)
+          },
+          {
+            name  = "RATE_LIMIT_REDIS_FAILURE_POLICY"
+            value = var.rate_limit_redis_failure_policy
+          },
+          {
+            # otel-collector (#339) in this same task, sharing
             # its network namespace, so it is reachable over localhost.
             # These are provided so backend instrumentation (#340) has a
             # known, stable endpoint to export OTLP to without needing
