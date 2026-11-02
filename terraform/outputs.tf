@@ -72,6 +72,16 @@ output "application_url" {
 # ─────────────────────────────────────────────
 # Database Outputs
 # ─────────────────────────────────────────────
+output "rate_limit_redis_endpoint" {
+  description = "Private primary endpoint for the shared rate-limit Redis cluster."
+  value       = aws_elasticache_replication_group.rate_limit.primary_endpoint_address
+}
+
+output "rate_limit_redis_port" {
+  description = "Port for the shared rate-limit Redis cluster."
+  value       = aws_elasticache_replication_group.rate_limit.port
+}
+
 output "db_endpoint" {
   description = "RDS instance endpoint (host:port). Use this for direct DB access from a bastion or VPN."
   value       = aws_db_instance.main.endpoint
