@@ -145,12 +145,25 @@ def create_app() -> FastAPI:
     rate_limit_enabled = os.getenv('RATE_LIMIT_ENABLED', 'true').lower() not in ('false', '0', 'no')
     rate_limit_per_minute = int(os.getenv('RATE_LIMIT_PER_MINUTE', '200'))
     rate_limit_auth_per_minute = int(os.getenv('RATE_LIMIT_AUTH_PER_MINUTE', '60'))
+    trusted_proxy_count = int(os.getenv('RATE_LIMIT_TRUSTED_PROXY_COUNT', '0'))
+    if trusted_proxy_count < 0:
+        raise ValueError('RATE_LIMIT_TRUSTED_PROXY_COUNT must be non-negative')
+    redis_required = os.getenv('RATE_LIMIT_REDIS_REQUIRED', 'false').lower() not in ('false', '0', 'no')
+    redis_url = os.getenv('RATE_LIMIT_REDIS_URL') or None
+    rate_limit_backend = os.getenv('RATE_LIMIT_BACKEND', 'memory').lower()
+    if rate_limit_backend not in ('memory', 'redis'):
+        raise ValueError('RATE_LIMIT_BACKEND must be memory or redis')
 
     application.add_middleware(
         RateLimitMiddleware,
         enabled=rate_limit_enabled,
         per_minute=rate_limit_per_minute,
         auth_per_minute=rate_limit_auth_per_minute,
+        trusted_proxy_count=trusted_proxy_count,
+        backend=rate_limit_backend,
+        redis_url=redis_url,
+        redis_required=redis_required,
+        redis_failure_policy=os.getenv('RATE_LIMIT_REDIS_FAILURE_POLICY', 'fail_open'),
     )
 
     # CORS Add CORSMiddleware LAST — it becomes the outermost layer,
