@@ -8,3 +8,5 @@
 - Added `redis` runtime dependency and focused middleware tests.
 - Validation: `python3 -m compileall backend/app/middleware/rate_limit.py backend/main.py` passed.
 - Validation: `/tmp/opm-test-venv/bin/python -m pytest backend/tests/test_rate_limit.py -q` initially found 1 failure; after trusted-hop extraction correction, rerun from `backend`: `18 passed, 2 warnings`.
+- 2026-11-03: Rebasing and synchronization completed: fetched latest origin, rebased `feature/distributed-rate-limiting` onto `origin/main`, and force-published the branch.
+- 2026-11-03: Post-rebase validation: focused rate-limit suite passed with `18 passed, 2 warnings`; Terraform format check and validate passed.
