@@ -18,6 +18,7 @@ def _make_app(per_minute: int = 3, auth_per_minute: int = 2) -> FastAPI:
         enabled=True,
         per_minute=per_minute,
         auth_per_minute=auth_per_minute,
+        trusted_proxy_count=1,
     )
 
     @app.get('/api/test')
@@ -166,6 +167,31 @@ class TestRateLimitMiddleware:
         assert client.get('/api/test', headers={'X-Forwarded-For': '10.0.0.1'}).status_code == 429
         # Different forwarded IP — must succeed
         assert client.get('/api/test', headers={'X-Forwarded-For': '10.0.0.2'}).status_code == 200
+
+    def test_trusted_proxy_count_ignores_untrusted_leftmost_hops(self):
+        app = FastAPI()
+        app.add_middleware(RateLimitMiddleware, per_minute=1, trusted_proxy_count=1)
+
+        @app.get('/api/test')
+        def api_test():
+            return {'ok': True}
+
+        client = TestClient(app)
+        # The leftmost address is the client when exactly one rightmost proxy hop is trusted.
+        assert client.get('/api/test', headers={'X-Forwarded-For': '10.0.0.1, 10.0.0.2'}).status_code == 200
+        assert client.get('/api/test', headers={'X-Forwarded-For': '10.0.0.1, 10.0.0.2'}).status_code == 429
+
+    def test_zero_trusted_proxies_ignores_forwarded_header(self):
+        app = FastAPI()
+        app.add_middleware(RateLimitMiddleware, per_minute=1, trusted_proxy_count=0)
+
+        @app.get('/api/test')
+        def api_test():
+            return {'ok': True}
+
+        client = TestClient(app)
+        assert client.get('/api/test', headers={'X-Forwarded-For': '10.0.0.1'}).status_code == 200
+        assert client.get('/api/test', headers={'X-Forwarded-For': '10.0.0.2'}).status_code == 429
 
     def test_rate_limit_response_body_structure(self):
         app = _make_app(per_minute=1)

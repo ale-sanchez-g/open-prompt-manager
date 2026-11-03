@@ -104,6 +104,7 @@ EVENT_ADMIN_USER_CREATE = 'admin.user.create'
 EVENT_ADMIN_USER_ROLE_CHANGE = 'admin.user.role_change'
 EVENT_ADMIN_USER_DELETE = 'admin.user.delete'
 EVENT_ADMIN_USER_UNLOCK = 'admin.user.unlock'
+EVENT_RATE_LIMIT_EXCEEDED = 'security.rate_limit.exceeded'
 
 # ── Redaction (defense in depth) ─────────────────────────────────────────────
 

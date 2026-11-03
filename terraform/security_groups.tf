@@ -208,6 +208,14 @@ resource "aws_security_group" "backend" {
   }
 
   egress {
+    description = "Redis to ElastiCache within the VPC"
+    from_port   = 6379
+    to_port     = 6379
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
     description = "DNS (UDP) to the VPC resolver"
     from_port   = 53
     to_port     = 53
@@ -225,6 +233,30 @@ resource "aws_security_group" "backend" {
 
   tags = {
     Name        = "${var.project_name}-backend-sg"
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+# ─────────────────────────────────────────────
+# ElastiCache Redis Security Group
+# Allows Redis connections only from backend ECS tasks.
+# ─────────────────────────────────────────────
+resource "aws_security_group" "rate_limit" {
+  name        = "${var.project_name}-rate-limit-sg"
+  description = "Allow inbound Redis from backend ECS tasks only"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description     = "Redis from backend"
+    from_port       = 6379
+    to_port         = 6379
+    protocol        = "tcp"
+    security_groups = [aws_security_group.backend.id]
+  }
+
+  tags = {
+    Name        = "${var.project_name}-rate-limit-sg"
     Project     = var.project_name
     Environment = var.environment
   }
